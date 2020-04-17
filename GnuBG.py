@@ -54,6 +54,7 @@ class GnuBG:
             except EOFError as e:
                 self._log.warning('EOF!')
 
+                print('quit', file=self._proc.stdin, flush=True)
                 self._activate = False
                 break
             
@@ -69,6 +70,13 @@ class GnuBG:
         while self._activate:
             line1 = self._proc.stdout.readline()
             print(line1, end='')
+            
+            if 'Position ID:' in line1:
+                posid = line1[30:-1]
+                print('> \'%s\'' % posid)
+
+                self.decode_posid(posid)
+
             time.sleep(0.1)
 
         self._log.warning('done')
@@ -77,39 +85,46 @@ class GnuBG:
     def decode_posid(cls, posid):
         cls._log.debug('posid=%s', posid)
 
-        bdata = base64.b64decode((posid + '==').encode('utf-8'))
-        cls._log.debug('bdata=%a', bdata)
-        
-        binstr = ''
-        for i in range(len(bdata)):
-            b1 = ('00000000' + bin(int(bdata[i]))[2:])[::-1][:8]
-            cls._log.debug('b1=%a', b1)
-            binstr += b1
+        posid_data = (posid + '==').encode('utf-8')
+        cls._log.debug('posid_data=%a', posid_data)
 
+        b64data = base64.b64decode(posid_data)
+        cls._log.debug('b64data=%a', b64data)
+        
+        binstr = ''.join([('00000000'+bin(d)[2:])[::-1][:8] for d in b64data])
         cls._log.debug('binstr=%s', binstr)
 
         binstr1 = binstr[:25]
         binstr2 = binstr[25:]
 
-        pos = []
+        pos0 = []
         i = 0
-        pos.append('')
+        pos0.append('')
         for j in range(len(binstr)):
             ch = binstr[j]
-            pos[i] += ch
+            pos0[i] += ch
 
             if ch == '0':
-                pos.append('')
                 i += 1
+                if i >= 50:
+                    break
+                pos0.append('')
 
-        pos1 = pos[:26]
-        pos2 = pos[25:]
+        pos = []
+        pos.append(pos0[:25])
+        pos.append(pos0[25:])
                 
-        for i, p in enumerate(pos1[:-1]):
-            cls._log.info('[%02d]%s', i, p)
+        for i, p in enumerate(pos[0]):
+            if i % 6 == 0:
+                cls._log.info('')
+            cls._log.info('[%02d]%s', i+1, p)
+
         cls._log.info('')
-        for i, p in enumerate(pos2[:-1]):
-            cls._log.info('[%02d]%s', i, p)
+
+        for i, p in enumerate(pos[1]):
+            if i % 6 == 0:
+                cls._log.info('')
+            cls._log.info('[%02d]%s', i+1, p)
 
 
 class SampleApp:
@@ -128,8 +143,8 @@ class SampleApp:
     def main(self):
         self._log.debug('')
 
-        # self.bg.run()
-        self.bg.decode_posid(self._arg[0])
+        self.bg.run()
+        # self.bg.decode_posid(self._arg[0])
 
         self._log.debug('done')
 
