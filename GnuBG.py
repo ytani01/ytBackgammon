@@ -12,13 +12,13 @@ import subprocess
 import threading
 import queue
 import time
-
+import base64
 from MyLogger import get_logger
 import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
-class GnuBGClass:
+class GnuBG:
     CMDLINE = ['gnubg', '-t']
 
     _log = get_logger(__name__, False)
@@ -72,7 +72,45 @@ class GnuBGClass:
             time.sleep(0.1)
 
         self._log.warning('done')
+
+    @classmethod
+    def decode_posid(cls, posid):
+        cls._log.debug('posid=%s', posid)
+
+        bdata = base64.b64decode((posid + '==').encode('utf-8'))
+        cls._log.debug('bdata=%a', bdata)
         
+        binstr = ''
+        for i in range(len(bdata)):
+            b1 = ('00000000' + bin(int(bdata[i]))[2:])[::-1][:8]
+            cls._log.debug('b1=%a', b1)
+            binstr += b1
+
+        cls._log.debug('binstr=%s', binstr)
+
+        binstr1 = binstr[:25]
+        binstr2 = binstr[25:]
+
+        pos = []
+        i = 0
+        pos.append('')
+        for j in range(len(binstr)):
+            ch = binstr[j]
+            pos[i] += ch
+
+            if ch == '0':
+                pos.append('')
+                i += 1
+
+        pos1 = pos[:26]
+        pos2 = pos[25:]
+                
+        for i, p in enumerate(pos1[:-1]):
+            cls._log.info('[%02d]%s', i, p)
+        cls._log.info('')
+        for i, p in enumerate(pos2[:-1]):
+            cls._log.info('[%02d]%s', i, p)
+
 
 class SampleApp:
     _log = get_logger(__name__, False)
@@ -85,12 +123,13 @@ class SampleApp:
         self._arg = arg
         self._opt = opt
 
-        self.obj = GnuBGClass(opt, debug=self._dbg)
+        self.bg = GnuBG(opt, debug=self._dbg)
 
     def main(self):
         self._log.debug('')
 
-        self.obj.run()
+        # self.bg.run()
+        self.bg.decode_posid(self._arg[0])
 
         self._log.debug('done')
 
