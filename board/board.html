@@ -2,41 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"> -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>board test</title>
-<script type="text/javascript">
-window.onload = function () {
-var move_flg = "";
-var move_start_x = 0;
-var move_start_y = 0;
-
-document.getElementById("t").onmousedown = function(e) {
-  move_flg = "true";
-  move_start_x = event.clientX - parseInt(document.getElementById("t").style.left.replace("px",""));
-  move_start_y = event.clientY - parseInt(document.getElementById("t").style.top.replace("px",""));
-}
-
-document.getElementById("t").onmouseup = function(e) {
-  move_flg = "false";
-}
-
-document.getElementById("t").onmousemove = function(e) {
-  if(move_flg == "true") {
-    console.log("a");
-    document.getElementById("t").style.left = (event.clientX - move_start_x) + "px";
-    document.getElementById("t").style.top = (event.clientY - move_start_y) + "px";    
-  }
-}
-}
-</script>
-<style>
-  * { margin: 0; }
-  html, body { height: 100%;
-  }
-</style>
-</head>
+    <script src="board.js"></script>
+    <style>
+      * { margin: 0; }
+      html, body { height: 100%;
+      }
+    </style>
+  </head>
   <body>
-    <div id="t" style="position:absolute;left:20px;top:20px;width:100px;height:100px;background-color:blue;cursor:move;" ></div>
+    <div
+      id="t" style="position:absolute;left:20px;top:20px;width:100px;height:100px;background-color:blue;cursor:move;" >abc</div>
+    <div id="c1" style="user-select:none;position:absolute;left:150px;top:150px;cursor:move;"><image src="images/checkerA.png"></div>
+    <div id="c2" style="user-select:none;position:absolute;left:250px;top:150px;"><image src="images/checkerB.png"></div>
   </body>
 </html>
