@@ -19,7 +19,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
 class GnuBG:
-    CMDLINE = ['gnubg', '-t']
+    CMDLINE = ['gnubg']
 
     _log = get_logger(__name__, False)
 
