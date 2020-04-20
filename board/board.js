@@ -10,11 +10,44 @@ class BackgammonObj {
         this.h = this.el.firstChild.height;
 
         this.el.style.position = "absolute";
-        this.el.style.cursor = "move";
+        this.el.style.cursor = "default";
         this.el.style.userSelect = "none";
 
         this.el.hidden = false;
         this.el.draggable = false;
+
+        this.move(this.x,this.y);
+    }
+
+    move(x, y, center=false) {
+        console.log("move(" + x + "," + y +")");
+        this.x = x;
+        this.y = y;
+
+        this.el.style.left = this.x + "px";
+        this.el.style.top = this.y + "px";
+        if ( center ) {
+            this.el.style.left = (this.x - this.w / 2) + "px";
+            this.el.style.top = (this.y - this.h / 2) + "px";
+        }
+    }
+
+    on() {
+        console.log('on');
+        this.el.hidden = false;
+
+        this.move(this.x, this.y);
+    }
+
+    off() {
+        console.log('off');
+        this.el.hidden = true;
+    }
+}
+
+class BoardArea extends BackgammonObj {
+    constructor(id, x, y) {
+        super(id, x, y);
     }
 }
 
@@ -22,17 +55,10 @@ class Board extends BackgammonObj {
     constructor(id, x, y) {
         super(id, x, y);
 
-        this.area_w = 324;
-        this.aria_h = 684;
-
-        this.point_w = this.area_w / 6;
-        this.point_h = this.area_h / 2;
-
-        this.x[0] = 108;
-        this.y[0] = 27;
-        this.x[1] = 540;
-        this.y[1] = this.y[0];
-
+        this.area = [];
+        this.area[0] = new BoardArea("board_area1", this.x + 108, this.y + 27);
+        this.area[1] = new BoardArea("board_area2", this.x + 540, this.y + 27);
+        
         for (let i = 1; i < 6; i++) {
             
         }
@@ -50,6 +76,7 @@ class Checker extends BackgammonObj {
         super(id, x, y);
 
         this.el.hidden = true;
+        this.el.style.cursor = "move";
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.onmouseup = this.on_mouse_up.bind(this);
@@ -58,27 +85,7 @@ class Checker extends BackgammonObj {
 
         this.moving = false;
 
-        this.move(this.x,this.y);
-    }
-
-    on() {
-        console.log('on');
-        this.el.hidden = false;
-
-        this.move(this.x, this.y);
-    }
-
-    off() {
-        console.log('off');
-        this.el.hidden = true;
-    }
-    
-    move(x, y) {
-        console.log("move(" + x + "," + y +")");
-        this.x = x;
-        this.y = y;
-        this.el.style.left = (this.x - this.w / 2) + "px";
-        this.el.style.top = (this.y - this.h / 2) + "px";
+        this.move(this.x, this.y, true);
     }
 
     on_mouse_down(e) {
@@ -99,7 +106,7 @@ class Checker extends BackgammonObj {
         console.log("on_mouse_move:" + this.moving);
         if (this.moving) {
         //if (e.buttons> 0) {
-            this.move(e.clientX, e.clientY);
+            this.move(e.clientX, e.clientY, true);
         }
     }
 
