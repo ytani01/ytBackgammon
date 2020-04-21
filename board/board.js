@@ -1,3 +1,6 @@
+/**
+ *
+ */
 class BackgammonObj {
     constructor(id, x, y) {
         this.id = id;
@@ -42,8 +45,11 @@ class BackgammonObj {
         console.log('off');
         this.el.hidden = true;
     }
-}
+} // class BackgammonObj
 
+/**
+ *
+ */
 class Checker extends BackgammonObj {
     constructor(id, x, y, board) {
         super(id, x, y);
@@ -155,6 +161,29 @@ class Checker extends BackgammonObj {
 
 } // class Checker
 
+/**
+ *
+ * T.B.D.
+ *
+ *   13 14 15 16 17 18    19 20 21 22 23 24
+ *  +-----------------+--+-----------------+--+
+ *  | O           X   |  | X              O|  |
+ *  | O           X   |  | X              O|  |
+ *  | O           X   |27| X               |25|
+ *  | O               |  | X               |  |
+ *  | O               |  | X               |  |
+ *  |                 |  |                 |  |
+ *  |                 |==|                 |==|
+ *  |                 |  |                 |  |
+ *  | X               |  | O               |  |
+ *  | X               |  | O               |  |
+ *  | X           O   |26| O               | 0|
+ *  | X           O   |  | O              X|  |
+ *  | X           O   |  | O              X|  |
+ *  +-----------------+--+-----------------+--+
+ *   12 11 10  9  8  7     6  5  4  3  2  1
+ *
+ */
 class Board extends BackgammonObj {
     constructor(id, x, y) {
         super(id, x, y);
@@ -338,6 +367,9 @@ class Board extends BackgammonObj {
     }
 }
 
+/**
+ *
+ */
 class BoardPoint {
     constructor(x, y, w, h, direction, max_n, board) {
         this.x = x;
@@ -368,6 +400,9 @@ class BoardPoint {
     }
 }
 
+/**
+ *
+ */
 window.onload = function () {
     let move_flg = undefined;
     let move_start_x = 0;
