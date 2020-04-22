@@ -155,7 +155,15 @@ class Checker extends BackgammonObj {
         if ( p >= 0 && p <= ch.board.point.length) {
             checkers = ch.board.point[p].checkers;
             console.log("checkers.length=" + checkers.length);
-            if ( checkers.length == 0 ) {
+            if ( p == 0 || p == 26 ) {
+                if ( ch.player == 0 ) {
+                    can_move = true;
+                }
+            } else if ( p == 25 || p == 27 ) {
+                if ( ch.player == 1 ) {
+                    can_move = true;
+                }
+            } else if ( checkers.length == 0 ) {
                 can_move = true;
             } else if ( checkers[0].player == ch.player ) {
                 can_move = true;
@@ -473,7 +481,7 @@ class Board extends BackgammonObj {
     }
 
     on_mouse_down(e) {
-        e.preventDefault();
+        let orig_e = e;
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
@@ -481,11 +489,12 @@ class Board extends BackgammonObj {
              e.clientY < this.by[0] || e.clientY > this.by[1] ) {
             this.inverse();
             console.log("Board.inverted=" + this.inverted);
+            orig_e.preventDefault();
         }
     }
 
     on_mouse_move(e) {
-        e.preventDefault();
+        // e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
