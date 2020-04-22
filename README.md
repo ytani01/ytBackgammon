@@ -2,7 +2,7 @@
 
 ## Javascript
 
-[](https://ytani01.github.io/GnuBG/)
+[Javascript board](https://ytani01.github.io/GnuBG/)
 
 ## References
 
