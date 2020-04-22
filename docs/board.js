@@ -108,52 +108,56 @@ class Checker extends BackgammonObj {
     }
     
     on_mouse_down(e) {
-        //e.preventDefault();
+        e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
-        let ch = this;
-        console.log("ch.id=" + ch.id);
-        let board = ch.board;
+        let [x, y] = this.board.get_xy(e);
 
-        let [x, y] = board.get_xy(e);
-        console.log("on_mouse_down: (x,y)=(" + x + "," + y + ")");
+        let ch = this;
+        console.log("on_mouse_down: ch.id=" + ch.id
+                    + ", (x,y)=(" + x + "," + y + ")");
         
         if ( ch.cur_point !== undefined ) {
-            let point = board.point[ch.cur_point];
+            let point = ch.board.point[ch.cur_point];
             ch = point.checkers.slice(-1)[0];
             console.log("ch.id=" + ch.id);
         }
+        ch.board.moving_checker = ch;
+
         ch.src_x = ch.x;
         ch.src_y = ch.y;
 
         ch.move(x, y, true);
         ch.set_z(1000);
 
-        board.moving_checker = ch;
     }
 
     on_mouse_up(e) {
-        //e.preventDefault();
+        e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let [x, y] = this.board.get_xy(e);
-        console.log("on_mouse_up: this.id=" + this.id + ", (x,y)=(" + x + "," + y + ")");
-        this.move(x, y, true);
-        let p = this.board.chpos2point(this);
+
+        let ch = this.board.moving_checker;
+        console.log("on_mouse_up: ch.id=" + ch.id
+                    + ", (x,y)=(" + x + "," + y + ")");
+
+        ch.move(x, y, true);
+        let p = ch.board.chpos2point(ch);
         console.log("on_mouse_up: p=" + p);
 
         let can_move = false;
         let hit_ch = undefined;
         let checkers = undefined;
 
-        if ( p >= 0 && p <= this.board.point.length) {
-            checkers = this.board.point[p].checkers;
+        if ( p >= 0 && p <= ch.board.point.length) {
+            checkers = ch.board.point[p].checkers;
             console.log("checkers.length=" + checkers.length);
             if ( checkers.length == 0 ) {
                 can_move = true;
-            } else if ( checkers[0].player == this.player ) {
+            } else if ( checkers[0].player == ch.player ) {
                 can_move = true;
             } else if ( checkers.length == 1 ) {
                 can_move = true;
@@ -165,8 +169,8 @@ class Checker extends BackgammonObj {
         console.log("can_move=" + can_move);
         console.log("hit_ch=" + hit_ch);
         if ( ! can_move ) {
-            this.move(this.src_x, this.src_y, true);
-            this.board.moving_checker = undefined;
+            ch.move(ch.src_x, ch.src_y, true);
+            ch.board.moving_checker = undefined;
             return;
         }
 
@@ -177,27 +181,28 @@ class Checker extends BackgammonObj {
             } else {
                 bar_p = 27;
             }
-            this.board.put_checker(hit_ch, bar_p);
+            ch.board.put_checker(hit_ch, bar_p);
             hit_ch.calc_z();
         }
 
-        this.board.put_checker(this, p);
-        this.calc_z();
+        ch.board.put_checker(this, p);
+        ch.calc_z();
 
-        this.board.moving_checker = undefined;
+        ch.board.moving_checker = undefined;
     }
 
     on_mouse_move(e) {
-        //e.preventDefault();
+        e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let [x, y] = this.board.get_xy(e);
-        console.log("on_mouse_move: this.id=" + this.id + ", (x,y)=(" + x + "," + y + ")");
+
+        let ch = this.board.moving_checker;
+        console.log("on_mouse_move: ch.id=" + ch.id
+                    + ", (x,y)=(" + x + "," + y + ")");
         
-        if ( this.board.moving_checker === this ) {
-            this.move(x, y, true);
-        }
+        ch.move(x, y, true);
     }
 
     on_drag_start(e) {
