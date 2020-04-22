@@ -63,8 +63,11 @@ class Checker extends BackgammonObj {
         this.el.style.cursor = "move";
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
+        this.el.ontouchstart = this.on_mouse_down.bind(this);
         this.el.onmouseup = this.on_mouse_up.bind(this);
+        this.el.ontoouchend = this.on_mouse_up.bind(this);
         this.el.onmousemove = this.on_mouse_move.bind(this);
+        this.el.ontouchmove = this.on_mouse_move.bind(this);
         this.el.ondragstart = this.on_drag_start.bind(this);
 
         this.cur_point = undefined;
