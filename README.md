@@ -2,7 +2,7 @@
 
 ## Javascript
 
-[Javascript board](https://ytani01.github.io/GnuBG/)
+[Backgammon board (Javascript version)](https://ytani01.github.io/ytBackgammon/)
 
 ## References
 
