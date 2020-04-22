@@ -199,6 +199,9 @@ class Checker extends BackgammonObj {
         let [x, y] = this.board.get_xy(e);
 
         let ch = this.board.moving_checker;
+        if ( ch === undefined ) {
+            return;
+        }
         console.log("on_mouse_move: ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
         
