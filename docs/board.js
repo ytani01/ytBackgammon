@@ -108,7 +108,7 @@ class Checker extends BackgammonObj {
     }
     
     on_mouse_down(e) {
-        if ( e.changedTouches[0] ) {
+        if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let ch = this;
@@ -130,7 +130,7 @@ class Checker extends BackgammonObj {
     }
 
     on_mouse_up(e) {
-        if ( e.changedTouches[0] ) {
+        if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let [x, y] = this.board.get_xy(e);
@@ -179,7 +179,7 @@ class Checker extends BackgammonObj {
     }
 
     on_mouse_move(e) {
-        if ( e.changedTouches[0] ) {
+        if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let [x, y] = this.board.get_xy(e);
@@ -239,7 +239,7 @@ class Cube extends BackgammonObj {
     }
 
     on_mouse_down(e) {
-        if ( e.changedTouches[0] ) {
+        if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         this.double();
@@ -454,7 +454,7 @@ class Board extends BackgammonObj {
     }
 
     on_mouse_down(e) {
-        if ( e.changedTouches[0] ) {
+        if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         if ( e.clientX < this.bx[0] || e.clientX > this.bx[7] ||
@@ -465,7 +465,7 @@ class Board extends BackgammonObj {
     }
 
     on_mouse_move(e) {
-        if ( e.changedTouches[0] ) {
+        if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         if ( this.moving_checker === undefined ) {
