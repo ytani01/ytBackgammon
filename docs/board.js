@@ -1,6 +1,12 @@
 /**
  *
  */
+const MyName = "ytBackgammon";
+const VersionStr = "Version 0.01";
+
+/**
+ *
+ */
 class BackgammonObj {
     constructor(id, x, y) {
         this.id = id;
@@ -46,6 +52,21 @@ class BackgammonObj {
         this.el.hidden = true;
     }
 } // class BackgammonObj
+
+/**
+ *
+ */
+class PlayerText extends BackgammonObj {
+    constructor(id, x, y, board) {
+        super(id, x, y);
+        this.board = board;
+    }
+
+    set_text(txt) {
+        this.el.innerHTML = "<strong style=\"color: gray;\">"
+            + txt + "</strong>";
+    }
+} // class PlayerText
 
 /**
  *
@@ -327,6 +348,15 @@ class Board extends BackgammonObj {
         this.moving_checker = undefined;
         this.inverted = false;
 
+        // PlayerText
+        this.txt = [new PlayerText("p0text", 673, 350, this),
+                    new PlayerText("p1text", 300, 388, this)];
+        this.txt[0].set_text("Player0");
+        this.txt[1].set_text("Player1");
+        
+        this.txt[1].el.style.transformOrigin = "top left";
+        this.txt[1].el.style.transform = "rotate(180deg)";
+
         // Cube
         this.cube = new Cube("cube", this);
 
@@ -412,6 +442,12 @@ class Board extends BackgammonObj {
         this.end();  // for debug
         this.init();
         // this.inverse();
+
+        let ver_el = document.getElementById("version");
+        ver_el.style.position = "absolute";
+        ver_el.style.left = "5px";
+        ver_el.style.top = (this.h + 5) + "px";
+        ver_el.innerHTML = "<strong>" + MyName + "</strong>, " + VersionStr;
     }
 
     init() {
@@ -457,6 +493,16 @@ class Board extends BackgammonObj {
             this.inverted = true;
         }
 
+        this.el.style.left = "0px";
+        this.el.style.top = "0px";
+        this.el.style.width = this.w + "px";
+        this.el.style.height = this.h + "px";
+        if ( this.inverted ) {
+            this.el.style.transform = "rotate(180deg)";
+        } else {
+            this.el.style.transform = "rotate(0deg)";
+        }
+        /*
         let e_all = document.getElementById("all");
         e_all.style.left = "0px";
         e_all.style.top = "0px";
@@ -467,6 +513,7 @@ class Board extends BackgammonObj {
         } else {
             e_all.style.transform = "rotate(0deg)";
         }
+        */
     }
 
     inverse_xy(e) {
