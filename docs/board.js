@@ -250,12 +250,13 @@ class Cube extends BackgammonObj {
 
     double() {
         this.value *= 2;
+        if ( this.value > 64 ) {
+            this.value = 1;
+        }
+        console.log("double: value=" + this.value);
 
         let val = this.value;
         if ( this.value == 1 ) {
-            val = 64;
-        }
-        if ( this.value > 64 ) {
             val = 64;
         }
         let filename =
