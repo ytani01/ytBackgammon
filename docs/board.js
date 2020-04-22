@@ -108,17 +108,21 @@ class Checker extends BackgammonObj {
     }
     
     on_mouse_down(e) {
+        //e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let ch = this;
+        console.log("ch.id=" + ch.id);
         let board = ch.board;
+
         let [x, y] = board.get_xy(e);
         console.log("on_mouse_down: (x,y)=(" + x + "," + y + ")");
         
         if ( ch.cur_point !== undefined ) {
             let point = board.point[ch.cur_point];
             ch = point.checkers.slice(-1)[0];
+            console.log("ch.id=" + ch.id);
         }
         ch.src_x = ch.x;
         ch.src_y = ch.y;
@@ -130,20 +134,23 @@ class Checker extends BackgammonObj {
     }
 
     on_mouse_up(e) {
+        //e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let [x, y] = this.board.get_xy(e);
-        console.log("on_mouse_up: (x,y)=(" + x + "," + y + ")");
+        console.log("on_mouse_up: this.id=" + this.id + ", (x,y)=(" + x + "," + y + ")");
+        this.move(x, y, true);
+        let p = this.board.chpos2point(this);
+        console.log("on_mouse_up: p=" + p);
+
         let can_move = false;
         let hit_ch = undefined;
-        let p = this.board.chpos2point(this);
         let checkers = undefined;
-        
-        this.move(x, y, true);
 
         if ( p >= 0 && p <= this.board.point.length) {
             checkers = this.board.point[p].checkers;
+            console.log("checkers.length=" + checkers.length);
             if ( checkers.length == 0 ) {
                 can_move = true;
             } else if ( checkers[0].player == this.player ) {
@@ -155,6 +162,8 @@ class Checker extends BackgammonObj {
             }
         }
             
+        console.log("can_move=" + can_move);
+        console.log("hit_ch=" + hit_ch);
         if ( ! can_move ) {
             this.move(this.src_x, this.src_y, true);
             this.board.moving_checker = undefined;
@@ -179,13 +188,14 @@ class Checker extends BackgammonObj {
     }
 
     on_mouse_move(e) {
+        //e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         let [x, y] = this.board.get_xy(e);
-        console.log("on_mouse_move: (x,y)=(" + x + "," + y + ")");
+        console.log("on_mouse_move: this.id=" + this.id + ", (x,y)=(" + x + "," + y + ")");
         
-        if (this.board.moving_checker === this) {
+        if ( this.board.moving_checker === this ) {
             this.move(x, y, true);
         }
     }
@@ -239,6 +249,7 @@ class Cube extends BackgammonObj {
     }
 
     on_mouse_down(e) {
+        e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
@@ -297,7 +308,7 @@ class Board extends BackgammonObj {
         }
 
         this.moving_checker = undefined;
-        this.invert = false;
+        this.inverted = false;
 
         // Cube
         this.cube = new Cube("cube", this);
@@ -423,10 +434,10 @@ class Board extends BackgammonObj {
     }
 
     inverse() {
-        if ( this.invert ) {
-            this.invert = false;
+        if ( this.inverted ) {
+            this.inverted = false;
         } else {
-            this.invert = true;
+            this.inverted = true;
         }
 
         let e_all = document.getElementById("all");
@@ -434,7 +445,7 @@ class Board extends BackgammonObj {
         e_all.style.top = "0px";
         e_all.style.width = this.w + "px";
         e_all.style.height = this.h + "px";
-        if ( this.invert ) {
+        if ( this.inverted ) {
             e_all.style.transform = "rotate(180deg)";
         } else {
             e_all.style.transform = "rotate(0deg)";
@@ -447,24 +458,26 @@ class Board extends BackgammonObj {
     
     get_xy(e) {
         let [x, y] = [e.clientX, e.clientY];
-        if ( this.invert ) {
+        if ( this.inverted ) {
             [x, y] = this.inverse_xy(e);
         }
         return [x, y];
     }
 
     on_mouse_down(e) {
+        e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         if ( e.clientX < this.bx[0] || e.clientX > this.bx[7] ||
              e.clientY < this.by[0] || e.clientY > this.by[1] ) {
             this.inverse();
-            console.log("Board.invest=" + this.invert);
+            console.log("Board.inverted=" + this.inverted);
         }
     }
 
     on_mouse_move(e) {
+        e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
