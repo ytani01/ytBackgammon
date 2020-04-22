@@ -1,4 +1,6 @@
-# GnuBG -- GNU Backgammon (gnubg) related
+# ytBackGammon
+
+## Javascript
 
 [](https://ytani01.github.io/GnuBG/)
 
