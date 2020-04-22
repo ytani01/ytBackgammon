@@ -51,27 +51,21 @@ class BackgammonObj {
  *
  */
 class Checker extends BackgammonObj {
-    constructor(id, x, y, board) {
-        super(id, x, y);
-
+    constructor(id, player, board) {
+        super(id, 0, 0);
+        this.player = player;
         this.board = board;
 
-        this.src_x = x;
-        this.src_y = x;
+        this.src_x = this.x;
+        this.src_y = this.y;
         this.z = 0;
         
-        this.el.hidden = false;
         this.el.style.cursor = "move";
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.onmouseup = this.on_mouse_up.bind(this);
         this.el.onmousemove = this.on_mouse_move.bind(this);
         this.el.ondragstart = this.on_drag_start.bind(this);
-
-        this.moving = false;
-
-        this.move(this.x, this.y, true);
-        this.set_z(this.z);
 
         this.cur_point = undefined;
     }
@@ -108,54 +102,78 @@ class Checker extends BackgammonObj {
     }
     
     on_mouse_down(e) {
-        if ( this.cur_point ) {
-            let po = this.board.point[this.cur_point];
-            let last_checker = po.checkers.slice(-1)[0];
-            if ( last_checker !== this ) {
-                return;
-            }
+        let ch = this;
+        let board = ch.board;
+        let [x, y] = board.get_xy(e);
+        console.log("(x,y)=(" + x + "," + y + ")");
+        
+        if ( ch.cur_point !== undefined ) {
+            let point = board.point[ch.cur_point];
+            ch = point.checkers.slice(-1)[0];
         }
+        ch.src_x = ch.x;
+        ch.src_y = ch.y;
 
-        this.moving = true;
+        ch.move(x, y, true);
+        ch.set_z(1000);
 
-        this.src_x = this.x;
-        this.src_y = this.y;
-
-        this.move(e.clientX, e.clientY, true);
-        this.set_z(1000);
-
-        this.board.moving_checker = this;
+        board.moving_checker = ch;
     }
 
     on_mouse_up(e) {
-        this.move(e.clientX, e.clientY, true);
+        let [x, y] = this.board.get_xy(e);
+        let can_move = false;
+        let hit_ch = undefined;
+        let p = this.board.chpos2point(this);
+        let checkers = undefined;
+        
+        this.move(x, y, true);
 
-        let p = this.board.xy2point(this);
         if ( p >= 0 && p <= this.board.point.length) {
-            this.board.put_checker(this, p);
-        } else {
+            checkers = this.board.point[p].checkers;
+            if ( checkers.length == 0 ) {
+                can_move = true;
+            } else if ( checkers[0].player == this.player ) {
+                can_move = true;
+            } else if ( checkers.length == 1 ) {
+                can_move = true;
+                hit_ch = checkers[0];
+                console.log("hit_ch.id=" + hit_ch.id);
+            }
+        }
+            
+        if ( ! can_move ) {
             this.move(this.src_x, this.src_y, true);
-            this.moving = false;
             this.board.moving_checker = undefined;
             return;
         }
+
+        if ( hit_ch !== undefined ) {
+            let bar_p = undefined;
+            if ( hit_ch.player == 0 ) {
+                bar_p = 26;
+            } else {
+                bar_p = 27;
+            }
+            this.board.put_checker(hit_ch, bar_p);
+            hit_ch.calc_z();
+        }
+
+        this.board.put_checker(this, p);
         this.calc_z();
 
-        console.log("Checker.on_mouse_up: x=" + this.x);
-
-        this.moving = false;
         this.board.moving_checker = undefined;
     }
 
     on_mouse_move(e) {
-        console.log("Checker.on_mouse_move:" + this.moving);
-        if (this.moving) {
-            this.move(e.clientX, e.clientY, true);
+        let [x, y] = this.board.get_xy(e);
+        
+        if (this.board.moving_checker === this) {
+            this.move(x, y, true);
         }
     }
 
     on_drag_start(e) {
-        console.log("Checker.on_drag_start");
         return false;
     }
 
@@ -163,28 +181,79 @@ class Checker extends BackgammonObj {
 
 /**
  *
- *           x0[0]                  x0[3]                 x0[5]
- *           |   x0[1]              | w/2                 |x0[6]
- *           |   |x0[2]             | | x0[4]             ||   x0[7]
- *           |   ||                 | | |                 ||   |
- *           v   vv                 v v v                 vv   v
+ */
+class Cube extends BackgammonObj {
+    constructor(id, board) {
+        super(id, 0, 0);
+        this.board = board;
+
+        this.value = 1;
+        
+        this.file_prefix = "images/cubeA-";
+        this.file_suffix = ".png";
+
+        this.el.style.cursor = "crosshair";
+
+        this.el.onmousedown = this.on_mouse_down.bind(this);
+        // this.el.onmouseup = this.on_mouse_up.bind(this);
+        // this.el.onmousemove = this.on_mouse_move.bind(this);
+        this.el.ondragstart = this.on_drag_start.bind(this);
+
+        this.move((this.board.bx[0] + this.board.bx[1]) / 2,
+                  this.board.h / 2,
+                  true);
+    }
+
+    double() {
+        this.value *= 2;
+
+        let val = this.value;
+        if ( this.value == 1 ) {
+            val = 64;
+        }
+        if ( this.value > 64 ) {
+            val = 64;
+        }
+        let filename =
+            this.file_prefix + ("0" + val).slice(-2) + this.file_suffix;
+
+        this.el.firstChild.src = filename;
+    }
+
+    on_mouse_down(e) {
+        this.double();
+    }
+
+    on_drag_start(e) {
+        return false;
+    }
+    
+} // class Cube
+
+/**
+ *
+ *           bx[0]                  bx[3]                 bx[5]
+ *           |   bx[1]              |   bx[4]             |bx[6]
+ *           |   |bx[2]             |   |                 ||   bx[7]
+ *           |   ||                 |   |                 ||   |
+ *           v   vv                 v   v                 vv   v
  *         +-----------------------------------------------------+ 
  *         |       13 14 15 16 17 18     19 20 21 22 23 24       |
- * y0[0] ->| +---++-----------------+---+-----------------++---+ |
+ * by[0] ->| +---++-----------------+---+-----------------++---+ |
  *         | |   ||p0          p1   |   |p1             p0||   | |
  *         | |   ||p0          p1   |   |p1             p0||   | |
  *         | |   ||p0          p1   |27 |p1               ||25 | |
  *         | |   ||p0               |   |p1               ||   | |
  *         | |   ||p0               |   |p1               ||   | |
  *         | |   ||                 |   |                 ||   | |
- *  h/2 -->| |   ||                 |---|                 ||---| |
+ *         | |   ||                 |---|                 ||---| |
  *         | |   ||                 |   |                 ||   | |
  *         | |   ||p1               |   |p0               ||   | |
  *         | |   ||p1               |   |p0               ||   | |
  *         | |   ||p1          p0   |26 |p0               || 0 | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
- * y0[1] ->| +----+-----------------+---+-----------------++---+ |
+ * by[1] ->| +----+-----------------+---+-----------------++---+ |
  *         |       12 11 10  9  8  7      6  5  4  3  2  1       |
  *         +-----------------------------------------------------+ 
  *
@@ -193,105 +262,105 @@ class Board extends BackgammonObj {
     constructor(id, x, y) {
         super(id, x, y);
 
-        x0 = [27, 81, 108, 432, 540, 864, 891, 945];
-        y0 = [27, 711];
+        this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
+        this.by = [27, 711];
         
         // Checkers
         this.checker = [Array(15), Array(15)];
-        for (let p=0; p < 2; p++) {
+        for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
-                let c_id = "p" + String(p) + ("0" + i).slice(-2);
+                let c_id = "p" + player + ("0" + i).slice(-2);
                 console.log("c_id=" + c_id);
-                this.checker[p][i] = new Checker(
-                    c_id, 100 + p * 100, 100 + i * 10, this
-                );
+                this.checker[player][i] = new Checker(c_id, player, this);
             }
         }
 
         this.moving_checker = undefined;
+        this.invert = false;
+
+        // Cube
+        this.cube = new Cube("cube", this);
 
         // Points
-        this.point = Array(27);
+        this.point = Array(28);
         
-        let cn = 5;
-        let pw = this.checker[0][0].w;
-        let ph = this.checker[0][0].h * cn;
-        let x1 = 108;
-        let x2 = 540;
-        let x3 = 891;
-        let x4 = 500;
-        let y1 = 27;
-        let y2 = 441;
         for ( let p=0; p < this.point.length; p++ ) {
+            let cn = 5;
+            let pw = this.checker[0][0].w;
+            let ph = this.h / 2 - this.by[0];
+
             if ( p == 0 ) {
-                let x0 = x3;
-                let y0 = y2;
+                let x0 = this.bx[6];
+                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 this.point[p] = new BoardPoint(x0, y0, pw, ph,
                                                -1, cn, this);
             }
             if ( p >= 1 && p <= 6 ) {
-                let x0 = x2;
-                let y0 = y2;
+                let x0 = this.bx[4];
+                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 6 - p;
                 let x = x0 + pw * xn;
                 this.point[p] = new BoardPoint(x, y0, pw, ph,
                                                -1, cn, this);
             }
             if ( p >= 7 && p <= 12 ) {
-                let x0 = 108;
-                let y0 = 441;
+                let x0 = this.bx[2];
+                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 12 - p;
                 let x = x0 + pw * xn;
                 this.point[p] = new BoardPoint(x, y0, pw, ph,
                                                -1, cn, this);
             }
             if ( p >= 13 && p <= 18 ) {
-                let x0 = 108;
-                let y0 = 27;
+                let x0 = this.bx[2];
+                let y0 = this.by[0];
                 let xn = p - 13;
                 let x = x0 + pw * xn;
                 this.point[p] = new BoardPoint(x, y0, pw, ph,
                                                1, cn, this);
             }
             if ( p >= 19 && p <= 24 ) {
-                let x0 = 540;
-                let y0 = 27;
+                let x0 = this.bx[4];
+                let y0 = this.by[0];
                 let xn = p - 19;
                 let x = x0 + pw * xn;
                 this.point[p] = new BoardPoint(x, y0, pw, ph,
                                                1, cn, this);
             }
             if ( p == 25 ) {
-                let x0 = 891;
-                let y0 = 27;
+                let x0 = this.bx[6];
+                let y0 = this.by[0];
                 this.point[p] = new BoardPoint(x0, y0, pw, ph,
                                                1, cn, this);
             }
             if ( p == 26 ) {
-                let x0 = 500;
-                let y0 = 411;
+                let x0 = this.bx[3];
+                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                let pw = this.bx[4] - this.bx[3];
                 this.point[p] = new BoardPoint(x0, y0, pw, ph,
                                                1, cn, this);
             }
             if ( p == 27 ) {
-                let x0 = 891;
-                let y0 = 27;
+                let x0 = this.bx[3];
+                let y0 = this.by[0];
+                let pw = this.bx[4] - this.bx[3];
                 this.point[p] = new BoardPoint(x0, y0, pw, ph,
-                                               1, cn, this);
+                                               -1, cn, this);
             }
         }
 
-        // this.el.onmousedown = this.on_mouse_down.bind(this);
+        this.el.onmousedown = this.on_mouse_down.bind(this);
         // this.el.onmouseup = this.on_mouse_up.bind(this);
         this.el.onmousemove = this.on_mouse_move.bind(this);
         this.el.ondragstart = this.on_drag_start.bind(this);
 
-        // this.init();
-        this.end();
+        this.end();  // for debug
+        this.init();
+        // this.inverse();
     }
 
     init() {
-        let init_point = [
+        let points = [
             [
                 24, 24,
                 13, 13, 13, 13, 13,
@@ -306,11 +375,11 @@ class Board extends BackgammonObj {
             ],
         ];
 
-        this.put_checkers(init_point);
+        this.put_checkers(points);
     }
 
     end() {
-        let end_point = [
+        let points = [
             [
                 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0,
@@ -323,14 +392,45 @@ class Board extends BackgammonObj {
             ],
         ];
 
-        this.put_checkers(end_point);
+        this.put_checkers(points);
     }
 
-    put_checkers(points) {
-        for (let p=0; p < 2; p++) {
-            for (let i=0; i < 15; i++) {
-                this.put_checker(this.checker[p][i], points[p][i]);
-            }
+    inverse() {
+        if ( this.invert ) {
+            this.invert = false;
+        } else {
+            this.invert = true;
+        }
+
+        let e_all = document.getElementById("all");
+        e_all.style.left = "0px";
+        e_all.style.top = "0px";
+        e_all.style.width = this.w + "px";
+        e_all.style.height = this.h + "px";
+        if ( this.invert ) {
+            e_all.style.transform = "rotate(180deg)";
+        } else {
+            e_all.style.transform = "rotate(0deg)";
+        }
+    }
+
+    inverse_xy(e) {
+        return [this.w - e.clientX, this.h - e.clientY];
+    }
+    
+    get_xy(e) {
+        let [x, y] = [e.clientX, e.clientY];
+        if ( this.invert ) {
+            [x, y] = this.inverse_xy(e);
+        }
+        return [x, y];
+    }
+
+    on_mouse_down(e) {
+        if ( e.clientX < this.bx[0] || e.clientX > this.bx[7] ||
+             e.clientY < this.by[0] || e.clientY > this.by[1] ) {
+            this.inverse();
+            console.log("Board.invest=" + this.invert);
         }
     }
 
@@ -339,53 +439,70 @@ class Board extends BackgammonObj {
             return;
         }
 
-        // console.log("Board.on_mouse_move:" + this.moving_checker.id);
-        this.moving_checker.move(e.clientX, e.clientY, true);
+        let [x, y] = this.get_xy(e);
+
+        this.moving_checker.move(x, y, true);
     }
 
     on_drag_start(e) {
-        console.log("Board.on_drag_start");
         return false;
     }
 
-    xy2point(ch) {
+    chpos2point(ch) {
         let point = undefined;
 
         for ( let i=0; i < this.point.length; i++ ) {
             if ( this.point[i].in_this(ch) ) {
-                console.log("xy2point: i=" + i);
+                console.log("chpos2point: i=" + i);
                 return i;
             }
         }
-        return point;
+        return undefined;
     }
 
     put_checker(ch, p) {
-        console.log("put_checker: ch.id=" + ch.id);
-        let po = this.point[p];
-        let nz = Math.floor(po.checkers.length / po.max_n);
-        let n = po.checkers.length % po.max_n;
-        let x = po.cx;
-        let y = po.y0 + (ch.h / 2 + ch.h * n + ch.h / 10 * nz) * po.direction;
-        console.log("y=" + y);
-
-        console.log("ch.cur_point=" + ch.cur_point);
-        if ( ch.cur_point ) {
+        console.log("put_checker(" + ch.id + "," + p + ")");
+        if ( ch.cur_point !== undefined ) {
+            console.log("ch.cur_point=" + ch.cur_point);
             let prev_po = this.point[ch.cur_point];
-            console.log("prev_po=" + prev_po);
-
-            ch.move(ch.src_x, ch.src_y, true);
-
             ch = prev_po.checkers.pop();
             console.log("ch.id=" + ch.id);
-            ch.set_z(1000);
         }
 
+        let po = this.point[p];
+        let ch_n = po.checkers.length;
+        let z = Math.floor(ch_n / po.max_n);
+        let n = ch_n % po.max_n;
+        let x = po.cx;
+        let y = po.y0 + (ch.h / 2 + ch.h * n + ch.h / 5 * z) * po.direction;
         ch.move(x, y, true);
         ch.calc_z();
         ch.cur_point = p;
 
         po.checkers.push(ch);
+    }
+
+    put_checkers(points) {
+        for (let player=0; player < 2; player++) {
+            for (let i=0; i < 15; i++) {
+                let ch = this.checker[player][i];
+                if ( ch.cur_point !== undefined ) {
+                    let ch_dumy = this.point[ch.cur_point].checkers.pop();
+                    ch.cur_point = undefined;
+                }
+                ch.move(this.w - ch.w / 2, this.h / 2, true);
+            }
+        }
+
+        for (let player=0; player < 2; player++) {
+            for (let i=0; i < 15; i++) {
+                let point = points[player][i];
+                if ( point < 0 ) continue;
+                
+                let ch = this.checker[player][i];
+                this.put_checker(ch, point);
+            }
+        }
     }
 }
 
