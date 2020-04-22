@@ -163,37 +163,41 @@ class Checker extends BackgammonObj {
 
 /**
  *
- * T.B.D.
- *
- *   13 14 15 16 17 18    19 20 21 22 23 24
- *  +-----------------+--+-----------------+--+
- *  | O           X   |  | X              O|  |
- *  | O           X   |  | X              O|  |
- *  | O           X   |27| X               |25|
- *  | O               |  | X               |  |
- *  | O               |  | X               |  |
- *  |                 |  |                 |  |
- *  |                 |==|                 |==|
- *  |                 |  |                 |  |
- *  | X               |  | O               |  |
- *  | X               |  | O               |  |
- *  | X           O   |26| O               | 0|
- *  | X           O   |  | O              X|  |
- *  | X           O   |  | O              X|  |
- *  +-----------------+--+-----------------+--+
- *   12 11 10  9  8  7     6  5  4  3  2  1
+ *           x0[0]                  x0[3]                 x0[5]
+ *           |   x0[1]              | w/2                 |x0[6]
+ *           |   |x0[2]             | | x0[4]             ||   x0[7]
+ *           |   ||                 | | |                 ||   |
+ *           v   vv                 v v v                 vv   v
+ *         +-----------------------------------------------------+ 
+ *         |       13 14 15 16 17 18     19 20 21 22 23 24       |
+ * y0[0] ->| +---++-----------------+---+-----------------++---+ |
+ *         | |   ||p0          p1   |   |p1             p0||   | |
+ *         | |   ||p0          p1   |   |p1             p0||   | |
+ *         | |   ||p0          p1   |27 |p1               ||25 | |
+ *         | |   ||p0               |   |p1               ||   | |
+ *         | |   ||p0               |   |p1               ||   | |
+ *         | |   ||                 |   |                 ||   | |
+ *  h/2 -->| |   ||                 |---|                 ||---| |
+ *         | |   ||                 |   |                 ||   | |
+ *         | |   ||p1               |   |p0               ||   | |
+ *         | |   ||p1               |   |p0               ||   | |
+ *         | |   ||p1          p0   |26 |p0               || 0 | |
+ *         | |   ||p1          p0   |   |p0             p1||   | |
+ *         | |   ||p1          p0   |   |p0             p1||   | |
+ * y0[1] ->| +----+-----------------+---+-----------------++---+ |
+ *         |       12 11 10  9  8  7      6  5  4  3  2  1       |
+ *         +-----------------------------------------------------+ 
  *
  */
 class Board extends BackgammonObj {
     constructor(id, x, y) {
         super(id, x, y);
 
-        // MEMO
-        // area: (108, 27)-(,), (540, 27)-(,)
-
+        x0 = [27, 81, 108, 432, 540, 864, 891, 945];
+        y0 = [27, 711];
+        
         // Checkers
-        this.checker = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-                       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]];
+        this.checker = [Array(15), Array(15)];
         for (let p=0; p < 2; p++) {
             for (let i=0; i < 15; i++) {
                 let c_id = "p" + String(p) + ("0" + i).slice(-2);
@@ -207,55 +211,73 @@ class Board extends BackgammonObj {
         this.moving_checker = undefined;
 
         // Points
-        this.point = [0,
-                      1, 2, 3, 4, 5, 6,
-                      7, 8, 9, 10, 11, 12,
-                      13, 14, 15, 16, 17, 18,
-                      19, 20, 21, 22, 23, 24,
-                      25
-                     ];
+        this.point = Array(27);
         
         let cn = 5;
-        let pw = 54;
+        let pw = this.checker[0][0].w;
         let ph = this.checker[0][0].h * cn;
+        let x1 = 108;
+        let x2 = 540;
+        let x3 = 891;
+        let x4 = 500;
+        let y1 = 27;
+        let y2 = 441;
         for ( let p=0; p < this.point.length; p++ ) {
             if ( p == 0 ) {
-                let x0 = 891;
-                let y0 = 441;
-                this.point[p] = new BoardPoint(x0, y0, pw, ph, -1, cn, this);
+                let x0 = x3;
+                let y0 = y2;
+                this.point[p] = new BoardPoint(x0, y0, pw, ph,
+                                               -1, cn, this);
             }
             if ( p >= 1 && p <= 6 ) {
-                let x0 = 540;
-                let y0 = 441;
+                let x0 = x2;
+                let y0 = y2;
                 let xn = 6 - p;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph, -1, cn, this);
+                this.point[p] = new BoardPoint(x, y0, pw, ph,
+                                               -1, cn, this);
             }
             if ( p >= 7 && p <= 12 ) {
                 let x0 = 108;
                 let y0 = 441;
                 let xn = 12 - p;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph, -1, cn, this);
+                this.point[p] = new BoardPoint(x, y0, pw, ph,
+                                               -1, cn, this);
             }
             if ( p >= 13 && p <= 18 ) {
                 let x0 = 108;
                 let y0 = 27;
                 let xn = p - 13;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph, 1, cn, this);
+                this.point[p] = new BoardPoint(x, y0, pw, ph,
+                                               1, cn, this);
             }
             if ( p >= 19 && p <= 24 ) {
                 let x0 = 540;
                 let y0 = 27;
                 let xn = p - 19;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph, 1, cn, this);
+                this.point[p] = new BoardPoint(x, y0, pw, ph,
+                                               1, cn, this);
             }
             if ( p == 25 ) {
                 let x0 = 891;
                 let y0 = 27;
-                this.point[p] = new BoardPoint(x0, y0, pw, ph, 1, cn, this);
+                this.point[p] = new BoardPoint(x0, y0, pw, ph,
+                                               1, cn, this);
+            }
+            if ( p == 26 ) {
+                let x0 = 500;
+                let y0 = 411;
+                this.point[p] = new BoardPoint(x0, y0, pw, ph,
+                                               1, cn, this);
+            }
+            if ( p == 27 ) {
+                let x0 = 891;
+                let y0 = 27;
+                this.point[p] = new BoardPoint(x0, y0, pw, ph,
+                                               1, cn, this);
             }
         }
 
