@@ -4,6 +4,11 @@
 const MY_NAME = "ytBackgammon";
 const VERSION_STR = "Version 0.02";
 
+const STAT_READY = "ready";
+const STAT_OPENING = "opening roll";
+const STAT_PLAYING = "playing";
+const STAT_FINISHED = "finished";
+
 /**
  *
  */
