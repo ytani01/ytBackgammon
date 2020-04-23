@@ -7,11 +7,19 @@ const VersionStr = "Version 0.01";
 /**
  *
  */
+class Player {
+    constructor(name) {
+        this.name = name;
+    }
+} // Player
+
+/**
+ *
+ */
 class BackgammonObj {
     constructor(id, x, y) {
         this.id = id;
-        this.x = x;
-        this.y = y;
+        [this.x, this.y] = [x, y];
 
         this.el = document.getElementById(this.id);
 
@@ -29,8 +37,7 @@ class BackgammonObj {
     }
 
     move(x, y, center=false) {
-        this.x = x;
-        this.y = y;
+        [this.x, this.y] = [x, y];
 
         this.el.style.left = this.x + "px";
         this.el.style.top = this.y + "px";
@@ -56,17 +63,16 @@ class BackgammonObj {
 /**
  *
  */
-class PlayerText extends BackgammonObj {
+class OnBoardText extends BackgammonObj {
     constructor(id, x, y, board) {
         super(id, x, y);
         this.board = board;
     }
 
     set_text(txt) {
-        this.el.innerHTML = "<strong style=\"color: gray;\">"
-            + txt + "</strong>";
+        this.el.innerHTML = "<strong>" + txt + "</strong>";
     }
-} // class PlayerText
+} // class OnBoardText
 
 /**
  *
@@ -77,8 +83,7 @@ class Checker extends BackgammonObj {
         this.player = player;
         this.board = board;
 
-        this.src_x = this.x;
-        this.src_y = this.y;
+        [this.src_x, this.src_y] = [this.x, this.y];
         this.z = 0;
         
         this.el.style.cursor = "move";
@@ -146,8 +151,7 @@ class Checker extends BackgammonObj {
         }
         ch.board.moving_checker = ch;
 
-        ch.src_x = ch.x;
-        ch.src_y = ch.y;
+        [ch.src_x, ch.src_y] = [ch.x, ch.y];
 
         ch.move(x, y, true);
         ch.set_z(1000);
@@ -302,6 +306,37 @@ class Cube extends BackgammonObj {
 
 /**
  *
+ */
+class Dice extends BackgammonObj {
+    constructor(id, x, y, board) {
+        super(id, x, y);
+        this.board = board;
+
+        this.value = 1;
+
+        this.el.hidden = true;
+    }
+} // class Dice
+        
+/**
+ *
+ */
+class DiceArea {
+    constructor(x, y, w, h, player, board) {
+        [this.x, this.y] = [x, y];
+        [this.w, this.h] = [w, h];
+        this.board = board;
+        this.player = player;
+    }
+
+    in_this(x, y) {
+        return (x >= this.x1) && (x <= this.x2)
+            && (y >= this.y1) && (y <= this.y2);
+    }
+}
+
+/**
+ *
  *           bx[0]                  bx[3]                 bx[5]
  *           |   bx[1]              |   bx[4]             |bx[6]
  *           |   |bx[2]             |   |                 ||   bx[7]
@@ -311,14 +346,14 @@ class Cube extends BackgammonObj {
  *         |       13 14 15 16 17 18     19 20 21 22 23 24       |
  * by[0] ->| +---++-----------------+---+-----------------++---+ |
  *         | |   ||p0          p1   |   |p1             p0||   | |
- *         | |   ||p0          p1   |   |p1             p0||   | |
- *         | |   ||p0          p1   |27 |p1               ||25 | |
- *         | |   ||p0               |   |p1               ||   | |
- *         | |   ||p0               |   |p1               ||   | |
- *         | |   ||                 |   |                 ||   | |
- *         | |   ||                 |---|                 ||---| |
- *         | |   ||                 |   |                 ||   | |
- *         | |   ||p1               |   |p0               ||   | |
+ *         | |   ||p0          p1   |   |p1 tx     dx   p0||   | |
+ *         | |   ||p0          p1   |27 |p1 |      |      ||25 | |
+ *         | |   ||p0               |   |p1 |      v      ||   | |
+ *         | |   ||p0               |   |p1 v      +------+<---------dy
+ *         | |   ||       ty -------------->+------+ Dice ||   | |
+ *         | |   ||                 |---|   |Text  | Area ||---| |
+ *         | |   ||                 |   |   +------+      ||   | |
+ *         | |   ||p1               |   |p0        +------+|   | |
  *         | |   ||p1               |   |p0               ||   | |
  *         | |   ||p1          p0   |26 |p0               || 0 | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
@@ -334,7 +369,26 @@ class Board extends BackgammonObj {
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [27, 711];
+        [this.tx, this.ty] = [560, 335];
+        [this.dx, this.dy] = [600, 300];
         
+        // Player
+        this.player = [ new Player("Player0"), new Player("Player1") ];
+
+        // OnBoardText
+        this.txt = [
+            new OnBoardText("p0text", this.tx, this.ty, this),
+            new OnBoardText("p1text",
+                            this.w - this.tx, this.h - this.ty, this)
+        ];
+        this.txt[1].el.style.transformOrigin = "top left";
+        this.txt[1].el.style.transform = "rotate(180deg)";
+
+        for ( let p=0; p < 2; p++ ) {
+            this.txt[p].set_text(this.player[p].name + "<br />"
+                                 + "This is test.");
+        }
+
         // Checkers
         this.checker = [Array(15), Array(15)];
         for (let player=0; player < 2; player++) {
@@ -347,15 +401,6 @@ class Board extends BackgammonObj {
 
         this.moving_checker = undefined;
         this.inverted = false;
-
-        // PlayerText
-        this.txt = [new PlayerText("p0text", 673, 350, this),
-                    new PlayerText("p1text", 300, 388, this)];
-        this.txt[0].set_text("Player0");
-        this.txt[1].set_text("Player1");
-        
-        this.txt[1].el.style.transformOrigin = "top left";
-        this.txt[1].el.style.transform = "rotate(180deg)";
 
         // Cube
         this.cube = new Cube("cube", this);
@@ -502,18 +547,6 @@ class Board extends BackgammonObj {
         } else {
             this.el.style.transform = "rotate(0deg)";
         }
-        /*
-        let e_all = document.getElementById("all");
-        e_all.style.left = "0px";
-        e_all.style.top = "0px";
-        e_all.style.width = this.w + "px";
-        e_all.style.height = this.h + "px";
-        if ( this.inverted ) {
-            e_all.style.transform = "rotate(180deg)";
-        } else {
-            e_all.style.transform = "rotate(0deg)";
-        }
-        */
     }
 
     inverse_xy(e) {
@@ -622,10 +655,8 @@ class Board extends BackgammonObj {
  */
 class BoardPoint {
     constructor(x, y, w, h, direction, max_n, board) {
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
+        [this.x, this.y] = [x, y];
+        [this.w, this.h] = [w, h];
         this.direction = direction; // up: +1, down: -1
         this.max_n = max_n;
         this.baord = board;
