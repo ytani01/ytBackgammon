@@ -5,7 +5,6 @@ const MY_NAME = "ytBackgammon";
 const VERSION_STR = "Version 0.02";
 
 const STAT_READY = "ready";
-const STAT_OPENING = "opening roll";
 const STAT_PLAYING = "playing";
 const STAT_FINISHED = "finished";
 
@@ -103,9 +102,11 @@ class Checker extends BackgammonObj {
 
     calc_z() {
         let z = 0;
+
         for (let p=0; p < 2; p++) {
             for (let i=0; i < 15; i++) {
                 let ch = this.board.checker[p][i];
+
                 if (ch !== this) {
                     let d = this.distance(ch);
                     if ( d < this.w ) {
@@ -121,8 +122,7 @@ class Checker extends BackgammonObj {
     }
 
     distance(ch) {
-        let dx = ch.x - this.x;
-        let dy = ch.y - this.y;
+        let [dx, dy] = [ch.x - this.x, ch.y - this.y];
         return Math.sqrt(dx * dx + dy * dy);
     }
     
@@ -248,7 +248,12 @@ class Cube extends BackgammonObj {
         super(id, 0, 0);
         this.board = board;
 
-        this.value = 1;
+        this.player = undefined;
+        this.value = undefined;
+        this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
+        this.y0 = this.board.h / 2;
+        this.y1 = [this.board.by[1] - this.h / 2,
+                   this.board.by[0] + this.h / 2];
         
         this.file_prefix = "images/cubeA-";
         this.file_suffix = ".png";
@@ -257,30 +262,53 @@ class Cube extends BackgammonObj {
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
+
         // this.el.onmouseup = this.on_mouse_up.bind(this);
         // this.el.onmousemove = this.on_mouse_move.bind(this);
+
         this.el.ondragstart = this.on_drag_start.bind(this);
 
         this.move((this.board.bx[0] + this.board.bx[1]) / 2,
                   this.board.h / 2,
                   true);
+
+        this.set(1);
+        //this.double(1);
     }
 
-    double() {
+    set(val, player=undefined) {
+        this.value = val;
+        this.player = player;
+
+        let filename = this.file_prefix;
+        filename += ("0" + val).slice(-2);
+        filename += this.file_suffix;
+
+        this.el.firstChild.src = filename;
+
+        if ( this.player === undefined ) {
+            this.move(this.x0, this.y0, true);
+        } else {
+            this.player = player;
+            this.move(this.x0, this.y1[this.player], true);
+        }
+    }
+
+    double(player=undefined) {
+        if ( player === undefined ) {
+            if ( this.player !== undefined ) {
+                player = 1 - this.player;
+            }
+        } else {
+            player = 1 - player;
+        }
+
         this.value *= 2;
         if ( this.value > 64 ) {
             this.value = 1;
         }
-        console.log("double: value=" + this.value);
 
-        let val = this.value;
-        if ( this.value == 1 ) {
-            val = 64;
-        }
-        let filename =
-            this.file_prefix + ("0" + val).slice(-2) + this.file_suffix;
-
-        this.el.firstChild.src = filename;
+        this.set(this.value, player);
     }
 
     on_mouse_down(e) {
@@ -288,7 +316,7 @@ class Cube extends BackgammonObj {
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
-        this.double();
+        this.double(this.board.cur_player);
     }
 
     on_drag_start(e) {
@@ -413,28 +441,28 @@ class DiceArea {
  *
  *           bx[0]                  bx[3]                 bx[5]
  *           |   bx[1]              |   bx[4]             |bx[6]
- *           |   |bx[2]             |   |                 ||   bx[7]
- *           |   ||                 |   |                 ||   |
- *           v   vv                 v   v                 vv   v
- *         +-----------------------------------------------------+ 
+ *         x |   |bx[2]             |   |                 ||   bx[7]
+ *         | |   ||                 |   |                 ||   |
+ *         v v   vv                 v   v                 vv   v
+ *     y ->+-----------------------------------------------------
  *         |       13 14 15 16 17 18     19 20 21 22 23 24       |
- * by[0] ->| +---++-----------------+---+-----------------++---+ |
+ * by[0] ->|  -------------------------------------------------  |
  *         | |   ||p0          p1   |   |p1             p0||   | |
  *         | |   ||p0          p1   |   |p1 tx     dx   p0||   | |
  *         | |   ||p0          p1   |27 |p1 |      |      ||25 | |
  *         | |   ||p0               |   |p1 |      v      ||   | |
  *         | |   ||p0               |   |p1 v      +------+<---------dy
- *         | |   ||       ty -------------->+------+ Dice ||   | |
+ *         | |   ||         ty ------------>+------| Dice ||   | |
  *         | |   ||                 |---|   |Text  | Area ||---| |
- *         | |   ||                 |   |   +------+      ||   | |
- *         | |   ||p1               |   |p0        +------+|   | |
+ *         | |   ||                 |   |    ------|      ||   | |
+ *         | |   ||p1               |   |p0         ------||   | |
  *         | |   ||p1               |   |p0               ||   | |
  *         | |   ||p1          p0   |26 |p0               || 0 | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
- * by[1] ->| +----+-----------------+---+-----------------++---+ |
+ * by[1] ->|  -------------------------------------------------  |
  *         |       12 11 10  9  8  7      6  5  4  3  2  1       |
- *         +-----------------------------------------------------+ 
+ *          ----------------------------------------------------- 
  *
  */
 class Board extends BackgammonObj {
@@ -448,6 +476,7 @@ class Board extends BackgammonObj {
         
         // Player
         this.player = [ new Player("Player0"), new Player("Player1") ];
+        this.cur_player = undefined;
 
         // OnBoardText
         this.txt = [
@@ -607,8 +636,10 @@ class Board extends BackgammonObj {
     inverse() {
         if ( this.inverted ) {
             this.inverted = false;
+            this.cur_player = 0;
         } else {
             this.inverted = true;
+            this.cur_player = 1;
         }
 
         this.el.style.transformOrigin = (this.w / 2) + "px "
@@ -658,9 +689,9 @@ class Board extends BackgammonObj {
                 } else {
                     this.dice_value[p] = da.roll();
                 }
+                console.log("dice_value=" + this.dice_value);
             }
         }
-        console.log("dice_value=" + this.dice_value);
     }
 
     on_mouse_move(e) {
