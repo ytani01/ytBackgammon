@@ -810,4 +810,5 @@ window.onload = function () {
     let move_start_y = 0;
 
     let board = new Board("board", 0, 0);
+
 };
