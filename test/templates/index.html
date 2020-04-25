@@ -1,10 +1,6 @@
 {% extends "layout.html" %}
 {% block content %}
 <div><h1>{{ title }}</h1></div>
-<form action="/action" method="POST">
-  <input type="text" value="BBB">
-  <button type="submit">AAA</input>
-</form>
 <div id="a" style="position:absolute;left:{{ x }}px;top:{{ y }}px;"><image src="/static/images/checker-Red.png"></div>
 {{ msg }}
 {% endblock %}
