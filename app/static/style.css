@@ -1,0 +1,13 @@
+* {
+    margin: 0;
+}
+html, body {
+    height: 100%;
+}
+.onboardtext {
+    border: 4px solid rgba(128, 128, 128, 0.5);
+    padding: 3px;
+    color: rgba(128, 128, 128, 0.8);
+    font-weight: bold;
+}
+
