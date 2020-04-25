@@ -4,7 +4,9 @@
 
 [Backgammon board (Javascript version)](https://ytani01.github.io/ytBackgammon/)
 
-## install
+## Memo
+
+### install browserMqtt.js
 
 ```
 ### make package.json
@@ -20,6 +22,7 @@ $ cd node_modules/mqtt
 $ npm install .
 $ browserify mqtt.js -s mqtt > browserMqtt.js
 $ cp browserMqtt.js ${jsdir}
+```
 
 ## References
 
