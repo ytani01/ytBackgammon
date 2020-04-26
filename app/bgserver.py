@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #
 #
+from Backgammon import Backgammon
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, send, emit
 import time
@@ -15,52 +16,25 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
+bg = Backgammon(debug=True)
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-"""
-@app.route('/action', methods=['POST'])
-def action():
-    _log.info('')
-    global x
-
-    if request.method != 'POST':
-        return
-
-    x += 10
-    return render_template('index.html', title="ABC", x=x, y=100)
-"""
-
 @socketio.on('connect', namespace='/test')
 def test_connect():
     _log.info('request.sid=%s', request.sid)
+
     emit('s', {
-        'event': 'load',
-        'data': [
-            [14, 24,
-             13, 13, 13, 13, 13,
-             8, 8, 8,
-             6, 6, 6, 6, 6],
-            [1, 1,
-             12, 12, 12, 12, 12,
-             17, 17, 17,
-             19, 19, 19, 19, 19]
-        ]
+        'event': 'gameinfo',
+        'data': bg._gameinfo
     })
 
-    # emit('s', {'event': 'connected', 'data': 'hello'})
-    
 @socketio.on('disconnect', namespace='/test')
 def test_disconnect():
     _log.info('request.sid=%s', request.sid)
 
-"""
-{ 'event': event, 'data':  {...} }
-
-{'event': 'up', 'data': {'player': p, 'x': x, 'y': y} }
-"""
 @socketio.on('p1', namespace='/test')
 def test_p1(msg):
     _log.info('request.sid=%s', request.sid)

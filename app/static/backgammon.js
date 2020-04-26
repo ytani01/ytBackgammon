@@ -274,7 +274,7 @@ class Cube extends BackgammonObj {
         //this.double(1);
     }
 
-    set(val, player=undefined) {
+    set(val, player=undefined, accepted=true) {
         this.value = val;
         this.player = player;
 
@@ -477,6 +477,8 @@ class Board extends BackgammonObj {
         this.player = player;
         this.ws = ws;
         
+        this.turn = -1;
+
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [27, 711];
         [this.tx, this.ty] = [560, 335];
@@ -492,7 +494,7 @@ class Board extends BackgammonObj {
         this.txt[1].el.style.transform = "rotate(180deg)";
 
         for ( let p=0; p < 2; p++ ) {
-            this.txt[p].set_text("Player " + p + "<br />"
+            this.txt[p].set_text("Player " + (p + 1) + "<br />"
                                  + "This is test.");
         }
 
@@ -603,8 +605,8 @@ class Board extends BackgammonObj {
         this.el.ondragstart = this.on_drag_start.bind(this);
 
         // Initialize
-        this.end();  // for debug
-        this.init();
+        //this.end();  // for debug
+        //this.init();
         // this.inverse();
 
         if ( this.player == 1 ) {
@@ -619,6 +621,22 @@ class Board extends BackgammonObj {
         ver_el.innerHTML = "<strong>" + MY_NAME + "</strong>, " + VERSION_STR;
     }
 
+    set_turn(player) {
+        this.turn = player;
+        console.log('turn=' + this.turn);
+        
+        for (let p=0; p < 2; p++) {
+            this.txt[p].el.style.borderColor = "rgba(128, 128, 128, 0.5)";
+            this.txt[p].el.style.color = "rgba(128, 128, 128, 0.5)";
+        }
+        if ( player < 0 || player > 1 ) {
+            return;
+        }
+
+        this.txt[player].el.style.borderColor = "rgba(255, 255, 255, 1)";
+        this.txt[player].el.style.color = "rgba(255, 255, 255, 1)";
+    }
+    
     init() {
         let points = [ [24, 24,
                         13, 13, 13, 13, 13,
@@ -639,6 +657,46 @@ class Board extends BackgammonObj {
                         25, 25, 25, 25, 25,
                         25, 25, 25, 25, 25] ];
         this.put_checkers(points);
+    }
+
+    load_gameinfo(gameinfo) {
+        // escape checkers
+        for (let player=0; player < 2; player++) {
+            for (let i=0; i < 15; i++) {
+                let ch = this.checker[player][i];
+                if ( ch.cur_point !== undefined ) {
+                    let ch_dumy = this.point[ch.cur_point].checkers.pop();
+                    ch.cur_point = undefined;
+                }
+                ch.move(this.w - ch.w / 2, this.h / 2, true);
+            }
+        }
+
+        // put checkers
+        let p = gameinfo.board.point;
+        let pi = [0, 0];
+        for (let i = 0; i < p.length; i++) {
+            console.log('i=' + i);
+            if ( p[i].length == 2 ) {
+                console.log('val=' + p[i]);
+                let player = p[i][0];
+                for (let j = 0; j < p[i][1]; j++) {
+                    console.log('[' + player + ', ' + (pi[player] + j) + ']');
+                    let ch = this.checker[player][pi[player] + j];
+                    console.log('ch.id=' + ch.id);
+                    this.put_checker(ch, i);
+                } // for (j)
+                pi[player] += p[i][1];
+            } // if
+        } // for(i)
+
+        // turn
+        this.set_turn(gameinfo.turn);
+
+        // cube
+        let c = gameinfo.board.cube;
+        console.log('c=' + JSON.stringify(c));
+        this.cube.set(c.value, c.side, c.accepted);
     }
 
     inverse() {
@@ -808,7 +866,8 @@ window.onload = function () {
     let url = "http://" + document.domain + ":" + location.port + "/test";
     let ws = io.connect(url);
 
-    let board = new Board("board", 0, 0, 1, ws);
+    let board = new Board("board", 0, 0, 0, ws);
+    board.set_turn(1);
 
     ws.on('connect', function() {
         console.log('connected');
@@ -821,8 +880,14 @@ window.onload = function () {
     ws.on('s', function(msg) {
         console.log("s> " + JSON.stringify(msg));
 
+        /*
         if ( msg.event == 'load' ) {
             board.put_checkers(msg.data);
+        }
+        */
+
+        if ( msg.event == 'gameinfo' ) {
+            board.load_gameinfo(msg.data);
         }
     });
 };

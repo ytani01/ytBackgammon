@@ -1,3 +1,4 @@
+import json
 from MyLogger import get_logger
 import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -47,9 +48,62 @@ class Backgammon:
         __class__._log = get_logger(__class__.__name__, self._dbg)
         self._log.debug('')
 
+        self._gameinfo = {
+            'game': 0,
+            'match': 0,
+            'score': [0, 0],
+            'turn': -1,
+            'dice': [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0]
+            ],
+            'board': {
+                'cube': {
+                    'side': -1,
+                    'value': 1,
+                    'accepted': True
+                },
+                'point': [
+                    [0, 1],
+                    [0, 1],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [1, 5],
+                    [],
+                    [1, 3],
+                    [],
+                    [],
+                    [],
+                    [0, 5],
+                    [1, 5],
+                    [],
+                    [],
+                    [],
+                    [0, 3],
+                    [],
+                    [0, 5],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [1, 2],
+                    [],
+                    [],
+                    []
+                ],
+            }
+        }
+        self._log.debug('_gameinfo=%s', self._gameinfo)
+
+        json_data = json.dumps(self._gameinfo)
+        self._log.debug('json_data=%a', json_data)
+        
+
         self.player = None
 
-        self.board = Board()
+        self.board = Board(debug=self._dbg)
 
 
-Board(debug=True)
+#Backgammon(debug=True)
