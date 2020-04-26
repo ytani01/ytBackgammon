@@ -652,11 +652,11 @@ class Board extends BackgammonObj {
     }
 
     inverse_xy(e) {
-        return [this.w - e.clientX + this.x, this.h - e.clientY + this.y];
+        return [this.w - e.pageX + this.x, this.h - e.pageY + this.y];
     }
     
     get_xy(e) {
-        let [x, y] = [e.clientX, e.clientY];
+        let [x, y] = [e.pageX, e.pageY];
         if ( this.inverted ) {
             [x, y] = this.inverse_xy(e);
         }
