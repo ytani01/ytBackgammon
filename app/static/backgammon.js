@@ -2,20 +2,11 @@
  *
  */
 const MY_NAME = "ytBackgammon";
-const VERSION_STR = "Version 0.02";
+const VERSION_STR = "Version 0.3s";
 
 const STAT_READY = "ready";
 const STAT_PLAYING = "playing";
 const STAT_FINISHED = "finished";
-
-/**
- *
- */
-class Player {
-    constructor(name) {
-        this.name = name;
-    }
-} // Player
 
 /**
  *
@@ -72,6 +63,11 @@ class OnBoardText extends BackgammonObj {
  *
  */
 class Checker extends BackgammonObj {
+    /*
+     * @param {string} id - div tag id
+     * @param {number} player - 0 or 1
+     * @param {Board} board - board object
+     */
     constructor(id, player, board) {
         super(id, 0, 0);
         this.player = player;
@@ -318,7 +314,7 @@ class Cube extends BackgammonObj {
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
-        this.double(this.board.cur_player);
+        this.double(this.board.player);
     }
 
     on_drag_start(e) {
@@ -468,18 +464,24 @@ class DiceArea {
  *
  */
 class Board extends BackgammonObj {
-    constructor(id, x, y) {
+    /*
+     * @param {string} id - div tag id
+     * @param {number} x - 
+     * @param {number} y - 
+     * @param {number} player - 0 or 1
+     * @param {io.connect} ws - websocket
+     */
+    constructor(id, x, y, player, ws) {
         super(id, x, y);
 
+        this.player = player;
+        this.ws = ws;
+        
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [27, 711];
         [this.tx, this.ty] = [560, 335];
         [this.dx, this.dy] = [760, 320];
         
-        // Player
-        this.player = [ new Player("Player0"), new Player("Player1") ];
-        this.cur_player = undefined;
-
         // OnBoardText
         this.txt = [
             new OnBoardText("p0text", this.tx, this.ty, this),
@@ -490,7 +492,7 @@ class Board extends BackgammonObj {
         this.txt[1].el.style.transform = "rotate(180deg)";
 
         for ( let p=0; p < 2; p++ ) {
-            this.txt[p].set_text(this.player[p].name + "<br />"
+            this.txt[p].set_text("Player " + p + "<br />"
                                  + "This is test.");
         }
 
@@ -505,7 +507,6 @@ class Board extends BackgammonObj {
         }
 
         this.moving_checker = undefined;
-        this.inverted = false;
 
         // Cube
         this.cube = new Cube("cube", this);
@@ -606,6 +607,11 @@ class Board extends BackgammonObj {
         this.init();
         // this.inverse();
 
+        if ( this.player == 1 ) {
+            this.player = 0;
+            this.inverse();
+        }
+
         let ver_el = document.getElementById("version");
         ver_el.style.position = "absolute";
         ver_el.style.left = "5px";
@@ -636,20 +642,14 @@ class Board extends BackgammonObj {
     }
 
     inverse() {
-        if ( this.inverted ) {
-            this.inverted = false;
-            this.cur_player = 0;
-        } else {
-            this.inverted = true;
-            this.cur_player = 1;
-        }
+        this.player = 1 - this.player;
 
         this.el.style.transformOrigin = (this.w / 2) + "px "
             + (this.h / 2) + "px";
-        if ( this.inverted ) {
-            this.el.style.transform = "rotate(180deg)";
-        } else {
+        if ( this.player == 0 ) {
             this.el.style.transform = "rotate(0deg)";
+        } else {
+            this.el.style.transform = "rotate(180deg)";
         }
     }
 
@@ -659,7 +659,7 @@ class Board extends BackgammonObj {
     
     get_xy(e) {
         let [x, y] = [e.pageX, e.pageY];
-        if ( this.inverted ) {
+        if ( this.player == 1 ) {
             [x, y] = this.inverse_xy(e);
         }
         return [x, y];
@@ -676,23 +676,21 @@ class Board extends BackgammonObj {
         if ( x < this.bx[0] || x > this.bx[7] ||
              y < this.by[0] || y > this.by[1] ) {
             this.inverse();
-            console.log("Board.inverted=" + this.inverted);
+            console.log("Board.player=" + this.player);
             orig_e.preventDefault();
             return;
         }
 
         // dice
-        for ( let p=0; p < 2; p++ ) {
-            let da = this.dice_area[p];
-            if ( da.in_this(x, y) ) {
-                this.dice_value[p] = [];
-                if ( da.active ) {
-                    da.clear();
-                } else {
-                    this.dice_value[p] = da.roll();
-                }
-                console.log("dice_value=" + this.dice_value);
+        let da = this.dice_area[this.player];
+        if ( da.in_this(x, y) ) {
+            this.dice_value[this.player] = [];
+            if ( da.active ) {
+                da.clear();
+            } else {
+                this.dice_value[this.player] = da.roll();
             }
+            console.log("dice_value=" + this.dice_value);
         }
     }
 
@@ -810,5 +808,21 @@ window.onload = function () {
     let url = "http://" + document.domain + ":" + location.port + "/test";
     let ws = io.connect(url);
 
-    let board = new Board("board", 0, 0);
+    let board = new Board("board", 0, 0, 1, ws);
+
+    ws.on('connect', function() {
+        console.log('connected');
+    });
+
+    ws.on('disconnect', function() {
+        console.log('disconnected');
+    });
+
+    ws.on('s', function(msg) {
+        console.log("s> " + JSON.stringify(msg));
+
+        if ( msg.event == 'load' ) {
+            board.put_checkers(msg.data);
+        }
+    });
 };

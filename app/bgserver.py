@@ -20,6 +20,7 @@ socketio = SocketIO(app)
 def index():
     return render_template('index.html')
 
+"""
 @app.route('/action', methods=['POST'])
 def action():
     _log.info('')
@@ -30,29 +31,49 @@ def action():
 
     x += 10
     return render_template('index.html', title="ABC", x=x, y=100)
+"""
 
 @socketio.on('connect', namespace='/test')
 def test_connect():
-    _log.info('')
-    emit('s', {'data': "hi!"})
+    _log.info('request.sid=%s', request.sid)
+    emit('s', {
+        'event': 'load',
+        'data': [
+            [14, 24,
+             13, 13, 13, 13, 13,
+             8, 8, 8,
+             6, 6, 6, 6, 6],
+            [1, 1,
+             12, 12, 12, 12, 12,
+             17, 17, 17,
+             19, 19, 19, 19, 19]
+        ]
+    })
+
+    # emit('s', {'event': 'connected', 'data': 'hello'})
     
 @socketio.on('disconnect', namespace='/test')
 def test_disconnect():
-    _log.info('')
+    _log.info('request.sid=%s', request.sid)
 
-@socketio.on('c', namespace='/test')
-def test_c(msg):
+"""
+{ 'event': event, 'data':  {...} }
+
+{'event': 'up', 'data': {'player': p, 'x': x, 'y': y} }
+"""
+@socketio.on('p1', namespace='/test')
+def test_p1(msg):
+    _log.info('request.sid=%s', request.sid)
     _log.info('msg=%s', msg)
 
-    if msg['event'] == 'up':
-        x = msg['x']
-        y = msg['y']
-        
     emit('s', msg, broadcast=True)
 
-@socketio.on('s', namespace='/test')
+@socketio.on('p2', namespace='/test')
 def test_s(msg):
+    _log.info('request.sid=%s', request.sid)
     _log.info('msg=%s', msg)
+
+    emit('s', msg, broadcast=True)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
