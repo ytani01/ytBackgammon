@@ -2,7 +2,7 @@
  *
  */
 const MY_NAME = "ytBackgammon";
-const VERSION_STR = "Version 0.3s";
+const VERSION_STR = "Version 0.4n";
 
 const STAT_READY = "ready";
 const STAT_PLAYING = "playing";
@@ -95,7 +95,6 @@ class Checker extends BackgammonObj {
     }
 
     set_z(z) {
-        console.log("set_z:z=" + z);
         this.z = z;
         this.el.style.zIndex = this.z;
     }
@@ -134,13 +133,13 @@ class Checker extends BackgammonObj {
         let [x, y] = this.board.get_xy(e);
 
         let ch = this;
-        console.log("on_mouse_down: ch.id=" + ch.id
+        console.log("on_mouse_down> ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
         
         if ( ch.cur_point !== undefined ) {
             let point = ch.board.point[ch.cur_point];
             ch = point.checkers.slice(-1)[0];
-            console.log("ch.id=" + ch.id);
+            console.log("on_mouse_down> ch.id=" + ch.id);
         }
         ch.board.moving_checker = ch;
 
@@ -159,14 +158,14 @@ class Checker extends BackgammonObj {
         let [x, y] = this.board.get_xy(e);
 
         let ch = this.board.moving_checker;
-        console.log("on_mouse_up: ch.id=" + ch.id
+        console.log("on_mouse_up> ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
 
         // this.board.emit_msg('mouse_up', {x: x, y: y});
 
         ch.move(x, y, true);
         let p = ch.board.chpos2point(ch);
-        console.log("on_mouse_up: p=" + p);
+        console.log("on_mouse_up> p=" + p);
 
         let can_move = false;
         let hit_ch = undefined;
@@ -174,7 +173,6 @@ class Checker extends BackgammonObj {
 
         if ( p >= 0 && p <= ch.board.point.length) {
             checkers = ch.board.point[p].checkers;
-            console.log("checkers.length=" + checkers.length);
             if ( p == 0 || p == 26 ) {
                 if ( ch.player == 0 ) {
                     can_move = true;
@@ -190,12 +188,9 @@ class Checker extends BackgammonObj {
             } else if ( checkers.length == 1 ) {
                 can_move = true;
                 hit_ch = checkers[0];
-                console.log("hit_ch.id=" + hit_ch.id);
             }
         }
             
-        console.log("can_move=" + can_move);
-        console.log("hit_ch=" + hit_ch);
         if ( ! can_move ) {
             ch.move(ch.src_x, ch.src_y, true);
             ch.board.moving_checker = undefined;
@@ -203,11 +198,10 @@ class Checker extends BackgammonObj {
         }
 
         if ( hit_ch !== undefined ) {
-            let bar_p = undefined;
+            console.log("on_mouse_up> hit_ch.id=" + hit_ch.id);
+            let bar_p = 27;
             if ( hit_ch.player == 0 ) {
                 bar_p = 26;
-            } else {
-                bar_p = 27;
             }
             ch.board.put_checker(hit_ch, bar_p);
             hit_ch.calc_z();
@@ -217,7 +211,7 @@ class Checker extends BackgammonObj {
         ch.calc_z();
 
         ch.board.moving_checker = undefined;
-    }
+    } // on_mouse_up()
 
     on_mouse_move(e) {
         e.preventDefault();
@@ -230,7 +224,7 @@ class Checker extends BackgammonObj {
         if ( ch === undefined ) {
             return;
         }
-        console.log("on_mouse_move: ch.id=" + ch.id
+        console.log("on_mouse_move> ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
         
         ch.move(x, y, true);
@@ -251,11 +245,15 @@ class Cube extends BackgammonObj {
         this.board = board;
 
         this.player = undefined;
-        this.value = undefined;
+        this.value = 1;
+        this.accepted = false;
+        
         this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
         this.y0 = this.board.h / 2;
-        this.y1 = [this.board.by[1] - this.h / 2,
+        this.y2 = [this.board.by[1] - this.h / 2,
                    this.board.by[0] + this.h / 2];
+        this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
+                   (this.y2[1] + this.board.h / 2) / 2];
         
         this.file_prefix = this.image_dir + "cubeA-";
         this.file_suffix = ".png";
@@ -265,7 +263,9 @@ class Cube extends BackgammonObj {
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
 
-        // this.el.onmouseup = this.on_mouse_up.bind(this);
+        this.el.onmouseup = this.on_mouse_up.bind(this);
+        this.el.ontouchend = this.on_mouse_up.bind(this);
+
         // this.el.onmousemove = this.on_mouse_move.bind(this);
 
         this.el.ondragstart = this.on_drag_start.bind(this);
@@ -274,13 +274,21 @@ class Cube extends BackgammonObj {
                   this.board.h / 2,
                   true);
 
-        this.set(1);
+        //this.set(1);
         //this.double(1);
     }
 
-    set(val, player=undefined, accepted=true) {
+    set(val, player=undefined, accepted=false, emit=true) {
+        console.log("Cube.set(val=" + val
+                    + ", player=" + player
+                    + ", accepted=" + accepted + ")");
         this.value = val;
         this.player = player;
+        this.accepted = accepted;
+
+        if ( player < 0 ) {
+            this.player = undefined;
+        }
 
         let filename = this.file_prefix;
         filename += ("0" + val).slice(-2);
@@ -290,13 +298,28 @@ class Cube extends BackgammonObj {
 
         if ( this.player === undefined ) {
             this.move(this.x0, this.y0, true);
+        } else if ( accepted ) {
+            this.player = player;
+            this.move(this.x0, this.y2[this.player], true);
         } else {
             this.player = player;
             this.move(this.x0, this.y1[this.player], true);
         }
+
+        if ( emit ) {
+            let side = this.player;
+            if ( side === undefined ) {
+                side = -1;
+            }
+
+            this.board.emit_msg('cube', {side: side,
+                                         value: this.value,
+                                         accepted: this.accepted});
+        }
     }
 
     double(player=undefined) {
+        console.log("Cube.double(player=" + player + ")");
         if ( player === undefined ) {
             if ( this.player !== undefined ) {
                 player = 1 - this.player;
@@ -304,21 +327,55 @@ class Cube extends BackgammonObj {
         } else {
             player = 1 - player;
         }
+        console.log("Cube.double> player=" + player);
 
         this.value *= 2;
         if ( this.value > 64 ) {
             this.value = 1;
         }
 
-        this.set(this.value, player);
+        this.accepted = false;
+        this.set(this.value, player, false);
+    }
+
+    double_accept() {
+        console.log("Cube.double_accept()");
+
+        this.set(this.value, this.player, true);
+    }
+
+    double_cancel() {
+        console.log("Cube.double_cancel()");
+        
+        let value = this.value / 2;
+        let player = 1 - this.player;
+        if ( value == 1 ) {
+            player = undefined;
+        }
+        this.set(value, player, true);
     }
 
     on_mouse_down(e) {
+        console.log("Cube.on_mouse_down> this.player=" + this.player
+                   + ", this.board.player=" + this.board.player);
         e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
-        this.double(this.board.player);
+        if ( this.player !== undefined && this.player != this.board.player ) {
+            this.double_cancel();
+            return;
+        }
+
+        if ( this.player === undefined || this.accepted == true ) {
+            this.double(this.board.player);
+        } else {
+            this.double_accept();
+        }
+    }
+
+    on_mouse_up(e) {
+        return false;
     }
 
     on_drag_start(e) {
@@ -386,21 +443,44 @@ class DiceArea {
                                 this.x + this.w / 4,
                                 this.y + this.h / 4,
                                 this.player,file_prefix, this.board));
+
         this.dice.push(new Dice("dice" + this.player + "1",
                                 this.x + this.w / 4 * 3,
                                 this.y + this.h / 4,
                                 this.player, file_prefix, this.board));
+
         this.dice.push(new Dice("dice" + this.player + "2",
                                 this.x + this.w / 4,
                                 this.y + this.h / 4 * 3,
                                 this.player, file_prefix,  this.board));
+
         this.dice.push(new Dice("dice" + this.player + "3",
                                 this.x + this.w / 4 * 3,
                                 this.y + this.h / 4 * 3,
                                 this.player, file_prefix, this.board));
     }
 
+    set(dice_value, emit=true) {
+        console.log("DiceArea.set(dive_value=" + toString(dice_value) + ")");
+        
+        this.clear();
+        
+        for (let i=0; i < 4; i++) {
+            if ( dice_value[i] < 1 ) {
+                continue;
+            }
+            this.dice[i].set_value(dice_value[i]);
+            this.active = true;
+        } // for(i)
+
+        if ( emit ) {
+            this.board.emit_msg('dice', {player: this.player,
+                                         dice: dice_value});
+        }
+    }
+
     roll() {
+        console.log("DiceArea.roll()");
         this.clear();
 
         let d1 = Math.floor(Math.random()  * 4);
@@ -415,21 +495,32 @@ class DiceArea {
         let value1 = this.dice[d1].roll();
         let value2 = this.dice[d2].roll();
 
+        let dice_value = [0, 0, 0, 0];
+        dice_value[d1] = value1;
+        dice_value[d2] = value2;
+
         if ( value1 == value2 ) {
             for ( let d = 0; d < 4; d++ ) {
                 this.dice[d].set_value(value1);
             }
-            return [value1, value1, value1, value1];
+            dice_value = [value1, value1, value1, value1];
         }
-        return [value1, value2];
+
+        this.board.emit_msg('dice', {player: this.player, dice: dice_value});
+        return dice_value;
     }
 
-    clear() {
+    clear(emit=false) {
+        console.log("DiceArea.clear()");
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].el.hidden = true;
         }
         this.active = false;
 
+        if ( emit ) {
+            this.board.emit_msg('dice', {player:this.player,
+                                         dice: [0, 0, 0, 0]});
+        }
         return [];
     }
 
@@ -486,7 +577,7 @@ class Board extends BackgammonObj {
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [27, 711];
         [this.tx, this.ty] = [560, 335];
-        [this.dx, this.dy] = [760, 320];
+        [this.dx, this.dy] = [740, 320];
         
         // OnBoardText
         this.txt = [
@@ -600,18 +691,13 @@ class Board extends BackgammonObj {
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
 
-        // this.el.onmouseup = this.on_mouse_up.bind(this);
-        // this.el.ontouchend = this.on_mouse_up.bind(this);
+        this.el.onmouseup = this.on_mouse_up.bind(this);
+        this.el.ontouchend = this.on_mouse_up.bind(this);
 
         this.el.onmousemove = this.on_mouse_move.bind(this);
         this.el.ontouchmove = this.on_mouse_move.bind(this);
 
         this.el.ondragstart = this.on_drag_start.bind(this);
-
-        // Initialize
-        //this.end();  // for debug
-        //this.init();
-        // this.inverse();
 
         if ( this.player == 1 ) {
             this.player = 0;
@@ -640,7 +726,7 @@ class Board extends BackgammonObj {
     }
 
     emit_msg(type, data) {
-        console.log('emit_msg> ' + type);
+        console.log('emit_msg> ' + type + ', ' + JSON.stringify(data));
         this.ws.emit('json', {src: this.player, type: type, data: data});
     }
 
@@ -660,57 +746,37 @@ class Board extends BackgammonObj {
         this.txt[player].el.style.color = "rgba(255, 255, 255, 1)";
     }
     
-    init() {
-        let points = [ [24, 24,
-                        13, 13, 13, 13, 13,
-                        8, 8, 8,
-                        6, 6, 6, 6, 6],
-                       [1, 1,
-                        12, 12, 12, 12, 12,
-                        17, 17, 17,
-                        19, 19, 19, 19, 19] ];
-        this.put_checkers(points);
-    }
-
-    end() {
-        let points = [ [0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0],
-                       [25, 25, 25, 25, 25,
-                        25, 25, 25, 25, 25,
-                        25, 25, 25, 25, 25] ];
-        this.put_checkers(points);
-    }
-
     load_gameinfo(gameinfo) {
         // escape checkers
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
                 let ch = this.checker[player][i];
-                if ( ch.cur_point !== undefined ) {
-                    let ch_dumy = this.point[ch.cur_point].checkers.pop();
-                    ch.cur_point = undefined;
-                }
-                ch.move(this.w - ch.w / 2, this.h / 2, true);
+                ch.el.hidden = true;
+                ch.cur_point = undefined;
+                ch.move(0, 0);
             }
         }
 
+        // clear points
+        for (let i=0; i < this.point.length; i++) {
+            this.point[i].checkers = [];
+        } // for(i)
+
         // put checkers
         let p = gameinfo.board.point;
-        let pi = [0, 0];
-        for (let i = 0; i < p.length; i++) {
-            console.log('i=' + i);
-            if ( p[i].length == 2 ) {
-                console.log('val=' + p[i]);
+        let p_idx = [0, 0];
+        for (let i=0; i < p.length; i++) {
+            if ( p[i].length == 0 ) {
+                continue;
+            }
+
+            for (let j=0; j < p[i].length; j++) {
                 let player = p[i][0];
-                for (let j = 0; j < p[i][1]; j++) {
-                    console.log('[' + player + ', ' + (pi[player] + j) + ']');
-                    let ch = this.checker[player][pi[player] + j];
-                    console.log('ch.id=' + ch.id);
-                    this.put_checker(ch, i);
-                } // for (j)
-                pi[player] += p[i][1];
-            } // if
+                let ch = this.checker[player][p_idx[player]];
+                this.put_checker(ch, i, false);
+                ch.el.hidden = false;
+                p_idx[player]++;
+            } // for (j)
         } // for(i)
 
         // turn
@@ -719,7 +785,12 @@ class Board extends BackgammonObj {
         // cube
         let c = gameinfo.board.cube;
         console.log('c=' + JSON.stringify(c));
-        this.cube.set(c.value, c.side, c.accepted);
+        this.cube.set(c.value, c.side, c.accepted, false);
+
+        // dice
+        let d = gameinfo.board.dice;
+        this.dice_area[0].set(d[0]);
+        this.dice_area[1].set(d[1]);
     }
 
     inverse() {
@@ -762,16 +833,16 @@ class Board extends BackgammonObj {
             return;
         }
 
-        // dice
+        // dice area
         let da = this.dice_area[this.player];
         if ( da.in_this(x, y) ) {
             this.dice_value[this.player] = [];
             if ( da.active ) {
-                da.clear();
+                da.clear(true);
             } else {
                 this.dice_value[this.player] = da.roll();
             }
-            console.log("dice_value=" + this.dice_value);
+            console.log("dice_value=" + this.dice_value[this.player]);
         }
     }
 
@@ -789,6 +860,10 @@ class Board extends BackgammonObj {
         this.moving_checker.move(x, y, true);
     }
 
+    on_mouse_up(e) {
+        return false;
+    }
+
     on_drag_start(e) {
         return false;
     }
@@ -798,22 +873,21 @@ class Board extends BackgammonObj {
 
         for ( let i=0; i < this.point.length; i++ ) {
             if ( this.point[i].in_this(ch) ) {
-                console.log("chpos2point: i=" + i);
                 return i;
             }
         }
         return undefined;
     }
 
-    put_checker(ch, p, remote=false) {
-        console.log("put_checker(" + ch.id + "," + p + ")");
+    put_checker(ch, p, emit=true) {
+        console.log("put_checker> ch.id=" + ch.id + ", p=" + p);
         let prev_p = undefined;
 
         if ( ch.cur_point !== undefined ) {
-            console.log("ch.cur_point=" + ch.cur_point);
+            console.log("put_checker> ch.cur_point=" + ch.cur_point);
             prev_p = ch.cur_point;
             ch = this.point[prev_p].checkers.pop();
-            console.log("ch.id=" + ch.id);
+            console.log("put_checker> ch.id=" + ch.id);
         }
 
         let po = this.point[p];
@@ -828,31 +902,9 @@ class Board extends BackgammonObj {
 
         po.checkers.push(ch);
 
-        if ( ! remote ) {
+        if ( emit ) {
+            console.log('prev_p=' + prev_p);
             this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p});
-        }
-    }
-
-    put_checkers(points) {
-        for (let player=0; player < 2; player++) {
-            for (let i=0; i < 15; i++) {
-                let ch = this.checker[player][i];
-                if ( ch.cur_point !== undefined ) {
-                    let ch_dumy = this.point[ch.cur_point].checkers.pop();
-                    ch.cur_point = undefined;
-                }
-                ch.move(this.w - ch.w / 2, this.h / 2, true);
-            }
-        }
-
-        for (let player=0; player < 2; player++) {
-            for (let i=0; i < 15; i++) {
-                let point = points[player][i];
-                if ( point < 0 ) continue;
-                
-                let ch = this.checker[player][i];
-                this.put_checker(ch, point);
-            }
         }
     }
 }
@@ -909,8 +961,6 @@ window.onload = function () {
     ws.on('connect', function() {
         console.log('connected');
 
-        // emit_msg("hello", "hi!");
-        // ws.emit('json', {src: player, type: 'hello', data: 'hello'});
     });
 
     ws.on('disconnect', function() {
@@ -934,7 +984,18 @@ window.onload = function () {
         if ( msg.type == 'put_checker' ) {
             let ch = board.search_checker(msg.data.ch);
             console.log('ch.id = ' + ch.id);
-            board.put_checker(ch, msg.data.p2, true);
+            board.put_checker(ch, msg.data.p2, false);
+        }
+
+        if ( msg.type == 'cube' ) {
+            board.cube.set(msg.data.value,
+                           msg.data.side,
+                           msg.data.accepted,
+                           false);
+        }
+
+        if ( msg.type == 'dice' ) {
+            board.dice_area[msg.data.player].set(msg.data.dice, false);
         }
     });
 };

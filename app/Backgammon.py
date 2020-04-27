@@ -16,42 +16,42 @@ class Backgammon:
             'match': 0,
             'score': [0, 0],
             'turn': -1,
-            'dice': [
-                [0, 0, 0, 0],
-                [0, 0, 0, 0]
-            ],
             'board': {
                 'cube': {
                     'side': -1,
                     'value': 1,
-                    'accepted': True
+                    'accepted': False
                 },
+                'dice': [
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]
+                ],
                 'point': [
                     [],
-                    [1, 2],
+                    [1, 1],
                     [],
                     [],
                     [],
                     [],
-                    [0, 5],
+                    [0, 0, 0, 0, 0],
                     [],
-                    [0, 3],
-                    [],
-                    [],
-                    [],
-                    [1, 5],
-                    [0, 5],
+                    [0, 0, 0],
                     [],
                     [],
                     [],
-                    [1, 3],
-                    [],
-                    [1, 5],
-                    [],
+                    [1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0],
                     [],
                     [],
                     [],
-                    [0, 2],
+                    [1, 1, 1],
+                    [],
+                    [1, 1, 1, 1, 1],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [0, 0],
                     [],
                     [],
                     []
@@ -67,22 +67,24 @@ class Backgammon:
 
     def put_checker(self, p1, p2):
         self._log.debug('p1=%s, p2=%s', p1, p2)
-        self._log.debug('_gameinfo=%a', self._gameinfo)
+        self._log.debug('_gameinfo[board][point]=%a',
+                        self._gameinfo['board']['point'])
 
-        p1data = self._gameinfo['board']['point'][p1]
-        p2data = self._gameinfo['board']['point'][p2]
-        self._log.debug('%s, %s', p1data, p2data)
+        ch = self._gameinfo['board']['point'][p1].pop()
+        self._gameinfo['board']['point'][p2].append(ch)
 
-        [player, n] = p1data
-        n -= 1
-        if n == 0:
-            self._gameinfo['board']['point'][p1] = []
-        else:
-            self._gameinfo['board']['point'][p1] = [player, n]
+        self._log.debug('_gameinfo[board][point]=%a',
+                        self._gameinfo['board']['point'])
 
-        if p2data == []:
-            self._gameinfo['board']['point'][p2] = [player, 1]
-        else:
-            self._gameinfo['board']['point'][p2][1] += 1
+    def cube(self, msg):
+        self._log.debug('msg=%s', msg)
 
-        self._log.debug('_gameinfo=%a', self._gameinfo)
+        self._gameinfo['board']['cube'] = msg
+
+        self._log.debug('_gameinfo[board][cube]=%a',
+                        self._gameinfo['board']['cube'])
+
+    def dice(self, msg):
+        self._log.debug('msg=%s', msg)
+        self._gameinfo['board']['dice'][msg['player']] = msg['dice']
+###

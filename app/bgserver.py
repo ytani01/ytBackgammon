@@ -15,6 +15,7 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
 bg = Backgammon(debug=True)
+client_sid = []
 
 
 @app.route('/')
@@ -38,12 +39,15 @@ def handle_connect():
               request.event['args'][0]['REMOTE_ADDR'],
               request.event['args'][0]['REMOTE_PORT'])
     _log.info('request.sid=%a', request.sid)
-    _log.info('request.namespace=%a', request.namespace)
     """
+    _log.info('request.namespace=%a', request.namespace)
     # for debug
     _log.debug('request.args=%a', request.args)
     _log.debug('request.event=%s', request.event)
     """
+
+    client_sid.append(request.sid)
+    _log.debug('client_sid=%s', client_sid)
 
     emit('json', {
         'src': 'server',
@@ -57,10 +61,13 @@ def handle_connect():
 def handle_disconnect():
     _log.info('request.sid=%s', request.sid)
 
+    client_sid.remove(request.sid)
+    _log.debug('client_sid=%s', client_sid)
+
 
 @socketio.on_error_default
 def default_error_handler(e):
-    _log.error('e=%a', type(e))
+    _log.error('e=%a:%a', type(e).__name__, e)
     _log.error('event[message]=%a', request.event["message"])
     _log.error('event[args]=%a', request.event["args"])
 
@@ -70,10 +77,25 @@ def handle_json(msg):
     _log.info('request.sid=%s', request.sid)
     _log.info('msg=%s', msg)
 
-    emit('json', msg, broadcast=True)
-
     if (msg['type'] == 'put_checker'):
         bg.put_checker(msg['data']['p1'], msg['data']['p2'])
+
+    if (msg['type'] == 'cube'):
+        bg.cube(msg['data'])
+
+    if (msg['type'] == 'dice'):
+        bg.dice(msg['data'])
+
+    emit('json', msg, broadcast=True)
+
+    """
+    emit('json', {
+        'src': 'server',
+        'dst': '',
+        'type': 'gameinfo',
+        'data': bg._gameinfo
+    }, broadcast=True)
+    """
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
