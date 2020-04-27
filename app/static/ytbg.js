@@ -9,7 +9,7 @@ const STAT_PLAYING = "playing";
 const STAT_FINISHED = "finished";
 
 /**
- *
+ * common class for Backgammon board items
  */
 class BackgammonObj {
     constructor(id, x, y) {
@@ -23,9 +23,11 @@ class BackgammonObj {
 
         this.image_dir = "/static/images/";
 
+        /*
         this.el.style.position = "absolute";
         this.el.style.cursor = "default";
         this.el.style.userSelect = "none";
+        */
 
         this.el.hidden = false;
         this.el.draggable = false;
@@ -76,7 +78,7 @@ class Checker extends BackgammonObj {
         [this.src_x, this.src_y] = [this.x, this.y];
         this.z = 0;
         
-        this.el.style.cursor = "move";
+        this.el.style.cursor = "pointer";
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
@@ -159,6 +161,8 @@ class Checker extends BackgammonObj {
         let ch = this.board.moving_checker;
         console.log("on_mouse_up: ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
+
+        // this.board.emit_msg('mouse_up', {x: x, y: y});
 
         ch.move(x, y, true);
         let p = ch.board.chpos2point(ch);
@@ -256,7 +260,7 @@ class Cube extends BackgammonObj {
         this.file_prefix = this.image_dir + "cubeA-";
         this.file_suffix = ".png";
 
-        this.el.style.cursor = "crosshair";
+        this.el.style.cursor = "pointer";
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
@@ -621,6 +625,25 @@ class Board extends BackgammonObj {
         ver_el.innerHTML = "<strong>" + MY_NAME + "</strong>, " + VERSION_STR;
     }
 
+    search_checker(ch_id) {
+        console.log('search_checker> ' + ch_id);
+        let player = parseInt(ch_id[1]);
+        console.log('search_checker> ' + player);
+
+        for (let i=0; i < 15; i++) {
+            let ch = this.checker[player][i];
+            if ( ch.id == ch_id ) {
+                return ch;
+            }
+        }
+        return undefined;
+    }
+
+    emit_msg(type, data) {
+        console.log('emit_msg> ' + type);
+        this.ws.emit('json', {src: this.player, type: type, data: data});
+    }
+
     set_turn(player) {
         this.turn = player;
         console.log('turn=' + this.turn);
@@ -782,12 +805,14 @@ class Board extends BackgammonObj {
         return undefined;
     }
 
-    put_checker(ch, p) {
+    put_checker(ch, p, remote=false) {
         console.log("put_checker(" + ch.id + "," + p + ")");
+        let prev_p = undefined;
+
         if ( ch.cur_point !== undefined ) {
             console.log("ch.cur_point=" + ch.cur_point);
-            let prev_po = this.point[ch.cur_point];
-            ch = prev_po.checkers.pop();
+            prev_p = ch.cur_point;
+            ch = this.point[prev_p].checkers.pop();
             console.log("ch.id=" + ch.id);
         }
 
@@ -802,6 +827,10 @@ class Board extends BackgammonObj {
         ch.cur_point = p;
 
         po.checkers.push(ch);
+
+        if ( ! remote ) {
+            this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p});
+        }
     }
 
     put_checkers(points) {
@@ -863,31 +892,49 @@ class BoardPoint {
  *
  */
 window.onload = function () {
-    let url = "http://" + document.domain + ":" + location.port + "/test";
+    let url = "http://" + document.domain + ":" + location.port + "/";
     let ws = io.connect(url);
 
-    let board = new Board("board", 0, 0, 0, ws);
-    board.set_turn(1);
+    let player = 0;
+    if ( location.pathname == "/p2" ) {
+        player = 1;
+    }
+
+    let board = new Board("board", 0, 0, player, ws);
+
+    const emit_msg = function (type, data) {
+        ws.emit('json', {src: player, type: type, data: data});        
+    };
 
     ws.on('connect', function() {
         console.log('connected');
+
+        // emit_msg("hello", "hi!");
+        // ws.emit('json', {src: player, type: 'hello', data: 'hello'});
     });
 
     ws.on('disconnect', function() {
         console.log('disconnected');
     });
 
-    ws.on('s', function(msg) {
-        console.log("s> " + JSON.stringify(msg));
+    ws.on('json', function(msg) {
+        console.log("msg> " + JSON.stringify(msg));
 
         /*
-        if ( msg.event == 'load' ) {
-            board.put_checkers(msg.data);
+        if ( msg.src == player ) {
+            console.log('msg> ignore');
+            return;
         }
         */
 
-        if ( msg.event == 'gameinfo' ) {
+        if ( msg.type == 'gameinfo' ) {
             board.load_gameinfo(msg.data);
+        }
+
+        if ( msg.type == 'put_checker' ) {
+            let ch = board.search_checker(msg.data.ch);
+            console.log('ch.id = ' + ch.id);
+            board.put_checker(ch, msg.data.p2, true);
         }
     });
 };

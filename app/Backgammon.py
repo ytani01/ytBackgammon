@@ -1,48 +1,11 @@
 import json
 from MyLogger import get_logger
-import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
-class Checker:
-    _log = get_logger(__name__, False)
-
-    def __init__(self, player, num, debug=False):
-        self._dbg = debug
-        __class__._log = get_logger(__class__.__name__, self._dbg)
-        self._log.debug('player=%s, num=%s', player, num)
-
-        self._player = player
-        self._num = num
-
-    def toString(self):
-        self._log.debug('')
-        return 'Checker(%d,%02d)' % (self._player, self._num)
-        
-
-class Board:
-    _log = get_logger(__name__, False)
-
-    def __init__(self, debug=False):
-        self._dbg = debug
-        __class__._log = get_logger(__class__.__name__, self._dbg)
-        self._log.debug('')
-
-        self.point = [[]]*28
-        self._log.debug('point=%s', self.point)
-
-        self.checker = [[],[]]
-        for p in [0, 1]:
-            for ch in range(15):
-                self.checker[p].append(Checker(p, ch))
-
-    def put_checker(self, player, num, point):
-        self._log.debug('[%s,%s]->%s', player, num, point)
-        
-
 class Backgammon:
     _log = get_logger(__name__, False)
-    
+
     def __init__(self, debug=False):
         self._dbg = debug
         __class__._log = get_logger(__class__.__name__, self._dbg)
@@ -64,31 +27,31 @@ class Backgammon:
                     'accepted': True
                 },
                 'point': [
-                    [0, 1],
-                    [0, 1],
                     [],
+                    [1, 2],
                     [],
-                    [],
-                    [],
-                    [1, 5],
-                    [],
-                    [1, 3],
                     [],
                     [],
                     [],
                     [0, 5],
-                    [1, 5],
-                    [],
-                    [],
                     [],
                     [0, 3],
                     [],
+                    [],
+                    [],
+                    [1, 5],
                     [0, 5],
                     [],
                     [],
                     [],
+                    [1, 3],
                     [],
-                    [1, 2],
+                    [1, 5],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [0, 2],
                     [],
                     [],
                     []
@@ -99,11 +62,27 @@ class Backgammon:
 
         json_data = json.dumps(self._gameinfo)
         self._log.debug('json_data=%a', json_data)
-        
 
         self.player = None
 
-        self.board = Board(debug=self._dbg)
+    def put_checker(self, p1, p2):
+        self._log.debug('p1=%s, p2=%s', p1, p2)
+        self._log.debug('_gameinfo=%a', self._gameinfo)
 
+        p1data = self._gameinfo['board']['point'][p1]
+        p2data = self._gameinfo['board']['point'][p2]
+        self._log.debug('%s, %s', p1data, p2data)
 
-#Backgammon(debug=True)
+        [player, n] = p1data
+        n -= 1
+        if n == 0:
+            self._gameinfo['board']['point'][p1] = []
+        else:
+            self._gameinfo['board']['point'][p1] = [player, n]
+
+        if p2data == []:
+            self._gameinfo['board']['point'][p2] = [player, 1]
+        else:
+            self._gameinfo['board']['point'][p2][1] += 1
+
+        self._log.debug('_gameinfo=%a', self._gameinfo)
