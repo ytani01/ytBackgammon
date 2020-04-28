@@ -4,9 +4,13 @@
 from Backgammon import Backgammon
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
+import copy
 from MyLogger import get_logger
 import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+
+MY_NAME = 'ytBackgammon Server'
+VERSION = '0.10'
 
 _log = get_logger(__name__, True)
 
@@ -14,23 +18,27 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
-bg = Backgammon(debug=True)
 client_sid = []
+history = []
+fwd_hist = []
+bg = Backgammon(debug=True)
 
+history.append(copy.deepcopy(bg._gameinfo))
+_log.debug('history=(%d)%s', len(history), history)
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('top.html', name=MY_NAME, version=VERSION)
 
 
 @app.route('/p1')
 def index_p1():
-    return render_template('index.html')
+    return render_template('index.html', name=MY_NAME, version=VERSION)
 
 
 @app.route('/p2')
 def index_p2():
-    return render_template('index.html')
+    return render_template('index.html', name=MY_NAME, version=VERSION)
 
 
 @socketio.on('connect')
@@ -39,22 +47,12 @@ def handle_connect():
               request.event['args'][0]['REMOTE_ADDR'],
               request.event['args'][0]['REMOTE_PORT'])
     _log.info('request.sid=%a', request.sid)
-    """
-    _log.info('request.namespace=%a', request.namespace)
-    # for debug
-    _log.debug('request.args=%a', request.args)
-    _log.debug('request.event=%s', request.event)
-    """
 
     client_sid.append(request.sid)
     _log.debug('client_sid=%s', client_sid)
 
-    emit('json', {
-        'src': 'server',
-        'dst': '',
-        'type': 'gameinfo',
-        'data': bg._gameinfo
-    })
+    emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                  'data': bg._gameinfo})
 
 
 @socketio.on('disconnect')
@@ -74,28 +72,58 @@ def default_error_handler(e):
 
 @socketio.on('json')
 def handle_json(msg):
+    global fwd_hist
     _log.info('request.sid=%s', request.sid)
     _log.info('msg=%s', msg)
 
-    if (msg['type'] == 'put_checker'):
-        bg.put_checker(msg['data']['p1'], msg['data']['p2'])
+    append_history = True
+    
+    if msg['type'] == 'back':
+        _log.debug('history=(%d)%s', len(history), history)
 
-    if (msg['type'] == 'cube'):
+        if len(history) == 1:
+            bg._gameinfo = copy.deepcopy(history[0])
+        else:
+            fwd_hist.append(history.pop())
+            bg._gameinfo = copy.deepcopy(history[-1])
+            
+        _log.debug('history=(%d)%s', len(history), history)
+
+        emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                      'data': bg._gameinfo})
+        return
+
+    if msg['type'] == 'forward':
+        if len(fwd_hist) == 0:
+            return
+
+        history.append(fwd_hist.pop())
+
+        bg._gameinfo = copy.deepcopy(history[-1])
+
+        emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                      'data': bg._gameinfo})
+        return
+
+    if msg['type'] == 'put_checker':
+        bg.put_checker(msg['data']['p1'], msg['data']['p2'])
+        if msg['data']['p2'] >= 26:
+            _log.debug('hit')
+            append_history = False
+            
+
+    if msg['type'] == 'cube':
         bg.cube(msg['data'])
 
-    if (msg['type'] == 'dice'):
+    if msg['type'] == 'dice':
         bg.dice(msg['data'])
 
-    emit('json', msg, broadcast=True)
+    fwd_hist = []
+    if append_history:
+        history.append(copy.deepcopy(bg._gameinfo))
+        _log.debug('history=(%d)%s', len(history), history)
 
-    """
-    emit('json', {
-        'src': 'server',
-        'dst': '',
-        'type': 'gameinfo',
-        'data': bg._gameinfo
-    }, broadcast=True)
-    """
+    emit('json', msg, broadcast=True)
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)

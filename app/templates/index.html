@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"> -->
     <meta name="viewport"
-          content="width=device-width, initial-scale=1, minimum-scale=0.25, maximum-scale=3">
+          content="width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=3">
     <title>ytBackgammon (alpha)</title>
     <script
       type="text/javascript"
@@ -14,6 +14,10 @@
     <link rel="stylesheet" type="text/css" href="/static/ytbg.css">
   </head>
   <body>
+    <div id="name">
+      <strong>{{ name }}</strong>, Version {{ version }}<br />
+      <span id="version">Version Number</span>
+    </div>
     <div id="board"><image src="/static/images/board-base.png">
         <div class="onboardtext"
              id="p0text"><image src="/static/images/checker-White.png"></div>
@@ -64,6 +68,5 @@
         <div id="dice12"><image src="/static/images/dice-Red-1.png"></div>
         <div id="dice13"><image src="/static/images/dice-Red-1.png"></div>
     </div>
-    <div id="version">Version Number</div>
   </body>
 </html>
