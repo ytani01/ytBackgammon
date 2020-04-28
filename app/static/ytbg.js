@@ -599,15 +599,17 @@ class Board extends BackgammonObj {
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
 
         // Buttons
+        const button_top = this.y + this.h + 10;
+        
         // * Undo button
         this.undo_el = document.getElementById("button-undo");
         const undo_width = this.undo_el.firstElementChild.width;
-        this.undo_el.style.left = (this.w / 2 - undo_width - 10)
-            + this. x + "px";
-        this.undo_el.style.top = "10px";
+        this.undo_el.style.left = (this.w / 2 - undo_width - 30 + this.x)
+            + "px";
+        this.undo_el.style.top = button_top + "px";
 
-        this.undo_el.onmousedown = e => {this.emit_msg('back', {});};
-        this.undo_el.ontouchstart = e => {this.emit_msg('back', {});};
+        this.undo_el.onmousedown = e => { this.emit_msg('back', {}); };
+        this.undo_el.ontouchstart = e => { this.emit_msg('back', {}); };
         this.undo_el.onmouseup = this.on_null.bind(this);
         this.undo_el.ontouchend = this.on_null.bind(this);
         this.undo_el.onmousemove = this.on_null.bind(this);
@@ -616,16 +618,31 @@ class Board extends BackgammonObj {
         
         // * Redo button
         this.redo_el = document.getElementById("button-redo");
-        this.redo_el.style.left = (this.w / 2 + 10) + this.x + "px";
-        this.redo_el.style.top = "10px";
+        this.redo_el.style.left = (this.w / 2 + 30) + this.x + "px";
+        this.redo_el.style.top = button_top + "px";
 
-        this.redo_el.onmousedown = e => {this.emit_msg('forward', {});};
-        this.redo_el.ontouchstart = e => {this.emit_msg('forward', {});};
+        this.redo_el.onmousedown = e => { this.emit_msg('forward', {}); };
+        this.redo_el.ontouchstart = e => { this.emit_msg('forward', {}); };
         this.redo_el.onmouseup = this.on_null.bind(this);
         this.redo_el.ontouchend = this.on_null.bind(this);
         this.redo_el.onmousemove = this.on_null.bind(this);
         this.redo_el.ontouchmove = this.on_null.bind(this);
         this.redo_el.ondragstart = this.on_null.bind(this);
+
+        // * Inverse button
+        this.inverse_el = document.getElementById("button-inverse");
+        const inverse_width = this.inverse_el.firstElementChild.width;
+        this.inverse_el.style.left = (this.x + this.w / 2 - inverse_width / 2)
+            + "px";
+        this.inverse_el.style.top = button_top + "px";
+        
+        this.inverse_el.onmousedown = e => { this.inverse(); };
+        this.inverse_el.ontouchstart = e => { this.inverse(); };
+        this.inverse_el.onmouseup = this.on_null.bind(this);
+        this.inverse_el.ontouchend = this.on_null.bind(this);
+        this.inverse_el.onmousemove = this.on_null.bind(this);
+        this.inverse_el.ontouchmove = this.on_null.bind(this);
+        this.inverse_el.ondragstart = this.on_null.bind(this);
         
         // <body>
         let body_el = document.body;
@@ -868,6 +885,7 @@ class Board extends BackgammonObj {
         }
         let [x, y] = this.get_xy(e);
 
+        /*
         // inverse
         if ( y < this.by[0] || y > this.by[1] ) {
             this.inverse();
@@ -887,6 +905,7 @@ class Board extends BackgammonObj {
             console.log("Board.on_mouse_down> forward");
             this.emit_msg('forward', {});
         }
+        */
 
         // dice area
         let da = this.dice_area[this.player];
