@@ -408,9 +408,22 @@ class Dice extends BackgammonObj {
         this.file_suffix = ".png";
         this.value = 1;
 
+        this.el_image = this.el.firstElementChild;
+
         this.el.hidden = true;
+        this.el.style.width = this.el_image.width + "px";
+        this.el.style.height = this.el_image.height + "px";
+        this.el.style.backgroundColor = "#000";
 
         this.move(x, y, true);
+    }
+
+    dark() {
+        this.el_image.style.opacity = 0.5;
+    }
+
+    bright() {
+        this.el_image.style.opacity = 1.0;
     }
 
     set_value(val) {
@@ -522,10 +535,19 @@ class DiceArea {
         return dice_value;
     }
 
+    bright(dice) {
+        this.dice[dice].bright();
+    }
+
+    dark(dice) {
+        this.dice[dice].dark();
+    }
+
     clear(emit=false) {
         console.log("DiceArea.clear()");
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].el.hidden = true;
+            this.bright(d);
         }
         this.active = false;
 
