@@ -140,6 +140,10 @@ class Checker extends BackgammonObj {
         console.log("on_mouse_down> ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
         
+        if ( this.player == 1 - this.board.player ) {
+            return;
+        }
+
         if ( ch.cur_point !== undefined ) {
             let point = ch.board.point[ch.cur_point];
             ch = point.checkers.slice(-1)[0];
@@ -162,6 +166,9 @@ class Checker extends BackgammonObj {
         let [x, y] = this.board.get_xy(e);
 
         let ch = this.board.moving_checker;
+        if ( ch === undefined ) {
+            return;
+        }
         console.log("on_mouse_up> ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
 
@@ -585,12 +592,41 @@ class Board extends BackgammonObj {
         [this.dx, this.dy] = [740, 320];
 
         // Title
-        // const name_el = document.getElementById("name");
-        // name_el.style.left = (this.x + 5) + "px";
+        const name_el = document.getElementById("name");
+        name_el.style.left = "35px";
         // name_el.style.top = "0px";
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
 
+        // Buttons
+        // * Undo button
+        this.undo_el = document.getElementById("button-undo");
+        const undo_width = this.undo_el.firstElementChild.width;
+        this.undo_el.style.left = (this.w / 2 - undo_width - 10)
+            + this. x + "px";
+        this.undo_el.style.top = "10px";
+
+        this.undo_el.onmousedown = e => {this.emit_msg('back', {});};
+        this.undo_el.ontouchstart = e => {this.emit_msg('back', {});};
+        this.undo_el.onmouseup = this.on_null.bind(this);
+        this.undo_el.ontouchend = this.on_null.bind(this);
+        this.undo_el.onmousemove = this.on_null.bind(this);
+        this.undo_el.ontouchmove = this.on_null.bind(this);
+        this.undo_el.ondragstart = this.on_null.bind(this);
+        
+        // * Redo button
+        this.redo_el = document.getElementById("button-redo");
+        this.redo_el.style.left = (this.w / 2 + 10) + this.x + "px";
+        this.redo_el.style.top = "10px";
+
+        this.redo_el.onmousedown = e => {this.emit_msg('forward', {});};
+        this.redo_el.ontouchstart = e => {this.emit_msg('forward', {});};
+        this.redo_el.onmouseup = this.on_null.bind(this);
+        this.redo_el.ontouchend = this.on_null.bind(this);
+        this.redo_el.onmousemove = this.on_null.bind(this);
+        this.redo_el.ontouchmove = this.on_null.bind(this);
+        this.redo_el.ondragstart = this.on_null.bind(this);
+        
         // <body>
         let body_el = document.body;
         body_el.style.width = (this.w * 2) + "px";
@@ -877,6 +913,10 @@ class Board extends BackgammonObj {
         let [x, y] = this.get_xy(e);
 
         this.moving_checker.move(x, y, true);
+    }
+
+    on_null(e) {
+        return false;
     }
 
     on_mouse_up(e) {

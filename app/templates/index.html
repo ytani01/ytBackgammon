@@ -12,11 +12,31 @@
     </script>
     <script type="text/javascript" src="/static/ytbg.js"></script>
     <link rel="stylesheet" type="text/css" href="/static/ytbg.css">
+    <link rel="stylesheet" type="text/css" href="/static/menu.css">
   </head>
   <body>
+    <div id="menu">
+      <div>
+        <a href="#menu"
+           class="menuopen"><img src="/static/images/menu01.png"></a>
+        <a href="#close"
+           class="menuclose"><img src="/static/images/menu01.png">
+      </div>
+      <ul>
+	<li><a>Undo</a></li>
+	<li><a>Redo</a></li>
+	<li><a>Reset</a></li>
+      </ul>
+    </div>
     <div id="name">
       <strong>{{ name }}</strong>, Version {{ version }}<br />
       <span id="version">Version Number</span>
+    </div>
+    <div id="buttons">
+      <div id="button-undo">
+        <image src="/static/images/button-bak.png"></div>
+      <div id="button-redo">
+        <image src="/static/images/button-fwd.png"></div>
     </div>
     <div id="board"><image src="/static/images/board-base.png">
         <div class="onboardtext"
