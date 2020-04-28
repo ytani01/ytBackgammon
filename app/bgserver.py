@@ -127,13 +127,16 @@ def handle_json(msg):
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.option('--port', '-p', 'port', type=int, default=5001,
+               help='port number')
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag')
-def main(debug):
+def main(port, debug):
     _log = get_logger(__name__, debug)
+    _log.info('port=%s', port)
 
     try:
-        socketio.run(app, host='0.0.0.0', debug=debug)
+        socketio.run(app, host='0.0.0.0', port=int(port), debug=debug)
     finally:
         _log.info('end')
 
