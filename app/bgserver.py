@@ -90,7 +90,7 @@ def handle_json(msg):
         _log.debug('history=(%d)%s', len(history), history)
 
         emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
-                      'data': bg._gameinfo})
+                      'data': bg._gameinfo}, broadcast=True)
         return
 
     if msg['type'] == 'forward':
@@ -102,7 +102,7 @@ def handle_json(msg):
         bg._gameinfo = copy.deepcopy(history[-1])
 
         emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
-                      'data': bg._gameinfo})
+                      'data': bg._gameinfo}, broadcast=True)
         return
 
     if msg['type'] == 'put_checker':
