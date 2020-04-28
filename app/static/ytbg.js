@@ -2,11 +2,7 @@
  *
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.10";
-
-const STAT_READY = "ready";
-const STAT_PLAYING = "playing";
-const STAT_FINISHED = "finished";
+const VERSION = "0.11";
 
 /**
  * common class for Backgammon board items
@@ -29,6 +25,12 @@ class BackgammonObj {
         this.move(this.x, this.y, false);
     }
 
+    /**
+     * move object to (x, y)
+     * @param {number} x
+     * @param {number} y
+     * @param {boolean} center - center flag
+     */
     move(x, y, center=false) {
         [this.x, this.y] = [x, y];
 
@@ -69,7 +71,7 @@ class OnBoardText extends BackgammonObj {
  *
  */
 class Checker extends BackgammonObj {
-    /*
+    /**
      * @param {string} id - div tag id
      * @param {number} player - 0 or 1
      * @param {Board} board - board object
@@ -98,11 +100,17 @@ class Checker extends BackgammonObj {
         this.cur_point = undefined;
     }
 
+    /**
+     * @param {number} z
+     */
     set_z(z) {
         this.z = z;
         this.el.style.zIndex = this.z;
     }
 
+    /**
+     * @return {number} z座標
+     */
     calc_z() {
         let z = 0;
 
@@ -124,11 +132,19 @@ class Checker extends BackgammonObj {
         this.set_z(z);
     }
 
+    /**
+     * calcurate distance
+     * @param {Checker} ch - distination checker object
+     * @return {number} - distance
+     */
     distance(ch) {
         let [dx, dy] = [ch.x - this.x, ch.y - this.y];
         return Math.sqrt(dx * dx + dy * dy);
     }
     
+    /**
+     *
+     */
     on_mouse_down(e) {
         e.preventDefault();
         if ( e.changedTouches ) {
@@ -158,7 +174,11 @@ class Checker extends BackgammonObj {
 
     }
 
+    /**
+     *
+     */
     on_mouse_up(e) {
+        console.log("Checker.on_mouse_up> ");
         e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
@@ -169,34 +189,52 @@ class Checker extends BackgammonObj {
         if ( ch === undefined ) {
             return;
         }
-        console.log("on_mouse_up> ch.id=" + ch.id
+
+        console.log("Checker.on_mouse_up> ch.id=" + ch.id
                     + ", (x,y)=(" + x + "," + y + ")");
 
-        // this.board.emit_msg('mouse_up', {x: x, y: y});
-
         ch.move(x, y, true);
-        let p = ch.board.chpos2point(ch);
-        console.log("on_mouse_up> p=" + p);
 
+        /**
+         * destination point index
+         * @type {Number}
+         */
+        let p = ch.board.chpos2point(ch);
+        console.log(`Checker.on_mouse_up> p=${p}`);
+
+        /**
+         * サイコロ判定
+         */
+        let active_dice = this.board.get_active_dice();
+        console.log(`Checker.on_mouse_up> active_dice=${JSON.stringify(active_dice)}`);
+
+        /**
+         * 移動先ポイントに応じた判定
+         */
         let can_move = false;
         let hit_ch = undefined;
         let checkers = undefined;
 
         if ( p >= 0 && p <= ch.board.point.length) {
             checkers = ch.board.point[p].checkers;
-            if ( p == 0 || p == 26 ) {
+            if ( p == 0 ) {
                 if ( ch.player == 0 ) {
                     can_move = true;
                 }
-            } else if ( p == 25 || p == 27 ) {
+            } else if ( p == 25 ) {
                 if ( ch.player == 1 ) {
                     can_move = true;
                 }
+            } else if ( p == 26 || p == 27 ) {
+                // cannnot move
             } else if ( checkers.length == 0 ) {
                 can_move = true;
             } else if ( checkers[0].player == ch.player ) {
                 can_move = true;
             } else if ( checkers.length == 1 ) {
+                /**
+                 * hit
+                 */
                 can_move = true;
                 hit_ch = checkers[0];
             }
@@ -209,7 +247,8 @@ class Checker extends BackgammonObj {
         }
 
         if ( hit_ch !== undefined ) {
-            console.log("on_mouse_up> hit_ch.id=" + hit_ch.id);
+            console.log(`Checker.on_mouse_up> hit_ch.id=${hit_ch.id}`);
+
             let bar_p = 27;
             if ( hit_ch.player == 0 ) {
                 bar_p = 26;
@@ -224,6 +263,9 @@ class Checker extends BackgammonObj {
         ch.board.moving_checker = undefined;
     } // on_mouse_up()
 
+    /**
+     *
+     */
     on_mouse_move(e) {
         e.preventDefault();
         if ( e.changedTouches ) {
@@ -235,12 +277,13 @@ class Checker extends BackgammonObj {
         if ( ch === undefined ) {
             return;
         }
-        console.log("on_mouse_move> ch.id=" + ch.id
-                    + ", (x,y)=(" + x + "," + y + ")");
         
         ch.move(x, y, true);
     }
 
+    /**
+     * 
+     */
     on_drag_start(e) {
         return false;
     }
@@ -289,6 +332,9 @@ class Cube extends BackgammonObj {
         //this.double(1);
     }
 
+    /**
+     * 
+     */
     set(val, player=undefined, accepted=false, emit=true) {
         console.log("Cube.set(val=" + val
                     + ", player=" + player
@@ -329,6 +375,9 @@ class Cube extends BackgammonObj {
         }
     }
 
+    /**
+     * 
+     */
     double(player=undefined) {
         console.log("Cube.double(player=" + player + ")");
         if ( player === undefined ) {
@@ -349,12 +398,18 @@ class Cube extends BackgammonObj {
         this.set(this.value, player, false);
     }
 
+    /**
+     *
+     */
     double_accept() {
         console.log("Cube.double_accept()");
 
         this.set(this.value, this.player, true);
     }
 
+    /**
+     *
+     */
     double_cancel() {
         console.log("Cube.double_cancel()");
         
@@ -366,6 +421,9 @@ class Cube extends BackgammonObj {
         this.set(value, player, true);
     }
 
+    /**
+     *
+     */
     on_mouse_down(e) {
         console.log("Cube.on_mouse_down> this.player=" + this.player
                    + ", this.board.player=" + this.board.player);
@@ -385,10 +443,16 @@ class Cube extends BackgammonObj {
         }
     }
 
+    /**
+     *
+     */
     on_mouse_up(e) {
         return false;
     }
 
+    /**
+     *
+     */
     on_drag_start(e) {
         return false;
     }
@@ -406,7 +470,15 @@ class Dice extends BackgammonObj {
         this.board = board;
 
         this.file_suffix = ".png";
-        this.value = 1;
+
+        /**
+         * ダイスの値
+         * @type {number}
+         *    0,10: 画面に表示されない
+         *    1- 6: 有効な値
+         *   11-16: 使えない(使い終わった)状態：暗くなる
+         *
+        this.value = 0;
 
         this.el_image = this.el.firstElementChild;
 
@@ -418,27 +490,57 @@ class Dice extends BackgammonObj {
         this.move(x, y, true);
     }
 
-    dark() {
-        this.el_image.style.opacity = 0.5;
-    }
-
-    bright() {
+    /**
+     *
+     */
+    enable() {
         this.el_image.style.opacity = 1.0;
+        this.value = this.value % 10;
     }
 
-    set_value(val) {
-        this.value = val;
+    /**
+     *
+     */
+    disable() {
+        this.el_image.style.opacity = 0.5;
+        this.value = this.value % 10 + 10;
+    }
 
-        let filename = this.image_dir + this.file_prefix + val
-            + this.file_suffix;
-        console.log("Dice.set_value(): filename=" + filename);
+    /**
+     * @param {number} val - dice number, 11-16 .. disable
+     */
+    set(val) {
+        console.log(`Dice.set(val=${val})>`);
+        this.value = val;
+        this.el.hidden = true;
+        this.enable();
+
+        if (val < 1) {
+            return;
+        }
+
+        if (val > 10) {
+            this.disable();
+            val %= 10;
+            this.value = val;
+        }
+
+        if ( val < 1 || val > 6 ) {
+            return;
+        }
 
         this.el.hidden = false;
+
+        const filename = this.image_dir + this.file_prefix + val + this.file_suffix;
+        console.log(`Dice.set(val=${val})> filename=${filename}`);
         this.el.firstChild.src = filename;
     }
-
+    
+    /**
+     *
+     */
     roll() {
-        this.set_value(Math.floor(Math.random() * 6) + 1);
+        this.set(Math.floor(Math.random() * 6) + 1);
         return this.value;
     }
 } // class Dice
@@ -484,9 +586,13 @@ class DiceArea {
                                 this.player, file_prefix, this.board));
     }
 
+    /**
+     * Set dice values
+     * @param {number[][]} dice_value
+     * @param {boolean} [emit=true] - emit flag
+     */
     set(dice_value, emit=true) {
-        console.log("DiceArea.set(dive_value=" + toString(dice_value)
-                    + ", emit=" + emit + ")");
+        console.log(`DiceArea.set(dive_value=${JSON.stringify(dice_value)}, emit=${emit})`);
         
         this.clear();
         
@@ -494,7 +600,7 @@ class DiceArea {
             if ( dice_value[i] < 1 ) {
                 continue;
             }
-            this.dice[i].set_value(dice_value[i]);
+            this.dice[i].set(dice_value[i]);
             this.active = true;
         } // for(i)
 
@@ -504,6 +610,23 @@ class DiceArea {
         }
     }
 
+    /**
+     * Get dice values
+     * @return {number[]} - dice values
+     */
+    get() {
+        let values = [];
+        for (let i=0; i < this.dice.length; i++) {
+            values.push(this.dice[i].value);
+        }
+        console.log(`DiceArea.get> values=${values}`);
+        return values;
+    }
+
+    /**
+     * Roll dices
+     * @return {number[]} - dice values
+     */
     roll() {
         console.log("DiceArea.roll()");
         this.clear();
@@ -517,8 +640,8 @@ class DiceArea {
 
         this.active = true;
 
-        let value1 = this.dice[d1].roll();
-        let value2 = this.dice[d2].roll();
+        const value1 = this.dice[d1].roll();
+        const value2 = this.dice[d2].roll();
 
         let dice_value = [0, 0, 0, 0];
         dice_value[d1] = value1;
@@ -526,28 +649,80 @@ class DiceArea {
 
         if ( value1 == value2 ) {
             for ( let d = 0; d < 4; d++ ) {
-                this.dice[d].set_value(value1);
+                this.dice[d].set(value1);
             }
             dice_value = [value1, value1, value1, value1];
         }
 
+        const bar_p = 26 + this.player;
+        if ( this.board.point[bar_p].checkers.length > 0 ) {
+            /**
+             * ヒットされてる場合の確認
+             */
+            console.log(`DiceArea.roll> hit`);
+
+            let dancing = true;
+
+            for (let d=0; d < 4; d++) {
+                if ( dice_value[d] == 0 ) {
+                    continue;
+                }
+
+                let dst_p = dice_value[d];
+                if ( this.player == 0 ) {
+                    dst_p = 25 - dice_value[d];
+                }
+                
+                let checkers = this.board.point[dst_p].checkers;
+                if ( checkers.length <= 1 || checkers[0].player == this.player ) {
+                    dancing = false;
+                    break;
+                }
+            } // for(d)
+
+            if ( dancing ) {
+                for (let d=0; d < 4; d++) {
+                    if ( dice_value[d] == 0 ) {
+                        continue;
+                    }
+                    this.dice[d].disable();
+                    dice_value[d] += 10;
+                }
+                console.log(`DiceArea.roll> dice_value=${JSON.stringify(dice_value)}`);
+            }
+        }
+
+        /**
+         * emit
+         */
         this.board.emit_msg('dice', {player: this.player, dice: dice_value});
+
         return dice_value;
     }
 
-    bright(dice) {
-        this.dice[dice].bright();
+    /**
+     *
+     */
+    enable(dice) {
+        this.dice[dice].enable();
     }
 
-    dark(dice) {
-        this.dice[dice].dark();
+    /**
+     *
+     */
+    disable(dice) {
+        this.dice[dice].disable();
     }
 
+    /**
+     *
+     */
     clear(emit=false) {
         console.log("DiceArea.clear()");
         for ( let d=0; d < 4; d++ ) {
+            this.dice[d].set(0);
             this.dice[d].el.hidden = true;
-            this.bright(d);
+            this.enable(d);
         }
         this.active = false;
 
@@ -558,6 +733,9 @@ class DiceArea {
         return [];
     }
 
+    /**
+     *
+     */
     in_this(x, y) {
         return (x >= this.x) && (x <= this.x + this.w)
             && (y >= this.y) && (y <= this.y + this.h);
@@ -632,11 +810,11 @@ class Board extends BackgammonObj {
 
         this.undo_el.onmousedown = e => { this.emit_msg('back', {}); };
         this.undo_el.ontouchstart = e => { this.emit_msg('back', {}); };
-        this.undo_el.onmouseup = this.on_null.bind(this);
-        this.undo_el.ontouchend = this.on_null.bind(this);
-        this.undo_el.onmousemove = this.on_null.bind(this);
-        this.undo_el.ontouchmove = this.on_null.bind(this);
-        this.undo_el.ondragstart = this.on_null.bind(this);
+        this.undo_el.onmouseup = this.null_handler.bind(this);
+        this.undo_el.ontouchend = this.null_handler.bind(this);
+        this.undo_el.onmousemove = this.null_handler.bind(this);
+        this.undo_el.ontouchmove = this.null_handler.bind(this);
+        this.undo_el.ondragstart = this.null_handler.bind(this);
         
         // * Redo button
         this.redo_el = document.getElementById("button-redo");
@@ -645,11 +823,11 @@ class Board extends BackgammonObj {
 
         this.redo_el.onmousedown = e => { this.emit_msg('forward', {}); };
         this.redo_el.ontouchstart = e => { this.emit_msg('forward', {}); };
-        this.redo_el.onmouseup = this.on_null.bind(this);
-        this.redo_el.ontouchend = this.on_null.bind(this);
-        this.redo_el.onmousemove = this.on_null.bind(this);
-        this.redo_el.ontouchmove = this.on_null.bind(this);
-        this.redo_el.ondragstart = this.on_null.bind(this);
+        this.redo_el.onmouseup = this.null_handler.bind(this);
+        this.redo_el.ontouchend = this.null_handler.bind(this);
+        this.redo_el.onmousemove = this.null_handler.bind(this);
+        this.redo_el.ontouchmove = this.null_handler.bind(this);
+        this.redo_el.ondragstart = this.null_handler.bind(this);
 
         // * Inverse button
         this.inverse_el = document.getElementById("button-inverse");
@@ -660,11 +838,11 @@ class Board extends BackgammonObj {
         
         this.inverse_el.onmousedown = e => { this.inverse(); };
         this.inverse_el.ontouchstart = e => { this.inverse(); };
-        this.inverse_el.onmouseup = this.on_null.bind(this);
-        this.inverse_el.ontouchend = this.on_null.bind(this);
-        this.inverse_el.onmousemove = this.on_null.bind(this);
-        this.inverse_el.ontouchmove = this.on_null.bind(this);
-        this.inverse_el.ondragstart = this.on_null.bind(this);
+        this.inverse_el.onmouseup = this.null_handler.bind(this);
+        this.inverse_el.ontouchend = this.null_handler.bind(this);
+        this.inverse_el.onmousemove = this.null_handler.bind(this);
+        this.inverse_el.ontouchmove = this.null_handler.bind(this);
+        this.inverse_el.ondragstart = this.null_handler.bind(this);
         
         // <body>
         let body_el = document.body;
@@ -768,7 +946,6 @@ class Board extends BackgammonObj {
             }
         } // for
 
-
         // DiceArea
         let da_w = this.bx[5] - this.dx;
         let da_h = this.h - this.dy * 2;
@@ -777,19 +954,19 @@ class Board extends BackgammonObj {
                                            0, this));
         this.dice_area.push(new DiceArea(this.bx[2], this.dy, da_w, da_h,
                                          1, this));
-        this.dice_value = [[], []];
+        // this.dice_value = [[], []];
 
         // Event handlers
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
 
-        this.el.onmouseup = this.on_mouse_up.bind(this);
-        this.el.ontouchend = this.on_mouse_up.bind(this);
+        this.el.onmouseup = this.null_handler.bind(this);
+        this.el.ontouchend = this.null_handler.bind(this);
 
         this.el.onmousemove = this.on_mouse_move.bind(this);
         this.el.ontouchmove = this.on_mouse_move.bind(this);
 
-        this.el.ondragstart = this.on_drag_start.bind(this);
+        this.el.ondragstart = this.null_handler.bind(this);
 
         if ( this.player == 1 ) {
             this.player = 0;
@@ -797,6 +974,11 @@ class Board extends BackgammonObj {
         }
     }
 
+    /**
+     * search checker object by checker id
+     * @param {string} ch_id - checker id
+     * @return {Checker | undefined} - checker object or undefined
+     */
     search_checker(ch_id) {
         console.log('search_checker> ' + ch_id);
         let player = parseInt(ch_id[1]);
@@ -811,11 +993,21 @@ class Board extends BackgammonObj {
         return undefined;
     }
 
+    /**
+     * emit message to server
+     * @param {string} type - message type
+     * @param {Object} data - message data
+     */
     emit_msg(type, data) {
-        console.log('emit_msg> ' + type + ', ' + JSON.stringify(data));
+        console.log(`Board.emit_msg(type=${type}`
+                    + `, data=${JSON.stringify(data)})`);
         this.ws.emit('json', {src: this.player, type: type, data: data});
     }
 
+    /**
+     * set turn
+     * @param {number} player
+     */
     set_turn(player) {
         this.turn = player;
         console.log('turn=' + this.turn);
@@ -828,7 +1020,32 @@ class Board extends BackgammonObj {
         }
     }
     
+    /**
+     * 使えるダイスを取得
+     * @return {number[]}
+     */
+    get_active_dice() {
+        let active_dice = [];
+
+        const dice_value = this.dice_area[this.player].get();
+        for (let i=0; i < dice_value.length; i++) {
+            let v = dice_value[i];
+            if ( v >= 1 && v <= 6 ) {
+                active_dice.push(v);
+            }
+        }
+
+        console.log(`Board.get_active_dice()> active_dice=${JSON.stringify(active_dice)}`);
+        return active_dice;
+    }
+
+    /**
+     * load all game information
+     * @param {Object} gameinfo - game information object
+     */
     load_gameinfo(gameinfo) {
+        console.log(`Board.load_info()`);
+
         // escape checkers
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
@@ -876,7 +1093,12 @@ class Board extends BackgammonObj {
         this.dice_area[1].set(d[1], false);
     }
 
+    /**
+     *
+     */
     inverse() {
+        console.log(`Board.inverse()`);
+        
         this.player = 1 - this.player;
 
         this.el.style.transformOrigin = (this.w / 2) + "px "
@@ -888,10 +1110,16 @@ class Board extends BackgammonObj {
         }
     }
 
+    /**
+     *
+     */
     inverse_xy(e) {
         return [this.w - e.pageX + this.x, this.h - e.pageY + this.y];
     }
     
+    /**
+     *
+     */
     get_xy(e) {
         let [x, y] = [e.pageX - this.x, e.pageY - this.y];
         if ( this.player == 1 ) {
@@ -900,6 +1128,9 @@ class Board extends BackgammonObj {
         return [x, y];
     }
 
+    /**
+     * mouse down handler
+     */
     on_mouse_down(e) {
         let orig_e = e;
         if ( e.changedTouches ) {
@@ -932,16 +1163,19 @@ class Board extends BackgammonObj {
         // dice area
         let da = this.dice_area[this.player];
         if ( da.in_this(x, y) ) {
-            this.dice_value[this.player] = [];
             if ( da.active ) {
                 da.clear(true);
             } else {
-                this.dice_value[this.player] = da.roll();
+                da.roll();
             }
-            console.log("dice_value=" + this.dice_value[this.player]);
+            let dice_values = da.get();
+            console.log(`Board.on_mouse_down> dice_values=${JSON.stringify(dice_values)}`);
         }
     }
 
+    /**
+     * mouse move handler
+     */
     on_mouse_move(e) {
         // e.preventDefault();
         if ( e.changedTouches ) {
@@ -956,18 +1190,17 @@ class Board extends BackgammonObj {
         this.moving_checker.move(x, y, true);
     }
 
-    on_null(e) {
+    /**
+     * null handler
+     */
+    null_handler(e) {
         return false;
     }
 
-    on_mouse_up(e) {
-        return false;
-    }
-
-    on_drag_start(e) {
-        return false;
-    }
-
+    /**
+     * checker position(x, y) to  piont index
+     * @param {Checker} ch - checker object
+     */
     chpos2point(ch) {
         let point = undefined;
 
@@ -979,15 +1212,22 @@ class Board extends BackgammonObj {
         return undefined;
     }
 
+    /**
+     * 
+     * @param {Checker} ch - Checker
+     * @param {number} p - point index
+     * @param {boolean} [emit=true] - emit flag
+     */
     put_checker(ch, p, emit=true) {
-        console.log("put_checker> ch.id=" + ch.id + ", p=" + p);
+        console.log(`Board.put_checker(ch.id=${ch.id}, p=${p}, emit=${emit})`);
+
         let prev_p = undefined;
 
         if ( ch.cur_point !== undefined ) {
-            console.log("put_checker> ch.cur_point=" + ch.cur_point);
             prev_p = ch.cur_point;
+            console.log(`Board.put_checker> prev_p=${prev_p}`);
             ch = this.point[prev_p].checkers.pop();
-            console.log("put_checker> ch.id=" + ch.id);
+            console.log(`Board.put_checker> ch.id=${ch.id}`);
         }
 
         let po = this.point[p];
@@ -1003,14 +1243,13 @@ class Board extends BackgammonObj {
         po.checkers.push(ch);
 
         if ( emit ) {
-            console.log('prev_p=' + prev_p);
             this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p});
         }
     }
 }
 
 /**
- *
+ * 
  */
 class BoardPoint {
     constructor(x, y, w, h, direction, max_n, board) {
@@ -1031,6 +1270,9 @@ class BoardPoint {
         this.checkers = [];
     }
     
+    /**
+     *
+     */
     in_this(ch) {
         if ( ch.x >= this.x && ch.x < this.x + this.w &&
              ch.y >= this.y && ch.y < this.y + this.h ) {
@@ -1054,6 +1296,9 @@ window.onload = function () {
 
     let board = new Board("board", 10, 50, player, ws);
 
+    /**
+     *
+     */
     const emit_msg = (type, data) => {
         ws.emit('json', {src: player, type: type, data: data});        
     };
