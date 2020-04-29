@@ -20,7 +20,7 @@ class Backgammon:
                 'cube': {
                     'side': -1,
                     'value': 1,
-                    'accepted': False
+                    'accepted': True
                 },
                 'dice': [
                     [0, 0, 0, 0],

@@ -1277,6 +1277,7 @@ class Board extends BackgammonItem {
      */
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
+        console.log(`Board.on_mouse_down> (x,y)=(${x},${y})`);
 
         // dice area
         let da = this.dice_area[this.player];
