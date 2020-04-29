@@ -219,20 +219,13 @@ class UndoButton extends EmitButton {
 /**
  *
  */
-class RedoButton extends BackgammonItem {
+class RedoButton extends EmitButton {
     constructor(id, board) {
-        super(id, 0, 0);
-
-        this.board = board;
+        super(id, board, "forward");
 
         this.x = this.board.x + this.board.w + 20;
         this.y = this.board.y;
         this.move(this.x, this.y);
-    }
-
-    on_mouse_down(e) {
-        super.on_mouse_down(e);
-        this.board.emit_msg('forward', {});
     }
 }
 
