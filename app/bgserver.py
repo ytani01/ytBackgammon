@@ -121,7 +121,7 @@ def handle_json(msg):
     fwd_hist = []
     if append_history:
         history.append(copy.deepcopy(bg._gameinfo))
-        _log.debug('history=(%d)%s', len(history), history)
+        _log.debug('history=(%d)', len(history))
 
     emit('json', msg, broadcast=True)
 

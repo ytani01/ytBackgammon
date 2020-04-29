@@ -15,7 +15,7 @@ class Backgammon:
             'game': 0,
             'match': 0,
             'score': [0, 0],
-            'turn': -1,
+            'turn': 2,  # <=-1:all off, 0:player0, 1:player1, >=2:all on
             'board': {
                 'cube': {
                     'side': -1,
@@ -87,4 +87,5 @@ class Backgammon:
     def dice(self, msg):
         self._log.debug('msg=%s', msg)
         self._gameinfo['board']['dice'][msg['player']] = msg['dice']
+        self._gameinfo['turn'] = msg['turn']
 ###

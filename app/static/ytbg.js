@@ -46,7 +46,11 @@ class BackgammonBase {
             this.board.emit_msg(type, data, history);
         }
     }
-}
+
+    goal_point(player) {
+        return (25 * player);
+    }
+} // class BackgammonBase
 
 /**
  *
@@ -72,7 +76,7 @@ class BackgammonArea extends BackgammonBase {
         return (x >= this.x) && (x < this.x + this.w)
             && (y >= this.y) && (y < this.y + this.h);
     }
-}
+} // BackgammonArea
 
 /**
  *
@@ -242,7 +246,7 @@ class InverseButton extends BoardButton {
         const [x, y] = this.get_xy(e);
         this.board.inverse();
     }
-}
+} // class InverseButton
 
 /**
  *
@@ -822,8 +826,7 @@ class Checker extends PlayerItem {
 
             let cancel_flag = true;
 
-            if ( (dst_p == 0 && ch.player == 0) || (dst_p == 25 && ch.player == 1) ) {
-
+            if ( dst_p == this.goal_point(ch.player) ) {
                 if ( this.board.all_inner(ch.player) ) {
                     dice_value = Math.min(...active_dice);
                     if ( ch.pip() < dice_value ) {
@@ -849,10 +852,10 @@ class Checker extends PlayerItem {
 
         if ( dst_p >= 0 && dst_p <= ch.board.point.length) {
             checkers = ch.board.point[dst_p].checkers;
-            if ( dst_p == 0 && ch.player == 0 ) {
-                can_move = true;
-            } else if ( dst_p == 25 && ch.player == 1 ) {
-                can_move = true;
+            if ( dst_p == this.goal_point(ch.player) ) {
+                if ( this.board.all_inner(ch.player) ) {
+                    can_move = true;
+                }
             } else if ( dst_p == 26 || dst_p == 27 ) {
                 // cannnot move
             } else if ( checkers.length == 0 ) {
@@ -885,7 +888,9 @@ class Checker extends PlayerItem {
         }
 
         const dice_values = this.board.dice_area[this.player].get();
-        this.emit_msg('dice', {player: this.player, dice: dice_values}, false);
+        this.emit_msg('dice', { turn: this.board.turn,
+                                player: this.player,
+                                dice: dice_values }, false);
 
         if ( hit_ch !== undefined ) {
             // hit
@@ -1144,25 +1149,25 @@ class Board extends BackgammonItem {
      *       1 : player 1
      *   >=  2 : all on
      */
-    set_turn(player) {
-        console.log(`Board.set_turn(player=${player})`);
-        this.turn = player;
+    set_turn(turn) {
+        console.log(`Board.set_turn(turn=${turn})`);
+        this.turn = turn;
         
         this.txt[0].off();
         this.txt[1].off();
 
-        if ( player < 0 ) {
+        if ( turn < 0 ) {
             return;
         }
 
-        if ( player >= 2 ) {
+        if ( turn >= 2 ) {
             this.txt[0].on();
-            this.txt[0].on();
+            this.txt[1].on();
             return;
         }
             
-        // player == 0 or 1
-        this.txt[player].on();
+        // turn == 0 or 1
+        this.txt[turn].on();
     }
     
     /**
@@ -1276,10 +1281,19 @@ class Board extends BackgammonItem {
         // dice area
         let da = this.dice_area[this.player];
         if ( da.in_this(x, y) ) {
+            if ( ! this.cube.accepted ) {
+                return;
+            }
             if ( da.active ) {
+                this.set_turn( 1 - this.player );
                 da.clear(true);
             } else {
-                da.roll();
+                if ( this.turn == this.player ) {
+                    da.roll();
+                } else if ( this.turn >= 2 ) {
+                    this.set_turn(this.player);
+                    da.roll();
+                }
             }
             let dice_values = da.get();
             console.log(`Board.on_mouse_down> dice_values=${JSON.stringify(dice_values)}`);
@@ -1345,14 +1359,16 @@ class Board extends BackgammonItem {
 
         if ( this.dice_area[ch.player].check_disable() ) {
             const dice_values = this.dice_area[this.player].get();
-            this.emit_msg('dice', {player: ch.player, dice: dice_values}, false);
+            this.emit_msg('dice', { turn: this.turn,
+                                    player: ch.player,
+                                    dice: dice_values }, false);
         }
 
         if ( emit ) {
             this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p});
         }
     }
-}
+} // class Board
 
 /**
  *
@@ -1362,7 +1378,7 @@ class BoardArea extends BackgammonArea {
         super(x, y, w, h);
         this.board = board;
     }
-}
+} // class BoardArea
 
 /**
  * 
@@ -1383,7 +1399,7 @@ class BoardPoint extends BoardArea {
 
         this.checkers = [];
     }
-}
+} // class BoardPoint
 
 /**
  *
@@ -1447,7 +1463,9 @@ class DiceArea extends BoardArea {
         } // for(i)
 
         if ( emit ) {
-            this.emit_msg('dice', {player: this.player, dice: dice_value});
+            this.emit_msg('dice', { turn: this.board.turn,
+                                    player: this.player,
+                                    dice: dice_value });
         }
     }
 
@@ -1546,7 +1564,9 @@ class DiceArea extends BoardArea {
         /**
          * emit
          */
-        this.emit_msg('dice', {player: this.player, dice: dice_values});
+        this.emit_msg('dice', { turn: this.board.turn,
+                                player: this.player,
+                                dice: dice_values });
 
         return dice_values;
     }
@@ -1564,14 +1584,13 @@ class DiceArea extends BoardArea {
         this.active = false;
 
         if ( emit ) {
-            this.emit_msg('dice', {
-                player:this.player,
-                dice: [0, 0, 0, 0]
-            });
+            this.emit_msg('dice', { turn: this.board.turn,
+                                    player: this.player,
+                                    dice: [0, 0, 0, 0] });
         }
         return [];
     }
-}
+} // DiceArea
 
 /**
  *
@@ -1635,4 +1654,4 @@ window.onload = function () {
             board.dice_area[msg.data.player].set(msg.data.dice, false);
         }
     });
-};
+}; // window.onload
