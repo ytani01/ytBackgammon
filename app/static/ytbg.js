@@ -109,6 +109,8 @@ class BackgammonItem extends BackgammonArea {
         this.el.ontouchend = this.on_mouse_up.bind(this);
         this.el.onmousemove = this.on_mouse_move.bind(this);
         this.el.ondragstart = this.null_handler.bind(this);
+
+        this.e = undefined; // MouseEvent
     }
 
     /**
@@ -152,21 +154,21 @@ class BackgammonItem extends BackgammonArea {
      * @param {MouseEvent} e
      */
     on_mouse_down(e) {
-        e = this.touch2mouse(e);
+        this.e = this.touch2mouse(e);
     }
 
     /**
      * @param {MouseEvent} e
      */
     on_mouse_up(e) {
-        e = this.touch2mouse(e);
+        this.e = this.touch2mouse(e);
     }
 
     /**
      * @param {MouseEvent} e
      */
     on_mouse_move(e) {
-        e = this.touch2mouse(e);
+        this.e = this.touch2mouse(e);
     }
 
     /**
@@ -492,7 +494,7 @@ class Checker extends PlayerItem {
      */
     on_mouse_down(e) {
         super.on_mouse_down(e);
-        let [x, y] = this.board.get_xy(e);
+        let [x, y] = this.board.get_xy(this.e);
 
         let ch = this;
         console.log(`Checker.on_mouse_down> ch.id=${ch.id}, (x,y)=${x},${y})`);
@@ -519,16 +521,16 @@ class Checker extends PlayerItem {
 
         ch.move(x, y, true);
         ch.set_z(1000);
-
     }
 
     /**
      *
      */
     on_mouse_up(e) {
-        super.on_mouse_up(e);
         console.log("Checker.on_mouse_up> ");
-        let [x, y] = this.board.get_xy(e);
+
+        super.on_mouse_up(e);
+        let [x, y] = this.board.get_xy(this.e);
 
         let ch = this.board.moving_checker;
         if ( ch === undefined ) {
@@ -613,7 +615,7 @@ class Checker extends PlayerItem {
      */
     on_mouse_move(e) {
         super.on_mouse_move(e);
-        let [x, y] = this.board.get_xy(e);
+        let [x, y] = this.board.get_xy(this.e);
 
         let ch = this.board.moving_checker;
         if ( ch === undefined ) {
