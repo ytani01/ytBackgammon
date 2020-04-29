@@ -10,7 +10,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.10'
+VERSION = '0.12'
 
 _log = get_logger(__name__, True)
 
@@ -76,7 +76,7 @@ def handle_json(msg):
     _log.info('request.sid=%s', request.sid)
     _log.info('msg=%s', msg)
 
-    append_history = True
+    append_history = msg['history'];
     
     if msg['type'] == 'back':
         _log.debug('history=(%d)%s', len(history), history)
