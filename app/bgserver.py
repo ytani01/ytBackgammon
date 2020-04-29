@@ -26,6 +26,7 @@ bg = Backgammon(debug=True)
 history.append(copy.deepcopy(bg._gameinfo))
 _log.debug('history=(%d)%s', len(history), history)
 
+
 @app.route('/')
 def index():
     return render_template('top.html', name=MY_NAME, version=VERSION)
@@ -76,8 +77,8 @@ def handle_json(msg):
     _log.info('request.sid=%s', request.sid)
     _log.info('msg=%s', msg)
 
-    append_history = msg['history'];
-    
+    append_history = msg['history']
+
     if msg['type'] == 'back':
         _log.debug('history=(%d)%s', len(history), history)
 
@@ -86,8 +87,8 @@ def handle_json(msg):
         else:
             fwd_hist.append(history.pop())
             bg._gameinfo = copy.deepcopy(history[-1])
-            
-        _log.debug('history=(%d)%s', len(history), history)
+
+        _log.debug('history=(%d)', len(history))
 
         emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
                       'data': bg._gameinfo}, broadcast=True)
@@ -110,7 +111,6 @@ def handle_json(msg):
         if msg['data']['p2'] >= 26:
             _log.debug('hit')
             append_history = False
-            
 
     if msg['type'] == 'cube':
         bg.cube(msg['data'])
@@ -128,7 +128,7 @@ def handle_json(msg):
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.option('--port', '-p', 'port', type=int, default=5001,
-               help='port number')
+              help='port number')
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag')
 def main(port, debug):
