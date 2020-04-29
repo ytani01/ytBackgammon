@@ -16,7 +16,12 @@
  *                |         +- UndoButton
  *                |         +- RedoButton
  *                |
- *                +- OnBoardText
+ *                +- Cube
+ *                |
+ *                +- PlayerItem .. owned by player
+ *                |    +- OnBoardText
+ *                |    +- Dice
+ *                |    +- Checker
  *                |
  *
  */
@@ -33,6 +38,12 @@ class BackgammonBase {
      */
     constructor(x, y) {
         [this.x, this.y] = [x, y];
+    }
+
+    emit_msg(type, data) {
+        if ( this.board ) {
+            this.board.emit_msg(type, data);
+        }
     }
 }
 
@@ -117,6 +128,18 @@ class BackgammonItem extends BackgammonArea {
         }
     }
 
+    /**
+     * @param {number} deg
+     */
+    rotate(deg) {
+        this.el.style.transformOrigin = "top left";
+        this.el.style.transform = `rotate(${deg}deg)`;
+    }
+
+    /**
+     * touch event to mouse event
+     * @param {MouseEvent} e
+     */
     touch2mouse(e) {
         e.preventDefault();
         if ( e.changedTouches ) {
@@ -125,18 +148,30 @@ class BackgammonItem extends BackgammonArea {
         return e;
     }
     
+    /**
+     * @param {MouseEvent} e
+     */
     on_mouse_down(e) {
         e = this.touch2mouse(e);
     }
 
+    /**
+     * @param {MouseEvent} e
+     */
     on_mouse_up(e) {
         e = this.touch2mouse(e);
     }
 
+    /**
+     * @param {MouseEvent} e
+     */
     on_mouse_move(e) {
         e = this.touch2mouse(e);
     }
 
+    /**
+     * @param {MouseEvent} e
+     */
     null_handler(e) {
         return false;
     }
@@ -150,11 +185,7 @@ class BoardItem extends BackgammonItem {
         super(id, x, y);
         this.board = board;
     }
-
-    emit_msg(type, data) {
-        this.board.emit_msg(type, data);
-    }
-}
+} // class BoardItem
 
 /**
  *
@@ -164,26 +195,6 @@ class BoardButton extends BoardItem {
         super(id, board, 0, 0);
     }
 } // class BoardButton
-
-/**
- *
- */
-class EmitButton extends BoardButton {
-    constructor(id, board, type) {
-        super(id, board);
-
-        this.type = type;
-    }
-
-    on_mouse_down(e) {
-        super.on_mouse_down(e);
-        this.emit_msg();
-    }
-
-    emit_msg() {
-        super.emit_msg(this.type, {});
-    }
-}
 
 /**
  *
@@ -206,6 +217,22 @@ class InverseButton extends BoardButton {
 /**
  *
  */
+class EmitButton extends BoardButton {
+    constructor(id, board, type) {
+        super(id, board);
+
+        this.type = type;
+    }
+
+    on_mouse_down(e) {
+        super.on_mouse_down(e);
+        this.emit_msg(this.type, {});
+    }
+} // class EmitButton
+
+/**
+ *
+ */
 class UndoButton extends EmitButton {
     constructor(id, board) {
         super(id, board, "back");
@@ -214,7 +241,7 @@ class UndoButton extends EmitButton {
         this.y = this.board.y + this.board.h - this.w;
         this.move(this.x, this.y);
     }
-}
+} // UndoButton
 
 /**
  *
@@ -227,14 +254,161 @@ class RedoButton extends EmitButton {
         this.y = this.board.y;
         this.move(this.x, this.y);
     }
-}
+} // RedoButton
 
 /**
  *
  */
-class OnBoardText extends BoardItem {
-    constructor(id, board, x, y,) {
+class Cube extends BoardItem {
+    constructor(id, board) {
+        super(id, board, 0, 0);
+
+        this.player = undefined;
+        this.value = 1;
+        this.accepted = false;
+        
+        this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
+        this.y0 = this.board.h / 2;
+        this.y2 = [this.board.by[1] - this.h / 2,
+                   this.board.by[0] + this.h / 2];
+        this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
+                   (this.y2[1] + this.board.h / 2) / 2];
+        
+        this.file_prefix = this.image_dir + "cubeA-";
+        this.file_suffix = ".png";
+
+        this.el.style.cursor = "pointer";
+
+        this.move((this.board.bx[0] + this.board.bx[1]) / 2,
+                  this.board.h / 2,
+                  true);
+    }
+
+    /**
+     * 
+     */
+    set(val, player=undefined, accepted=false, emit=true) {
+        console.log("Cube.set(val=" + val
+                    + ", player=" + player
+                    + ", accepted=" + accepted + ")");
+        this.value = val;
+        this.player = player;
+        this.accepted = accepted;
+
+        if ( player < 0 ) {
+            this.player = undefined;
+        }
+
+        let filename = this.file_prefix;
+        filename += ("0" + val).slice(-2);
+        filename += this.file_suffix;
+
+        this.el.firstChild.src = filename;
+
+        if ( this.player === undefined ) {
+            this.move(this.x0, this.y0, true);
+        } else if ( accepted ) {
+            this.player = player;
+            this.move(this.x0, this.y2[this.player], true);
+        } else {
+            this.player = player;
+            this.move(this.x0, this.y1[this.player], true);
+        }
+
+        if ( emit ) {
+            let side = this.player;
+            if ( side === undefined ) {
+                side = -1;
+            }
+
+            this.emit_msg('cube', {side: side,
+                                         value: this.value,
+                                         accepted: this.accepted});
+        }
+    }
+
+    /**
+     * 
+     */
+    double(player=undefined) {
+        console.log("Cube.double(player=" + player + ")");
+        if ( player === undefined ) {
+            if ( this.player !== undefined ) {
+                player = 1 - this.player;
+            }
+        } else {
+            player = 1 - player;
+        }
+        console.log("Cube.double> player=" + player);
+
+        this.value *= 2;
+        if ( this.value > 64 ) {
+            this.value = 1;
+        }
+
+        this.accepted = false;
+        this.set(this.value, player, false);
+    }
+
+    /**
+     *
+     */
+    double_accept() {
+        console.log("Cube.double_accept()");
+
+        this.set(this.value, this.player, true);
+    }
+
+    /**
+     *
+     */
+    double_cancel() {
+        console.log("Cube.double_cancel()");
+        
+        let value = this.value / 2;
+        let player = 1 - this.player;
+        if ( value == 1 ) {
+            player = undefined;
+        }
+        this.set(value, player, true);
+    }
+
+    /**
+     * @param {MouseEvent} e
+     */
+    on_mouse_down(e) {
+        super.on_mouse_down(e);
+        console.log("Cube.on_mouse_down> this.player=" + this.player
+                   + ", this.board.player=" + this.board.player);
+        if ( this.player !== undefined && this.player != this.board.player ) {
+            this.double_cancel();
+            return;
+        }
+
+        if ( this.player === undefined || this.accepted == true ) {
+            this.double(this.board.player);
+        } else {
+            this.double_accept();
+        }
+    }
+} // class Cube
+
+/**
+ *
+ */
+class PlayerItem extends BoardItem {
+    constructor(id, board, player, x, y) {
         super(id, board, x, y);
+        this.player = player;
+    }
+} // class PlayerItem
+
+/**
+ *
+ */
+class OnBoardText extends PlayerItem {
+    constructor(id, board, player, x, y,) {
+        super(id, board, player, x, y);
     }
 
     set_text(txt) {
@@ -255,33 +429,19 @@ class OnBoardText extends BoardItem {
 /**
  *
  */
-class Checker extends BackgammonItem {
+class Checker extends PlayerItem {
     /**
      * @param {string} id - div tag id
      * @param {number} player - 0 or 1
      * @param {Board} board - board object
      */
-    constructor(id, player, board) {
-        super(id, 0, 0);
-        this.player = player;
-        this.board = board;
+    constructor(id, board, player) {
+        super(id, board, player, 0, 0);
 
         [this.src_x, this.src_y] = [this.x, this.y];
         this.z = 0;
         
         this.el.style.cursor = "pointer";
-
-        this.el.onmousedown = this.on_mouse_down.bind(this);
-        this.el.ontouchstart = this.on_mouse_down.bind(this);
-
-        this.el.onmouseup = this.on_mouse_up.bind(this);
-        this.el.ontouchend = this.on_mouse_up.bind(this);
-
-        this.el.onmousemove = this.on_mouse_move.bind(this);
-        this.el.ontouchmove = this.on_mouse_move.bind(this);
-
-        this.el.ondragstart = this.on_drag_start.bind(this);
-
         this.cur_point = undefined;
     }
 
@@ -331,14 +491,11 @@ class Checker extends BackgammonItem {
      *
      */
     on_mouse_down(e) {
-        e.preventDefault();
-        if ( e.changedTouches ) {
-            e = e.changedTouches[0];
-        }
+        super.on_mouse_down(e);
         let [x, y] = this.board.get_xy(e);
 
         let ch = this;
-        console.log(`Checker.on_mouse_down> ch.id=${ch.id}, (x,y)=${x}, ${y})`);
+        console.log(`Checker.on_mouse_down> ch.id=${ch.id}, (x,y)=${x},${y})`);
         
         // check player
         if ( this.player == 1 - this.board.player ) {
@@ -369,11 +526,8 @@ class Checker extends BackgammonItem {
      *
      */
     on_mouse_up(e) {
+        super.on_mouse_up(e);
         console.log("Checker.on_mouse_up> ");
-        e.preventDefault();
-        if ( e.changedTouches ) {
-            e = e.changedTouches[0];
-        }
         let [x, y] = this.board.get_xy(e);
 
         let ch = this.board.moving_checker;
@@ -458,10 +612,7 @@ class Checker extends BackgammonItem {
      *
      */
     on_mouse_move(e) {
-        e.preventDefault();
-        if ( e.changedTouches ) {
-            e = e.changedTouches[0];
-        }
+        super.on_mouse_move(e);
         let [x, y] = this.board.get_xy(e);
 
         let ch = this.board.moving_checker;
@@ -471,194 +622,15 @@ class Checker extends BackgammonItem {
         
         ch.move(x, y, true);
     }
-
-    /**
-     * 
-     */
-    on_drag_start(e) {
-        return false;
-    }
-
 } // class Checker
 
 /**
  *
  */
-class Cube extends BackgammonItem {
-    constructor(id, board) {
-        super(id, 0, 0);
-        this.board = board;
-
-        this.player = undefined;
-        this.value = 1;
-        this.accepted = false;
-        
-        this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
-        this.y0 = this.board.h / 2;
-        this.y2 = [this.board.by[1] - this.h / 2,
-                   this.board.by[0] + this.h / 2];
-        this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
-                   (this.y2[1] + this.board.h / 2) / 2];
-        
-        this.file_prefix = this.image_dir + "cubeA-";
-        this.file_suffix = ".png";
-
-        this.el.style.cursor = "pointer";
-
-        this.el.onmousedown = this.on_mouse_down.bind(this);
-        this.el.ontouchstart = this.on_mouse_down.bind(this);
-
-        this.el.onmouseup = this.on_mouse_up.bind(this);
-        this.el.ontouchend = this.on_mouse_up.bind(this);
-
-        // this.el.onmousemove = this.on_mouse_move.bind(this);
-
-        this.el.ondragstart = this.on_drag_start.bind(this);
-
-        this.move((this.board.bx[0] + this.board.bx[1]) / 2,
-                  this.board.h / 2,
-                  true);
-
-        //this.set(1);
-        //this.double(1);
-    }
-
-    /**
-     * 
-     */
-    set(val, player=undefined, accepted=false, emit=true) {
-        console.log("Cube.set(val=" + val
-                    + ", player=" + player
-                    + ", accepted=" + accepted + ")");
-        this.value = val;
-        this.player = player;
-        this.accepted = accepted;
-
-        if ( player < 0 ) {
-            this.player = undefined;
-        }
-
-        let filename = this.file_prefix;
-        filename += ("0" + val).slice(-2);
-        filename += this.file_suffix;
-
-        this.el.firstChild.src = filename;
-
-        if ( this.player === undefined ) {
-            this.move(this.x0, this.y0, true);
-        } else if ( accepted ) {
-            this.player = player;
-            this.move(this.x0, this.y2[this.player], true);
-        } else {
-            this.player = player;
-            this.move(this.x0, this.y1[this.player], true);
-        }
-
-        if ( emit ) {
-            let side = this.player;
-            if ( side === undefined ) {
-                side = -1;
-            }
-
-            this.board.emit_msg('cube', {side: side,
-                                         value: this.value,
-                                         accepted: this.accepted});
-        }
-    }
-
-    /**
-     * 
-     */
-    double(player=undefined) {
-        console.log("Cube.double(player=" + player + ")");
-        if ( player === undefined ) {
-            if ( this.player !== undefined ) {
-                player = 1 - this.player;
-            }
-        } else {
-            player = 1 - player;
-        }
-        console.log("Cube.double> player=" + player);
-
-        this.value *= 2;
-        if ( this.value > 64 ) {
-            this.value = 1;
-        }
-
-        this.accepted = false;
-        this.set(this.value, player, false);
-    }
-
-    /**
-     *
-     */
-    double_accept() {
-        console.log("Cube.double_accept()");
-
-        this.set(this.value, this.player, true);
-    }
-
-    /**
-     *
-     */
-    double_cancel() {
-        console.log("Cube.double_cancel()");
-        
-        let value = this.value / 2;
-        let player = 1 - this.player;
-        if ( value == 1 ) {
-            player = undefined;
-        }
-        this.set(value, player, true);
-    }
-
-    /**
-     *
-     */
-    on_mouse_down(e) {
-        console.log("Cube.on_mouse_down> this.player=" + this.player
-                   + ", this.board.player=" + this.board.player);
-        e.preventDefault();
-        if ( e.changedTouches ) {
-            e = e.changedTouches[0];
-        }
-        if ( this.player !== undefined && this.player != this.board.player ) {
-            this.double_cancel();
-            return;
-        }
-
-        if ( this.player === undefined || this.accepted == true ) {
-            this.double(this.board.player);
-        } else {
-            this.double_accept();
-        }
-    }
-
-    /**
-     *
-     */
-    on_mouse_up(e) {
-        return false;
-    }
-
-    /**
-     *
-     */
-    on_drag_start(e) {
-        return false;
-    }
-    
-} // class Cube
-
-/**
- *
- */
 class Dice extends BackgammonItem {
-    constructor(id, x, y, player, file_prefix, board) {
-        super(id, x, y);
-        this.player = player;
+    constructor(id, board, player, x, y, file_prefix) {
+        super(id, board, player, x, y);
         this.file_prefix = file_prefix;
-        this.board = board;
 
         this.file_suffix = ".png";
 
@@ -760,24 +732,28 @@ class DiceArea extends BoardArea {
 
         this.dice = [];
         this.dice.push(new Dice("dice" + this.player + "0",
+                                this.board, this.player,
                                 this.x + this.w / 4,
                                 this.y + this.h / 4,
-                                this.player,file_prefix, this.board));
+                                file_prefix));
 
         this.dice.push(new Dice("dice" + this.player + "1",
+                                this.board, this.player,
                                 this.x + this.w / 4 * 3,
                                 this.y + this.h / 4,
-                                this.player, file_prefix, this.board));
+                                file_prefix));
 
         this.dice.push(new Dice("dice" + this.player + "2",
+                                this.board, this.player,
                                 this.x + this.w / 4,
                                 this.y + this.h / 4 * 3,
-                                this.player, file_prefix,  this.board));
+                                file_prefix));
 
         this.dice.push(new Dice("dice" + this.player + "3",
+                                this.board, this.player,
                                 this.x + this.w / 4 * 3,
                                 this.y + this.h / 4 * 3,
-                                this.player, file_prefix, this.board));
+                                file_prefix));
     }
 
     /**
@@ -799,7 +775,7 @@ class DiceArea extends BoardArea {
         } // for(i)
 
         if ( emit ) {
-            this.board.emit_msg('dice', {
+            this.emit_msg('dice', {
                 player: this.player,
                 dice: dice_value
             });
@@ -891,23 +867,9 @@ class DiceArea extends BoardArea {
         /**
          * emit
          */
-        this.board.emit_msg('dice', {player: this.player, dice: dice_value});
+        this.emit_msg('dice', {player: this.player, dice: dice_value});
 
         return dice_value;
-    }
-
-    /**
-     *
-     */
-    enable(dice) {
-        this.dice[dice].enable();
-    }
-
-    /**
-     *
-     */
-    disable(dice) {
-        this.dice[dice].disable();
     }
 
     /**
@@ -918,13 +880,15 @@ class DiceArea extends BoardArea {
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].set(0);
             this.dice[d].el.hidden = true;
-            this.enable(d);
+            this.dice[d].enable();
         }
         this.active = false;
 
         if ( emit ) {
-            this.board.emit_msg('dice', {player:this.player,
-                                         dice: [0, 0, 0, 0]});
+            this.emit_msg('dice', {
+                player:this.player,
+                dice: [0, 0, 0, 0]
+            });
         }
         return [];
     }
@@ -998,11 +962,10 @@ class Board extends BackgammonItem {
 
         // OnBoardText
         this.txt = [];
-        this.txt.push(new OnBoardText("p0text", this, this.tx, this.ty));
-        this.txt.push(new OnBoardText("p1text", this, this.w - this.tx, this.h - this.ty));
-
-        this.txt[1].el.style.transformOrigin = "top left";
-        this.txt[1].el.style.transform = "rotate(180deg)";
+        this.txt.push(new OnBoardText("p0text", this, 0, this.tx, this.ty));
+        this.txt.push(new OnBoardText("p1text", this, 1,
+                                      this.w - this.tx, this.h - this.ty));
+        this.txt[1].rotate(180);
 
         for ( let p=0; p < 2; p++ ) {
             this.txt[p].set_text("Player " + (p + 1) + "<br />"
@@ -1016,7 +979,7 @@ class Board extends BackgammonItem {
             for (let i=0; i < 15; i++) {
                 let c_id = "p" + player + ("0" + i).slice(-2);
                 console.log("c_id=" + c_id);
-                this.checker[player][i] = new Checker(c_id, player, this);
+                this.checker[player][i] = new Checker(c_id, this, player);
             }
         }
 
@@ -1439,20 +1402,21 @@ window.onload = function () {
      *
      */
     const emit_msg = (type, data) => {
+        console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
         ws.emit('json', {src: player, type: type, data: data});        
     };
 
     ws.on('connect', function() {
-        console.log('connected');
+        console.log('ws.on(connected)');
 
     });
 
     ws.on('disconnect', function() {
-        console.log('disconnected');
+        console.log('ws.on(disconnected)');
     });
 
     ws.on('json', function(msg) {
-        console.log("msg> " + JSON.stringify(msg));
+        console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
         /*
         if ( msg.src == player ) {
