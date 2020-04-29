@@ -1,16 +1,84 @@
 /**
+ * BackgammonBase .. have (x, y)
+ * |
+ * +- BackgammonArea .. have (w, h) / without image
+ *      +- BoardArea .. on board
+ *      |   +- BoardPoint
+ *      |   +- DiceArea
+ *      |
+ *      +- BackgammonItem .. have image
+ *           +- Board
+ *           |
+ *           +- BoardItem .. on board
+ *                +- BoardButton
+ *                |    +- InverseButton
+ *                |    +- EmitButton
+ *                |         +- UndoButton
+ *                |         +- RedoButton
+ *                |
+ *                +- OnBoardText
+ *                |
  *
  */
 const MY_NAME = "ytBackgammon Client";
 const VERSION = "0.11";
 
 /**
- * common class for Backgammon board items
+ *
  */
-class BackgammonObj {
-    constructor(id, x, y) {
-        this.id = id;
+class BackgammonBase {
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    constructor(x, y) {
         [this.x, this.y] = [x, y];
+    }
+}
+
+/**
+ *
+ */
+class BackgammonArea extends BackgammonBase {
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {number} w
+     * @param {number} h
+     */
+    constructor(x, y, w, h) {
+        super(x, y);
+        [this.w, this.h] = [w, h];
+    }
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @return {boolean}
+     */
+    in_this(x, y) {
+        return (x >= this.x) && (x < this.x + this.w)
+            && (y >= this.y) && (y < this.y + this.h);
+    }
+}
+
+/**
+ *
+ */
+class BoardArea extends BackgammonArea {
+    constructor(board, x, y, w, h) {
+        super(x, y, w, h);
+        this.board = board;
+    }
+}
+
+/**
+ *
+ */
+class BackgammonItem extends BackgammonArea {
+    constructor(id, x, y) {
+        super(x, y, 0, 0);
+        this.id = id;
 
         this.el = document.getElementById(this.id);
 
@@ -23,10 +91,17 @@ class BackgammonObj {
         this.el.draggable = false;
 
         this.move(this.x, this.y, false);
+
+        this.el.onmousedown = this.on_mouse_down.bind(this);
+        this.el.ontouchstart = this.on_mouse_down.bind(this);
+        this.el.onmouseup = this.on_mouse_up.bind(this);
+        this.el.ontouchend = this.on_mouse_up.bind(this);
+        this.el.onmousemove = this.on_mouse_move.bind(this);
+        this.el.ondragstart = this.null_handler.bind(this);
     }
 
     /**
-     * move object to (x, y)
+     * move to (x, y)
      * @param {number} x
      * @param {number} y
      * @param {boolean} center - center flag
@@ -41,15 +116,132 @@ class BackgammonObj {
             this.el.style.top = (this.y - this.h / 2) + "px";
         }
     }
-} // class BackgammonObj
+
+    touch2mouse(e) {
+        e.preventDefault();
+        if ( e.changedTouches ) {
+            e = e.changedTouches[0];
+        }
+        return e;
+    }
+    
+    on_mouse_down(e) {
+        e = this.touch2mouse(e);
+    }
+
+    on_mouse_up(e) {
+        e = this.touch2mouse(e);
+    }
+
+    on_mouse_move(e) {
+        e = this.touch2mouse(e);
+    }
+
+    null_handler(e) {
+        return false;
+    }
+} // class BackgammonItem
 
 /**
  *
  */
-class OnBoardText extends BackgammonObj {
-    constructor(id, x, y, board) {
+class BoardItem extends BackgammonItem {
+    constructor(id, board, x, y) {
         super(id, x, y);
         this.board = board;
+    }
+
+    emit_msg(type, data) {
+        this.board.emit_msg(type, data);
+    }
+}
+
+/**
+ *
+ */
+class BoardButton extends BoardItem {
+    constructor(id, board) {
+        super(id, board, 0, 0);
+    }
+} // class BoardButton
+
+/**
+ *
+ */
+class EmitButton extends BoardButton {
+    constructor(id, board, type) {
+        super(id, board);
+
+        this.type = type;
+    }
+
+    on_mouse_down(e) {
+        super.on_mouse_down(e);
+        this.emit_msg();
+    }
+
+    emit_msg() {
+        super.emit_msg(this.type, {});
+    }
+}
+
+/**
+ *
+ */
+class InverseButton extends BoardButton {
+    constructor(id, board) {
+        super(id, board);
+
+        this.x = this.board.x + this.board.w + 20;
+        this.y = this.board.y + this.board.h / 2 - this.h / 2;
+        this.move(this.x, this.y);
+    }
+
+    on_mouse_down(e) {
+        super.on_mouse_down(e);
+        this.board.inverse();
+    }
+}
+
+/**
+ *
+ */
+class UndoButton extends EmitButton {
+    constructor(id, board) {
+        super(id, board, "back");
+
+        this.x = this.board.x + this.board.w + 20;
+        this.y = this.board.y + this.board.h - this.w;
+        this.move(this.x, this.y);
+    }
+}
+
+/**
+ *
+ */
+class RedoButton extends BackgammonItem {
+    constructor(id, board) {
+        super(id, 0, 0);
+
+        this.board = board;
+
+        this.x = this.board.x + this.board.w + 20;
+        this.y = this.board.y;
+        this.move(this.x, this.y);
+    }
+
+    on_mouse_down(e) {
+        super.on_mouse_down(e);
+        this.board.emit_msg('forward', {});
+    }
+}
+
+/**
+ *
+ */
+class OnBoardText extends BoardItem {
+    constructor(id, board, x, y,) {
+        super(id, board, x, y);
     }
 
     set_text(txt) {
@@ -70,7 +262,7 @@ class OnBoardText extends BackgammonObj {
 /**
  *
  */
-class Checker extends BackgammonObj {
+class Checker extends BackgammonItem {
     /**
      * @param {string} id - div tag id
      * @param {number} player - 0 or 1
@@ -153,17 +345,23 @@ class Checker extends BackgammonObj {
         let [x, y] = this.board.get_xy(e);
 
         let ch = this;
-        console.log("on_mouse_down> ch.id=" + ch.id
-                    + ", (x,y)=(" + x + "," + y + ")");
+        console.log(`Checker.on_mouse_down> ch.id=${ch.id}, (x,y)=${x}, ${y})`);
         
+        // check player
         if ( this.player == 1 - this.board.player ) {
+            return;
+        }
+
+        // check active dices
+        const active_dice = this.board.get_active_dice();
+        if ( active_dice.length == 0 ) {
             return;
         }
 
         if ( ch.cur_point !== undefined ) {
             let point = ch.board.point[ch.cur_point];
             ch = point.checkers.slice(-1)[0];
-            console.log("on_mouse_down> ch.id=" + ch.id);
+            console.log(`Checker.on_mouse_down> ch.id=${ch.id}`);
         }
         ch.board.moving_checker = ch;
 
@@ -203,13 +401,13 @@ class Checker extends BackgammonObj {
         console.log(`Checker.on_mouse_up> p=${p}`);
 
         /**
-         * サイコロ判定
+         * ダイスによる判定
          */
         let active_dice = this.board.get_active_dice();
         console.log(`Checker.on_mouse_up> active_dice=${JSON.stringify(active_dice)}`);
 
         /**
-         * 移動先ポイントに応じた判定
+         * 移動先ポイントの状態に応じた判定
          */
         let can_move = false;
         let hit_ch = undefined;
@@ -293,7 +491,7 @@ class Checker extends BackgammonObj {
 /**
  *
  */
-class Cube extends BackgammonObj {
+class Cube extends BackgammonItem {
     constructor(id, board) {
         super(id, 0, 0);
         this.board = board;
@@ -462,7 +660,7 @@ class Cube extends BackgammonObj {
 /**
  *
  */
-class Dice extends BackgammonObj {
+class Dice extends BackgammonItem {
     constructor(id, x, y, player, file_prefix, board) {
         super(id, x, y);
         this.player = player;
@@ -477,7 +675,7 @@ class Dice extends BackgammonObj {
          *    0,10: 画面に表示されない
          *    1- 6: 有効な値
          *   11-16: 使えない(使い終わった)状態：暗くなる
-         *
+         */
         this.value = 0;
 
         this.el_image = this.el.firstElementChild;
@@ -507,6 +705,14 @@ class Dice extends BackgammonObj {
     }
 
     /**
+     *
+     */
+    get_filename(val) {
+        val %= 10;
+        return this.image_dir + this.file_prefix + val + this.file_suffix;
+    }
+
+    /**
      * @param {number} val - dice number, 11-16 .. disable
      */
     set(val) {
@@ -521,19 +727,16 @@ class Dice extends BackgammonObj {
 
         if (val > 10) {
             this.disable();
-            val %= 10;
             this.value = val;
         }
 
-        if ( val < 1 || val > 6 ) {
+        if ( val % 10 < 1 || val % 10 > 6 ) {
             return;
         }
 
         this.el.hidden = false;
 
-        const filename = this.image_dir + this.file_prefix + val + this.file_suffix;
-        console.log(`Dice.set(val=${val})> filename=${filename}`);
-        this.el.firstChild.src = filename;
+        this.el.firstChild.src = this.get_filename(val);
     }
     
     /**
@@ -548,12 +751,10 @@ class Dice extends BackgammonObj {
 /**
  *
  */
-class DiceArea {
-    constructor(x, y, w, h, player, board) {
-        [this.x, this.y] = [x, y];
-        [this.w, this.h] = [w, h];
+class DiceArea extends BoardArea {
+    constructor(board, x, y, w, h, player) {
+        super(board, x, y, w, h);
         this.player = player;
-        this.board = board;
 
         this.active = false;
 
@@ -605,8 +806,10 @@ class DiceArea {
         } // for(i)
 
         if ( emit ) {
-            this.board.emit_msg('dice', {player: this.player,
-                                         dice: dice_value});
+            this.board.emit_msg('dice', {
+                player: this.player,
+                dice: dice_value
+            });
         }
     }
 
@@ -619,7 +822,7 @@ class DiceArea {
         for (let i=0; i < this.dice.length; i++) {
             values.push(this.dice[i].value);
         }
-        console.log(`DiceArea.get> values=${values}`);
+        console.log(`DiceArea.get> values=${JSON.stringify(values)}`);
         return values;
     }
 
@@ -636,7 +839,7 @@ class DiceArea {
         while ( d1 == d2 ) {
             d2 = Math.floor(Math.random()  * 4);
         }
-        console.log("d1, d2=" + d1 + ", " + d2);
+        console.log(`[d1, d2]=[${d1}, ${d2}]`);
 
         this.active = true;
 
@@ -732,14 +935,6 @@ class DiceArea {
         }
         return [];
     }
-
-    /**
-     *
-     */
-    in_this(x, y) {
-        return (x >= this.x) && (x <= this.x + this.w)
-            && (y >= this.y) && (y <= this.y + this.h);
-    }
 }
 
 /**
@@ -770,7 +965,7 @@ class DiceArea {
  *          ----------------------------------------------------- 
  *
  */
-class Board extends BackgammonObj {
+class Board extends BackgammonItem {
     /*
      * @param {string} id - div tag id
      * @param {number} x - 
@@ -799,50 +994,9 @@ class Board extends BackgammonObj {
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
 
         // Buttons
-        const button_top = this.y + this.h + 10;
-        
-        // * Undo button
-        this.undo_el = document.getElementById("button-undo");
-        const undo_width = this.undo_el.firstElementChild.width;
-        this.undo_el.style.left = (this.w / 2 - undo_width - 30 + this.x)
-            + "px";
-        this.undo_el.style.top = button_top + "px";
-
-        this.undo_el.onmousedown = e => { this.emit_msg('back', {}); };
-        this.undo_el.ontouchstart = e => { this.emit_msg('back', {}); };
-        this.undo_el.onmouseup = this.null_handler.bind(this);
-        this.undo_el.ontouchend = this.null_handler.bind(this);
-        this.undo_el.onmousemove = this.null_handler.bind(this);
-        this.undo_el.ontouchmove = this.null_handler.bind(this);
-        this.undo_el.ondragstart = this.null_handler.bind(this);
-        
-        // * Redo button
-        this.redo_el = document.getElementById("button-redo");
-        this.redo_el.style.left = (this.w / 2 + 30) + this.x + "px";
-        this.redo_el.style.top = button_top + "px";
-
-        this.redo_el.onmousedown = e => { this.emit_msg('forward', {}); };
-        this.redo_el.ontouchstart = e => { this.emit_msg('forward', {}); };
-        this.redo_el.onmouseup = this.null_handler.bind(this);
-        this.redo_el.ontouchend = this.null_handler.bind(this);
-        this.redo_el.onmousemove = this.null_handler.bind(this);
-        this.redo_el.ontouchmove = this.null_handler.bind(this);
-        this.redo_el.ondragstart = this.null_handler.bind(this);
-
-        // * Inverse button
-        this.inverse_el = document.getElementById("button-inverse");
-        const inverse_width = this.inverse_el.firstElementChild.width;
-        this.inverse_el.style.left = (this.x + this.w / 2 - inverse_width / 2)
-            + "px";
-        this.inverse_el.style.top = button_top + "px";
-        
-        this.inverse_el.onmousedown = e => { this.inverse(); };
-        this.inverse_el.ontouchstart = e => { this.inverse(); };
-        this.inverse_el.onmouseup = this.null_handler.bind(this);
-        this.inverse_el.ontouchend = this.null_handler.bind(this);
-        this.inverse_el.onmousemove = this.null_handler.bind(this);
-        this.inverse_el.ontouchmove = this.null_handler.bind(this);
-        this.inverse_el.ondragstart = this.null_handler.bind(this);
+        this.button_undo = new UndoButton("button-undo", this);
+        this.button_redo = new RedoButton("button-redo", this);
+        this.button_inverse = new InverseButton("button-inverse", this);
         
         // <body>
         let body_el = document.body;
@@ -851,8 +1005,8 @@ class Board extends BackgammonObj {
 
         // OnBoardText
         this.txt = [];
-        this.txt.push(new OnBoardText("p0text", this.tx, this.ty, this));
-        this.txt.push(new OnBoardText("p1text", this.w - this.tx, this.h - this.ty, this));
+        this.txt.push(new OnBoardText("p0text", this, this.tx, this.ty));
+        this.txt.push(new OnBoardText("p1text", this, this.w - this.tx, this.h - this.ty));
 
         this.txt[1].el.style.transformOrigin = "top left";
         this.txt[1].el.style.transform = "rotate(180deg)";
@@ -889,60 +1043,52 @@ class Board extends BackgammonObj {
             if ( p == 0 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
-                this.point[p] = new BoardPoint(x0, y0, pw, ph,
-                                               -1, cn, this);
+                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, -1, cn);
             }
             if ( p >= 1 && p <= 6 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 6 - p;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph,
-                                               -1, cn, this);
+                this.point[p] = new BoardPoint(this, x, y0, pw, ph, -1, cn);
             }
             if ( p >= 7 && p <= 12 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 12 - p;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph,
-                                               -1, cn, this);
+                this.point[p] = new BoardPoint(this, x, y0, pw, ph, -1, cn);
             }
             if ( p >= 13 && p <= 18 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0];
                 let xn = p - 13;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph,
-                                               1, cn, this);
+                this.point[p] = new BoardPoint(this, x, y0, pw, ph, 1, cn);
             }
             if ( p >= 19 && p <= 24 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0];
                 let xn = p - 19;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(x, y0, pw, ph,
-                                               1, cn, this);
+                this.point[p] = new BoardPoint(this, x, y0, pw, ph, 1, cn);
             }
             if ( p == 25 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0];
-                this.point[p] = new BoardPoint(x0, y0, pw, ph,
-                                               1, cn, this);
+                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, 1, cn);
             }
             if ( p == 26 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
-                this.point[p] = new BoardPoint(x0, y0, pw, ph,
-                                               1, cn, this);
+                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, 1, cn);
             }
             if ( p == 27 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0];
                 let pw = this.bx[4] - this.bx[3];
-                this.point[p] = new BoardPoint(x0, y0, pw, ph,
-                                               -1, cn, this);
+                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, -1, cn);
             }
         } // for
 
@@ -950,11 +1096,11 @@ class Board extends BackgammonObj {
         let da_w = this.bx[5] - this.dx;
         let da_h = this.h - this.dy * 2;
         this.dice_area = [];
-        this.dice_area.push(new DiceArea(this.dx, this.dy, da_w, da_h,
-                                           0, this));
-        this.dice_area.push(new DiceArea(this.bx[2], this.dy, da_w, da_h,
-                                         1, this));
-        // this.dice_value = [[], []];
+        this.dice_area.push(new DiceArea(this, this.dx, this.dy,
+                                         da_w, da_h, 0));
+
+        this.dice_area.push(new DiceArea(this, this.bx[2], this.dy,
+                                         da_w, da_h, 1));
 
         // Event handlers
         this.el.onmousedown = this.on_mouse_down.bind(this);
@@ -1007,17 +1153,30 @@ class Board extends BackgammonObj {
     /**
      * set turn
      * @param {number} player
+     *   <= -1 : all off
+     *       0 : player 0
+     *       1 : player 1
+     *   >=  2 : all on
      */
     set_turn(player) {
         this.turn = player;
         console.log('turn=' + this.turn);
         
-        this.txt[0].on();
-        this.txt[1].on();
+        this.txt[0].off();
+        this.txt[1].off();
 
-        if ( player == 0 || player == 1 ) {
-            this.txt[1 - player].off();
+        if ( player < 0 ) {
+            return;
         }
+
+        if ( player >= 2 ) {
+            this.txt[0].on();
+            this.txt[0].on();
+            return;
+        }
+            
+        // player == 0 or 1
+        this.txt[player].on();
     }
     
     /**
@@ -1205,7 +1364,7 @@ class Board extends BackgammonObj {
         let point = undefined;
 
         for ( let i=0; i < this.point.length; i++ ) {
-            if ( this.point[i].in_this(ch) ) {
+            if ( this.point[i].in_this(ch.x, ch.y) ) {
                 return i;
             }
         }
@@ -1251,13 +1410,11 @@ class Board extends BackgammonObj {
 /**
  * 
  */
-class BoardPoint {
-    constructor(x, y, w, h, direction, max_n, board) {
-        [this.x, this.y] = [x, y];
-        [this.w, this.h] = [w, h];
+class BoardPoint extends BoardArea {
+    constructor(board, x, y, w, h, direction, max_n) {
+        super(board, x, y, w, h);
         this.direction = direction; // up: +1, down: -1
         this.max_n = max_n;
-        this.baord = board;
 
         this.cx = this.x + this.w / 2;
 
@@ -1268,17 +1425,6 @@ class BoardPoint {
         }
 
         this.checkers = [];
-    }
-    
-    /**
-     *
-     */
-    in_this(ch) {
-        if ( ch.x >= this.x && ch.x < this.x + this.w &&
-             ch.y >= this.y && ch.y < this.y + this.h ) {
-            return true;
-        }
-        return false;
     }
 }
 
