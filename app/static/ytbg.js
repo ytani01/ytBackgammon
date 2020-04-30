@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.13";
+const VERSION = "0.14";
 
 /**
  * base class for backgammon
@@ -562,6 +562,8 @@ class Dice extends BackgammonItem {
             return;
         }
 
+        this.el.hidden = false;
+
         if (val > 10) {
             this.disable();
             this.value = val;
@@ -571,7 +573,6 @@ class Dice extends BackgammonItem {
             return;
         }
 
-        this.el.hidden = false;
         this.el.firstChild.src = this.get_filename(val);
     }
     
@@ -983,9 +984,9 @@ class Board extends BackgammonItem {
         this.turn = -1;
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
-        this.by = [25, 634];
-        [this.tx, this.ty] = [550, 310];
-        [this.dx, this.dy] = [630, 300];
+        this.by = [24, 586];
+        [this.tx, this.ty] = [570, 285];
+        [this.dx, this.dy] = [620, 285];
 
         // Title
         const name_el = document.getElementById("name");
@@ -1031,62 +1032,62 @@ class Board extends BackgammonItem {
         this.cube = new Cube("cube", this);
 
         // Points
-        this.point = Array(28);
+        this.point = [];
         
-        for ( let p=0; p < this.point.length; p++ ) {
+        for ( let p=0; p < 28; p++ ) {
             let cn = 5;
-            let pw = this.checker[0][0].w;
+            let pw = (this.bx[3] - this.bx[2]) / 6;
             let ph = this.h / 2 - this.by[0];
 
             if ( p == 0 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
-                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, -1, cn);
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, -1, cn));
             }
             if ( p >= 1 && p <= 6 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 6 - p;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(this, x, y0, pw, ph, -1, cn);
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, -1, cn));
             }
             if ( p >= 7 && p <= 12 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 12 - p;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(this, x, y0, pw, ph, -1, cn);
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, -1, cn));
             }
             if ( p >= 13 && p <= 18 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0];
                 let xn = p - 13;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(this, x, y0, pw, ph, 1, cn);
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, 1, cn));
             }
             if ( p >= 19 && p <= 24 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0];
                 let xn = p - 19;
                 let x = x0 + pw * xn;
-                this.point[p] = new BoardPoint(this, x, y0, pw, ph, 1, cn);
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, 1, cn));
             }
             if ( p == 25 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0];
-                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, 1, cn);
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, 1, cn));
             }
             if ( p == 26 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
-                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, 1, cn);
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, 1, cn));
             }
             if ( p == 27 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0];
                 let pw = this.bx[4] - this.bx[3];
-                this.point[p] = new BoardPoint(this, x0, y0, pw, ph, -1, cn);
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, -1, cn));
             }
         } // for
 
@@ -1432,13 +1433,14 @@ class DiceArea extends BoardArea {
 
         this.dice = [];
         for (let i=0; i < 4; i++) {
-            let img_i = i;
+            const x1 = this.w / 20 * (i * 4 + 1);
+            let x2 = this.x + x1;
             if ( this.player == 1 ) {
-                img_i = 3 - i;
+                x2 = this.x + this.w - x1;
             }
-            this.dice.push(new Dice("dice" + this.player + img_i,
+            this.dice.push(new Dice("dice" + this.player + i,
                                     this.board, this.player,
-                                    this.x + this.w / 8 * (i * 2 + 1),
+                                    x2,
                                     this.y + this.h / 4 * ((i * 2 + 1) % 4),
                                     file_prefix));
         } // for(i)
@@ -1465,7 +1467,7 @@ class DiceArea extends BoardArea {
         if ( emit ) {
             this.emit_msg('dice', { turn: this.board.turn,
                                     player: this.player,
-                                    dice: dice_value });
+                                    dice: dice_value }, true);
         }
     }
 
@@ -1566,7 +1568,7 @@ class DiceArea extends BoardArea {
          */
         this.emit_msg('dice', { turn: this.board.turn,
                                 player: this.player,
-                                dice: dice_values });
+                                dice: dice_values }, true);
 
         return dice_values;
     }
@@ -1586,7 +1588,7 @@ class DiceArea extends BoardArea {
         if ( emit ) {
             this.emit_msg('dice', { turn: this.board.turn,
                                     player: this.player,
-                                    dice: [0, 0, 0, 0] });
+                                    dice: [0, 0, 0, 0] }, true);
         }
         return [];
     }
