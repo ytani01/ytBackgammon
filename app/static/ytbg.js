@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.14";
+const VERSION = "0.15";
 
 /**
  * base class for backgammon
@@ -241,7 +241,7 @@ class InverseButton extends BoardButton {
     constructor(id, board) {
         super(id, board);
 
-        this.x = this.board.x + this.board.w + 50;
+        this.x = this.board.x + this.board.w + 30;
         this.y = this.board.y + this.board.h / 2 - this.h / 2;
         this.move(this.x, this.y);
     }
@@ -275,7 +275,7 @@ class UndoButton extends EmitButton {
     constructor(id, board) {
         super(id, board, "back");
 
-        this.x = this.board.x + this.board.w + 40;
+        this.x = this.board.x + this.board.w + 20;
         this.y = this.board.y + this.board.h - this.w - 50;
         this.move(this.x, this.y);
     }
@@ -288,7 +288,7 @@ class RedoButton extends EmitButton {
     constructor(id, board) {
         super(id, board, "forward");
 
-        this.x = this.board.x + this.board.w + 40;
+        this.x = this.board.x + this.board.w + 20;
         this.y = this.board.y + 50;
         this.move(this.x, this.y);
     }
@@ -984,15 +984,16 @@ class Board extends BackgammonItem {
         this.turn = -1;
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
-        this.by = [24, 586];
-        [this.tx, this.ty] = [570, 285];
-        [this.dx, this.dy] = [620, 285];
+        this.by = [46, 535];
+        [this.tx, this.ty] = [570, 270];
+        [this.dx, this.dy] = [620, 267];
 
         // Title
         const name_el = document.getElementById("name");
-        name_el.style.left = "35px";
+        name_el.style.left = "10px";
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
+        ver_el.style.width = "500px";
 
         // Buttons
         this.button_undo = new UndoButton("button-undo", this);
@@ -1363,7 +1364,7 @@ class Board extends BackgammonItem {
         let z = Math.floor(ch_n / po.max_n);
         let n = ch_n % po.max_n;
         let x = po.cx;
-        let y = po.y0 + (ch.h / 2 + ch.h * n + ch.h / 5 * z) * po.direction;
+        let y = po.y0 + (ch.h / 2 + ch.h * n * 0.75 + ch.h / 5 * z) * po.direction;
         ch.move(x, y, true);
         ch.calc_z();
         ch.cur_point = p;
@@ -1594,27 +1595,21 @@ class DiceArea extends BoardArea {
     }
 } // DiceArea
 
+let ws = undefined;
+
 /**
  *
  */
 window.onload = function () {
     let url = "http://" + document.domain + ":" + location.port + "/";
-    let ws = io.connect(url);
+    ws = io.connect(url);
 
     let player = 0;
     if ( location.pathname == "/p2" ) {
         player = 1;
     }
 
-    let board = new Board("board", 50, 50, player, ws);
-
-    /**
-     *
-     */
-    const emit_msg = (type, data) => {
-        console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
-        ws.emit('json', {src: player, type: type, data: data});        
-    };
+    let board = new Board("board", 10, 15, player, ws);
 
     ws.on('connect', function() {
         console.log('ws.on(connected)');
@@ -1627,13 +1622,6 @@ window.onload = function () {
 
     ws.on('json', function(msg) {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
-
-        /*
-        if ( msg.src == player ) {
-            console.log('msg> ignore');
-            return;
-        }
-        */
 
         if ( msg.type == 'gameinfo' ) {
             board.load_gameinfo(msg.data);
@@ -1658,3 +1646,25 @@ window.onload = function () {
         }
     });
 }; // window.onload
+
+const menu_undo = () => {
+    console.log('menu_back()');
+};
+
+const menu_redo = () => {
+    console.log('menu_redo()');
+};
+
+const menu_reset = () => {
+    console.log('menu_reset()');
+
+    emit_msg('back_all', {}, false);
+};
+
+/**
+ *
+ */
+const emit_msg = (type, data, history=false) => {
+    console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
+    ws.emit('json', {src: "player", type: type, data: data, history: history});        
+};

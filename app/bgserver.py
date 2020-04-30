@@ -5,12 +5,13 @@ from Backgammon import Backgammon
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import copy
+import time
 from MyLogger import get_logger
 import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.12'
+VERSION = '0.14'
 
 _log = get_logger(__name__, True)
 
@@ -21,12 +22,37 @@ socketio = SocketIO(app)
 client_sid = []
 history = []
 fwd_hist = []
-bg = Backgammon(debug=True)
+bg = Backgammon(VERSION, debug=True)
 
 history.append(copy.deepcopy(bg._gameinfo))
 _log.debug('history=(%d)%s', len(history), history)
 
 
+def back_all():
+    _log.debug('')
+
+    while len(history) > 1:
+        back()
+        time.sleep(.2)
+        
+
+def back():
+    """
+    """
+    _log.debug('history=(%d)', len(history))
+
+    if len(history) == 1:
+        bg._gameinfo = copy.deepcopy(history[0])
+    else:
+        fwd_hist.append(history.pop())
+        bg._gameinfo = copy.deepcopy(history[-1])
+
+    _log.debug('history=(%d)', len(history))
+
+    emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                  'data': bg._gameinfo}, broadcast=True)
+
+        
 @app.route('/')
 def index():
     return render_template('top.html', name=MY_NAME, version=VERSION)
@@ -79,19 +105,12 @@ def handle_json(msg):
 
     append_history = msg['history']
 
+    if msg['type'] == 'back_all':
+        back_all()
+        return
+
     if msg['type'] == 'back':
-        _log.debug('history=(%d)%s', len(history), history)
-
-        if len(history) == 1:
-            bg._gameinfo = copy.deepcopy(history[0])
-        else:
-            fwd_hist.append(history.pop())
-            bg._gameinfo = copy.deepcopy(history[-1])
-
-        _log.debug('history=(%d)', len(history))
-
-        emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
-                      'data': bg._gameinfo}, broadcast=True)
+        back()
         return
 
     if msg['type'] == 'forward':

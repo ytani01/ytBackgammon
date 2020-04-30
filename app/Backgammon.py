@@ -6,16 +6,23 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 class Backgammon:
     _log = get_logger(__name__, False)
 
-    def __init__(self, debug=False):
+    def __init__(self, svr_ver='', debug=False):
         self._dbg = debug
         __class__._log = get_logger(__class__.__name__, self._dbg)
-        self._log.debug('')
+        self._log.debug('svr_ver=%a', svr_ver)
 
+        self.svr_ver = svr_ver
+        
         self._gameinfo = {
+            'server_version': self.svr_ver,
             'game': 0,
             'match': 0,
             'score': [0, 0],
             'turn': 2,  # <=-1:all off, 0:player0, 1:player1, >=2:all on
+            'text': [
+                '',
+                ''
+            ],
             'board': {
                 'cube': {
                     'side': -1,
