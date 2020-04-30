@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.12";
+const VERSION = "0.13";
 
 /**
  * base class for backgammon
@@ -128,8 +128,12 @@ class BackgammonItem extends BackgammonArea {
     /**
      * @param {number} deg
      */
-    rotate(deg) {
+    rotate(deg, center=false) {
+        console.log(`rotate(deg=${deg}, center=${center})`);
         this.el.style.transformOrigin = "top left";
+        if ( center ) {
+            this.el.style.transformOrigin = "center center";
+        }
         this.el.style.transform = `rotate(${deg}deg)`;
     }
 
@@ -237,7 +241,7 @@ class InverseButton extends BoardButton {
     constructor(id, board) {
         super(id, board);
 
-        this.x = this.board.x + this.board.w + 20;
+        this.x = this.board.x + this.board.w + 50;
         this.y = this.board.y + this.board.h / 2 - this.h / 2;
         this.move(this.x, this.y);
     }
@@ -271,8 +275,8 @@ class UndoButton extends EmitButton {
     constructor(id, board) {
         super(id, board, "back");
 
-        this.x = this.board.x + this.board.w + 20;
-        this.y = this.board.y + this.board.h - this.w;
+        this.x = this.board.x + this.board.w + 40;
+        this.y = this.board.y + this.board.h - this.w - 50;
         this.move(this.x, this.y);
     }
 } // UndoButton
@@ -284,8 +288,8 @@ class RedoButton extends EmitButton {
     constructor(id, board) {
         super(id, board, "forward");
 
-        this.x = this.board.x + this.board.w + 20;
-        this.y = this.board.y;
+        this.x = this.board.x + this.board.w + 40;
+        this.y = this.board.y + 50;
         this.move(this.x, this.y);
     }
 } // RedoButton
@@ -354,8 +358,12 @@ class Cube extends BoardItem {
             this.player = undefined;
         }
 
+        let file_val = val;
+        if ( val > 64 ) {
+            file_val = 1;
+        }
         let filename = this.file_prefix;
-        filename += ("0" + val).slice(-2);
+        filename += ("0" + file_val).slice(-2);
         filename += this.file_suffix;
 
         this.el.firstChild.src = filename;
@@ -397,9 +405,11 @@ class Cube extends BoardItem {
         console.log("Cube.double> player=" + player);
 
         this.value *= 2;
+        /*
         if ( this.value > 64 ) {
-            this.value = 1;
+            this.value = 64;
         }
+        */
 
         this.accepted = false;
         this.set(this.value, player, false);
@@ -465,15 +475,17 @@ class PlayerItem extends BoardItem {
 class OnBoardText extends PlayerItem {
     constructor(id, board, player, x, y,) {
         super(id, board, player, x, y);
+
+        this.player_name = `Player ${player + 1}`;
     }
 
     set_text(txt) {
-        this.el.innerHTML = txt;
+        this.el.innerHTML = this.player_name + "<br />" + txt;
     }
 
     on() {
-        this.el.style.borderColor = "rgba(255, 255, 255, 0.7)";
-        this.el.style.color = "rgba(255, 255, 255, 0.7)";
+        this.el.style.borderColor = "rgba(255, 0, 255, 0.7)";
+        this.el.style.color = "rgba(255, 0, 255, 0.7)";
     }
 
     off() {
@@ -488,6 +500,7 @@ class OnBoardText extends PlayerItem {
 class Dice extends BackgammonItem {
     constructor(id, board, player, x, y, file_prefix) {
         super(id, board, player, x, y);
+        console.log(`Dice> (x,y)=(${x},${y})`);
         this.file_prefix = file_prefix;
 
         this.file_suffix = ".png";
@@ -559,7 +572,6 @@ class Dice extends BackgammonItem {
         }
 
         this.el.hidden = false;
-
         this.el.firstChild.src = this.get_filename(val);
     }
     
@@ -568,6 +580,7 @@ class Dice extends BackgammonItem {
      */
     roll() {
         this.set(Math.floor(Math.random() * 6) + 1);
+        this.rotate(Math.floor(Math.random() * 90 - 45), true);
         return this.value;
     }
 } // class Dice
@@ -970,14 +983,13 @@ class Board extends BackgammonItem {
         this.turn = -1;
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
-        this.by = [27, 711];
-        [this.tx, this.ty] = [560, 335];
-        [this.dx, this.dy] = [740, 320];
+        this.by = [25, 634];
+        [this.tx, this.ty] = [550, 310];
+        [this.dx, this.dy] = [630, 300];
 
         // Title
         const name_el = document.getElementById("name");
         name_el.style.left = "35px";
-        // name_el.style.top = "0px";
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
 
@@ -989,18 +1001,18 @@ class Board extends BackgammonItem {
         // <body>
         let body_el = document.body;
         body_el.style.width = (this.w * 2) + "px";
-        body_el.style.height = (this.h * 2) + "px";
+        body_el.style.height = (this.h * 1.5) + "px";
 
         // OnBoardText
         this.txt = [];
-        this.txt.push(new OnBoardText("p0text", this, 0, this.tx, this.ty));
-        this.txt.push(new OnBoardText("p1text", this, 1,
-                                      this.w - this.tx, this.h - this.ty));
+        this.txt.push(new OnBoardText(
+            "p0text", this, 0, this.tx, this.ty));
+        this.txt.push(new OnBoardText(
+            "p1text", this, 1, this.w - this.tx, this.h - this.ty));
         this.txt[1].rotate(180);
 
         for ( let p=0; p < 2; p++ ) {
-            this.txt[p].set_text("Player " + (p + 1) + "<br />"
-                                 + "This is test.");
+            this.txt[p].set_text("");
             this.txt[p].on();
         }
 
@@ -1084,7 +1096,6 @@ class Board extends BackgammonItem {
         this.dice_area = [];
         this.dice_area.push(new DiceArea(this, this.dx, this.dy,
                                          da_w, da_h, 0));
-
         this.dice_area.push(new DiceArea(this, this.bx[2], this.dy,
                                          da_w, da_h, 1));
 
@@ -1420,29 +1431,17 @@ class DiceArea extends BoardArea {
         }
 
         this.dice = [];
-        this.dice.push(new Dice("dice" + this.player + "0",
-                                this.board, this.player,
-                                this.x + this.w / 4,
-                                this.y + this.h / 4,
-                                file_prefix));
-
-        this.dice.push(new Dice("dice" + this.player + "1",
-                                this.board, this.player,
-                                this.x + this.w / 4 * 3,
-                                this.y + this.h / 4,
-                                file_prefix));
-
-        this.dice.push(new Dice("dice" + this.player + "2",
-                                this.board, this.player,
-                                this.x + this.w / 4,
-                                this.y + this.h / 4 * 3,
-                                file_prefix));
-
-        this.dice.push(new Dice("dice" + this.player + "3",
-                                this.board, this.player,
-                                this.x + this.w / 4 * 3,
-                                this.y + this.h / 4 * 3,
-                                file_prefix));
+        for (let i=0; i < 4; i++) {
+            let img_i = i;
+            if ( this.player == 1 ) {
+                img_i = 3 - i;
+            }
+            this.dice.push(new Dice("dice" + this.player + img_i,
+                                    this.board, this.player,
+                                    this.x + this.w / 8 * (i * 2 + 1),
+                                    this.y + this.h / 4 * ((i * 2 + 1) % 4),
+                                    file_prefix));
+        } // for(i)
     }
 
     /**
@@ -1605,7 +1604,7 @@ window.onload = function () {
         player = 1;
     }
 
-    let board = new Board("board", 10, 50, player, ws);
+    let board = new Board("board", 50, 50, player, ws);
 
     /**
      *
@@ -1652,6 +1651,7 @@ window.onload = function () {
         }
 
         if ( msg.type == 'dice' ) {
+            board.set_turn(msg.data.turn);
             board.dice_area[msg.data.player].set(msg.data.dice, false);
         }
     });
