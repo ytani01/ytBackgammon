@@ -1609,7 +1609,7 @@ window.onload = function () {
         player = 1;
     }
 
-    let board = new Board("board", 10, 15, player, ws);
+    let board = new Board("board", 10, 20, player, ws);
 
     ws.on('connect', function() {
         console.log('ws.on(connected)');
