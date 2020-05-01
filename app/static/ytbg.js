@@ -4,7 +4,7 @@
  *   |
  *   +- BackgammonArea .. have (w, h) / without image
  *        |
- *        +- BackgammonItem .. have image
+ *        +- ImageItem .. have image
  *        |    |
  *        |    +- BoardItem .. on board
  *        |    |    |
@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.15";
+const VERSION = "0.16";
 
 /**
  * base class for backgammon
@@ -79,24 +79,28 @@ class BackgammonArea extends BackgammonBase {
 } // BackgammonArea
 
 /**
- *
+ * <div id="${id}"><image src="${image_dir}/.."></div>
  */
-class BackgammonItem extends BackgammonArea {
+class ImageItem extends BackgammonArea {
     constructor(id, x, y) {
         super(x, y, 0, 0);
         this.id = id;
 
+        this.image_dir = "/static/images/";
+        this.file_suffix = ".png";
+
         this.el = document.getElementById(this.id);
 
-        this.w = this.el.firstChild.width;
-        this.h = this.el.firstChild.height;
+        this.image_el = this.el.firstChild;
 
-        this.image_dir = "/static/images/";
+        this.w = this.image_el.width;
+        this.h = this.image_el.height;
 
+        this.el.style.width = `${this.w}px`;
+        this.el.style.height = `${this.h}px`;
+  
         this.el.hidden = false;
         this.el.draggable = false;
-
-        this.move(this.x, this.y, false);
 
         this.el.onmousedown = this.on_mouse_down.bind(this);
         this.el.ontouchstart = this.on_mouse_down.bind(this);
@@ -104,6 +108,8 @@ class BackgammonItem extends BackgammonArea {
         this.el.ontouchend = this.on_mouse_up.bind(this);
         this.el.onmousemove = this.on_mouse_move.bind(this);
         this.el.ondragstart = this.null_handler.bind(this);
+
+        this.move(this.x, this.y, false);
 
         this.e = undefined; // MouseEvent
     }
@@ -213,12 +219,12 @@ class BackgammonItem extends BackgammonArea {
     null_handler(e) {
         return false;
     }
-} // class BackgammonItem
+} // class ImageItem
 
 /**
  * item on board
  */
-class BoardItem extends BackgammonItem {
+class BoardItem extends ImageItem {
     constructor(id, board, x, y) {
         super(id, x, y);
         this.board = board;
@@ -333,12 +339,11 @@ class Cube extends BoardItem {
         this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
                    (this.y2[1] + this.board.h / 2) / 2];
         
-        this.file_prefix = this.image_dir + "cubeA-";
-        this.file_suffix = ".png";
+        this.file_prefix = this.image_dir + "cube";
 
         this.el.style.cursor = "pointer";
 
-        this.move((this.board.bx[0] + this.board.bx[1]) / 2,
+        this.move(this.x0,
                   this.board.h / 2,
                   true);
     }
@@ -476,6 +481,9 @@ class OnBoardText extends PlayerItem {
     constructor(id, board, player, x, y,) {
         super(id, board, player, x, y);
 
+        this.el.style.removeProperty('width');
+        this.el.style.removeProperty('height');
+
         this.player_name = `Player ${player + 1}`;
     }
 
@@ -497,13 +505,11 @@ class OnBoardText extends PlayerItem {
 /**
  *
  */
-class Dice extends BackgammonItem {
+class Dice extends ImageItem {
     constructor(id, board, player, x, y, file_prefix) {
         super(id, board, player, x, y);
         console.log(`Dice> (x,y)=(${x},${y})`);
         this.file_prefix = file_prefix;
-
-        this.file_suffix = ".png";
 
         /**
          * ダイスの値
@@ -514,11 +520,9 @@ class Dice extends BackgammonItem {
          */
         this.value = 0;
 
-        this.el_image = this.el.firstElementChild;
+        this.image_el = this.el.firstElementChild;
 
         this.el.hidden = true;
-        this.el.style.width = this.el_image.width + "px";
-        this.el.style.height = this.el_image.height + "px";
         this.el.style.backgroundColor = "#000";
         this.el.style.cursor = "pointer";
 
@@ -529,7 +533,7 @@ class Dice extends BackgammonItem {
      *
      */
     enable() {
-        this.el_image.style.opacity = 1.0;
+        this.image_el.style.opacity = 1.0;
         this.value = this.value % 10;
     }
 
@@ -537,7 +541,7 @@ class Dice extends BackgammonItem {
      *
      */
     disable() {
-        this.el_image.style.opacity = 0.5;
+        this.image_el.style.opacity = 0.5;
         this.value = this.value % 10 + 10;
     }
 
@@ -602,6 +606,7 @@ class Checker extends PlayerItem {
         this.z = 0;
         
         this.el.style.cursor = "pointer";
+
         this.cur_point = undefined;
     }
 
@@ -804,7 +809,7 @@ class Checker extends PlayerItem {
     }
 
     /**
-     *
+     * @param {MouseEvent} e
      */
     on_mouse_up(e) {
         let [x, y] = this.get_xy(e);
@@ -890,21 +895,23 @@ class Checker extends PlayerItem {
             return;
         }
 
-        // 移動OK
+        // 移動OK. 以降、移動後の処理
 
-        // ダイスを使用済みする
+        const da = this.board.dice_area[this.player];
+
+        // 使ったダイスを使用済みする
         for (let i=0; i < 4; i++) {
-            let dice = this.board.dice_area[this.player].dice[i];
-            if ( dice.value == dice_value ) {
-                dice.disable();
+            if ( da.dice[i].value == dice_value ) {
+                da.dice[i].disable();
                 break;
             }
-        }
+        } // for(i)
 
-        const dice_values = this.board.dice_area[this.player].get();
+        // emit dice values to server
+        // const dice_values = this.board.dice_area[this.player].get();
         this.emit_msg('dice', { turn: this.board.turn,
                                 player: this.player,
-                                dice: dice_values }, false);
+                                dice: da.get() }, false);
 
         if ( hit_ch !== undefined ) {
             // hit
@@ -918,10 +925,32 @@ class Checker extends PlayerItem {
             hit_ch.calc_z();
         }
 
+        // move_checker
         ch.board.put_checker(this, dst_p);
         ch.calc_z();
 
         ch.board.moving_checker = undefined;
+
+        if ( this.board.game_is_finished(this.player) ) {
+            /**
+             * ゲーム終了処理
+             *
+             * XXX T.B.D XXX
+             */
+            // ダイスを全て使用済みにする
+            for (let i=0; i < 4; i++) {
+                if ( da.dice[i].value > 0 ) {
+                    da.dice[i].disable();
+                }
+            } // for(i)
+
+            this.board.set_turn(-1);
+
+            this.emit_msg('dice', { turn: this.board.turn,
+                                    player: this.player,
+                                    dice: da.get() }, true);
+        }
+        
     } // on_mouse_up()
 
     /**
@@ -967,7 +996,7 @@ class Checker extends PlayerItem {
  *          ----------------------------------------------------- 
  *
  */
-class Board extends BackgammonItem {
+class Board extends ImageItem {
     /*
      * @param {string} id - div tag id
      * @param {number} x - 
@@ -990,10 +1019,9 @@ class Board extends BackgammonItem {
 
         // Title
         const name_el = document.getElementById("name");
-        name_el.style.left = "10px";
+        name_el.style.width = this.w + "px";
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
-        ver_el.style.width = "500px";
 
         // Buttons
         this.button_undo = new UndoButton("button-undo", this);
@@ -1002,8 +1030,8 @@ class Board extends BackgammonItem {
         
         // <body>
         let body_el = document.body;
-        body_el.style.width = (this.w * 2) + "px";
-        body_el.style.height = (this.h * 1.5) + "px";
+        body_el.style.width = (this.button_undo.x + this.button_undo.w + 100) + "px";
+        body_el.style.height = (this.h + 100) + "px";
 
         // OnBoardText
         this.txt = [];
@@ -1182,8 +1210,25 @@ class Board extends BackgammonItem {
         // turn == 0 or 1
         this.txt[turn].on();
     }
+
+    /**
+     * @param {number} player
+     * @return {boolean}
+     */
+    game_is_finished(player) {
+        console.log(`Board.game_is_finished(player=${player})`);
+        for (let i=0; i < 15; i++) {
+            const pip = this.checker[player][i].pip();
+            console.log(`Board.game_is_finished()> i=${i}, pip=${pip}`);
+            if ( pip != 0 ) {
+                return false;
+            }
+        } // for(i)
+        return true;
+    }
     
     /**
+     * @param {number} player
      * @return {boolean}
      */
     all_inner(player) {
@@ -1609,7 +1654,7 @@ window.onload = function () {
         player = 1;
     }
 
-    let board = new Board("board", 10, 20, player, ws);
+    let board = new Board("board", 0, 20, player, ws);
 
     ws.on('connect', function() {
         console.log('ws.on(connected)');
@@ -1625,38 +1670,59 @@ window.onload = function () {
 
         if ( msg.type == 'gameinfo' ) {
             board.load_gameinfo(msg.data);
-        }
+            return;
+        } // 'gameinfo'
 
         if ( msg.type == 'put_checker' ) {
+            console.log(`board.turn=${board.turn}`);
+            if ( board.turn == -1 ) {
+                return;
+            }
             let ch = board.search_checker(msg.data.ch);
-            console.log('ch.id = ' + ch.id);
             board.put_checker(ch, msg.data.p2, false);
-        }
+            return;
+        } // 'put_checker'
 
         if ( msg.type == 'cube' ) {
             board.cube.set(msg.data.value,
                            msg.data.side,
                            msg.data.accepted,
                            false);
-        }
+            return;
+        } // 'cube'
 
         if ( msg.type == 'dice' ) {
+            console.log(`board.turn=${board.turn}`);
+            if ( board.turn == -1 ) {
+                return;
+            }
             board.set_turn(msg.data.turn);
             board.dice_area[msg.data.player].set(msg.data.dice, false);
-        }
+            if ( board.turn < 0 ) {
+                board.txt[0].off();
+                board.txt[1].off();
+            }
+            return;
+        } // 'dice'
     });
 }; // window.onload
 
-const menu_undo = () => {
-    console.log('menu_back()');
+const backward_hist = () => {
+    console.log('backward_hist()');
 };
 
-const menu_redo = () => {
-    console.log('menu_redo()');
+const forward_hist = () => {
+    console.log('forward_hist()');
 };
 
-const menu_reset = () => {
-    console.log('menu_reset()');
+const back_turn = () => {
+    console.log('back_turn');
+
+    emit_msg('back_turn', {}, false);
+};
+
+const back_all = () => {
+    console.log('back_all()');
 
     emit_msg('back_all', {}, false);
 };

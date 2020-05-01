@@ -11,7 +11,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.14'
+VERSION = '0.15'
 
 _log = get_logger(__name__, True)
 
@@ -28,17 +28,7 @@ history.append(copy.deepcopy(bg._gameinfo))
 _log.debug('history=(%d)%s', len(history), history)
 
 
-def back_all():
-    _log.debug('')
-
-    while len(history) > 1:
-        back()
-        time.sleep(.2)
-        
-
-def back():
-    """
-    """
+def backward_hist():
     _log.debug('history=(%d)', len(history))
 
     if len(history) == 1:
@@ -47,12 +37,51 @@ def back():
         fwd_hist.append(history.pop())
         bg._gameinfo = copy.deepcopy(history[-1])
 
-    _log.debug('history=(%d)', len(history))
+    _log.debug('history=(%d), fwd_hist=(%d)', len(history), len(fwd_hist))
 
     emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
                   'data': bg._gameinfo}, broadcast=True)
 
+
+def forward_hist():
+    _log.debug('fwd_hist=(%d)', len(fwd_hist))
+
+    if len(fwd_hist) == 0:
+        _log.warning('fwd_hist=%s', fwd_hist)
+        return
+
+    history.append(fwd_hist.pop())
+
+    bg._gameinfo = copy.deepcopy(history[-1])
+
+    emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                  'data': bg._gameinfo}, broadcast=True)
+    return
+
+
+def back_all():
+    _log.debug('history=[%d]', len(history))
+
+    while len(history) > 1:
+        backward_hist()
+        _log.debug('history=[%d]', len(history))
+        time.sleep(.2)
         
+
+def back_turn():
+    _log.debug('history=[%d]', len(history))
+
+    cur_turn = history[-1]['turn']
+
+    while True:
+        if len(history) <= 1:
+            break
+        if history[-2]['turn'] != cur_turn:
+            break
+        backward_hist()
+        time.sleep(.5)
+        
+
 @app.route('/')
 def index():
     return render_template('top.html', name=MY_NAME, version=VERSION)
@@ -109,20 +138,16 @@ def handle_json(msg):
         back_all()
         return
 
+    if msg['type'] == 'back_turn':
+        back_turn()
+        return
+
     if msg['type'] == 'back':
-        back()
+        backward_hist()
         return
 
     if msg['type'] == 'forward':
-        if len(fwd_hist) == 0:
-            return
-
-        history.append(fwd_hist.pop())
-
-        bg._gameinfo = copy.deepcopy(history[-1])
-
-        emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
-                      'data': bg._gameinfo}, broadcast=True)
+        forward_hist()
         return
 
     if msg['type'] == 'put_checker':

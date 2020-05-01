@@ -15,8 +15,8 @@ class Backgammon:
         
         self._gameinfo = {
             'server_version': self.svr_ver,
-            'game': 0,
-            'match': 0,
+            'game_num': 0,
+            'match_score': 0,
             'score': [0, 0],
             'turn': 2,  # <=-1:all off, 0:player0, 1:player1, >=2:all on
             'text': [

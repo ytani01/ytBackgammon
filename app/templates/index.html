@@ -18,12 +18,6 @@
     <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
   </head>
   <body>
-    <blockquote>
-    <div id="name">
-      <i class="fas fa-bars" onClick="menu_reset();"></i>&nbsp;&nbsp;
-      <strong>{{ name }}</strong>, Version {{ version }}&nbsp;/&nbsp;
-      <span id="version">Version Number</span>
-    </div>
     <div id="buttons">
       <div id="button-undo"><image src="/static/images/button-bak.png"></div>
       <div id="button-inverse"><image
@@ -68,7 +62,7 @@
         <div id="p113"><image src="/static/images/checker-Red.png"></div>
         <div id="p114"><image src="/static/images/checker-Red.png"></div>
 
-        <div id="cube"><image src="/static/images/cubeA-64.png"></div>
+        <div id="cube"><image src="/static/images/cube01.png"></div>
 
         <div id="dice00"><image src="/static/images/dice-White-1.png"></div>
         <div id="dice01"><image src="/static/images/dice-White-1.png"></div>
@@ -79,6 +73,16 @@
         <div id="dice11"><image src="/static/images/dice-Red-1.png"></div>
         <div id="dice12"><image src="/static/images/dice-Red-1.png"></div>
         <div id="dice13"><image src="/static/images/dice-Red-1.png"></div>
+    </div>
+    <div style="display:table;width:100%;height:10px">
+      <div id="name" style="display:table-cell;">
+        &nbsp;&nbsp;
+        <i style="font-size:40px;color:#FFF;vertical-align:middle;"
+           class="fas fa-bars" onClick="back_all();"></i>
+        &nbsp;&nbsp;
+        <strong>{{ name }}, Version {{ version }}</strong>&nbsp;/&nbsp;
+        <strong id="version">Version Number</strong>
+      </div>
     </div>
   </body>
 </html>
