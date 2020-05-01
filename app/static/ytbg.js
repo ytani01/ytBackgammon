@@ -11,8 +11,8 @@
  *        |    |    +- BoardButton
  *        |    |    |    +- InverseButton
  *        |    |    |    +- EmitButton
- *        |    |    |         +- UndoButton
- *        |    |    |         +- RedoButton
+ *        |    |    |         +- BackButton
+ *        |    |    |         +- FwdButton
  *        |    |    +- Cube
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.16";
+const VERSION = "0.17";
 
 /**
  * base class for backgammon
@@ -273,20 +273,20 @@ class EmitButton extends BoardButton {
 /**
  *
  */
-class UndoButton extends EmitButton {
+class BackButton extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "back", x, y);
     }
-} // UndoButton
+} // BackButton
 
 /**
  *
  */
-class RedoButton extends EmitButton {
+class Back2Button extends EmitButton {
     constructor(id, board, x, y) {
-        super(id, board, "forward", x, y);
+        super(id, board, "back2", x, y);
     }
-} // RedoButton
+} // Back2Button
 
 /**
  *
@@ -296,6 +296,24 @@ class BackAllButton extends EmitButton {
         super(id, board, "back_all", x, y);
     }
 } // BackAllButton
+
+/**
+ *
+ */
+class FwdButton extends EmitButton {
+    constructor(id, board, x, y) {
+        super(id, board, "forward", x, y);
+    }
+} // FwdButton
+
+/**
+ *
+ */
+class Fwd2Button extends EmitButton {
+    constructor(id, board, x, y) {
+        super(id, board, "fwd2", x, y);
+    }
+} // FwdButton
 
 /**
  *
@@ -1031,20 +1049,28 @@ class Board extends ImageItem {
 
         // Buttons
         const bx0 = this.x + this.w + 20;
+        this.button_back_all = new BackAllButton(
+            "button-back_all", this, bx0, 20);
+
+        this.button_back2 = new Back2Button(
+            "button-back2", this, bx0,
+            this.button_back_all.y + this.button_back_all.h);
+
         this.button_fwd_all = new FwdAllButton(
             "button-fwd_all", this, bx0,
-            20);
-        this.button_back_all = new BackAllButton(
-            "button-back_all", this, bx0,
-            this.button_fwd_all.y + this.button_fwd_all.h + 5);
+            this.button_back2.y + this.button_back2.h);
 
-        this.button_undo = new UndoButton(
-            "button-undo", this, bx0, this.h);
-        this.button_undo.move(bx0, this.y + this.h - this.button_undo.h - 25);
-        this.button_redo = new RedoButton(
-            "button-redo", this, bx0,
-            this.button_undo.y - this.button_undo.h - 20);
+        this.button_fwd2 = new Fwd2Button(
+            "button-fwd2", this, bx0,
+            this.button_fwd_all.y + this.button_fwd_all.h);
 
+        this.button_back = new BackButton("button-back", this, bx0, this.h);
+        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 25);
+
+        this.button_fwd = new FwdButton(
+            "button-fwd", this, bx0,
+            this.button_back.y - this.button_back.h - 20);
+        
         this.button_inverse = new InverseButton(
             "button-inverse", this, bx0, 0);
         this.button_inverse.move(bx0,
@@ -1052,7 +1078,7 @@ class Board extends ImageItem {
         
         // <body>
         let body_el = document.body;
-        body_el.style.width = (this.button_undo.x + this.button_undo.w + 100) + "px";
+        body_el.style.width = (this.button_back.x + this.button_back.w + 100) + "px";
         body_el.style.height = (this.y + this.h + 10) + "px";
 
         // OnBoardText
@@ -1736,9 +1762,14 @@ const forward_hist = () => {
     console.log('forward_hist()');
 };
 
-const back_turn = () => {
-    console.log('back_turn');
-    emit_msg('back_turn', {}, false);
+const back2 = () => {
+    console.log('back2');
+    emit_msg('back2', {}, false);
+};
+
+const fwd2 = () => {
+    console.log('fwd2');
+    emit_msg('fwd2', {}, false);
 };
 
 const back_all = () => {

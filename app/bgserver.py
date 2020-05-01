@@ -11,7 +11,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.16'
+VERSION = '0.17'
 
 _log = get_logger(__name__, True)
 
@@ -28,69 +28,59 @@ history.append(copy.deepcopy(bg._gameinfo))
 _log.debug('history=(%d)%s', len(history), history)
 
 
-def backward_hist():
-    _log.debug('history=(%d)', len(history))
+def backward_hist(n=1, sleep_sec=0.1):
+    """
+    Parameters
+    ----------
+    n : int
+        < 0: all
+    sleep_sec : float
+        sleep seconds
+    """
+    _log.debug('n=%d, sleep_sec=%s', n, sleep_sec)
 
-    if len(history) == 1:
-        bg._gameinfo = copy.deepcopy(history[0])
-    else:
+    count = 0
+
+    while len(history) > 1:
         fwd_hist.append(history.pop())
         bg._gameinfo = copy.deepcopy(history[-1])
 
-    _log.debug('history=(%d), fwd_hist=(%d)', len(history), len(fwd_hist))
+        _log.debug('history=(%d), fwd_hist=(%d)', len(history), len(fwd_hist))
 
-    emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
-                  'data': bg._gameinfo}, broadcast=True)
+        emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                      'data': bg._gameinfo}, broadcast=True)
 
+        count += 1
+        if n > 0 and count >= n:
+            break
 
-def forward_hist():
-    _log.debug('fwd_hist=(%d)', len(fwd_hist))
+        time.sleep(sleep_sec)
 
-    if len(fwd_hist) == 0:
-        _log.warning('fwd_hist=%s', fwd_hist)
-        return
-
-    history.append(fwd_hist.pop())
-
-    bg._gameinfo = copy.deepcopy(history[-1])
-
-    _log.debug('history=(%d), fwd_hist=(%d)', len(history), len(fwd_hist))
-    emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
-                  'data': bg._gameinfo}, broadcast=True)
     return
 
 
-def back_all():
-    _log.debug('history=[%d]', len(history))
+def forward_hist(n=1, sleep_sec=0.1):
+    _log.debug('n=%s, sleep_sec=%s', n, sleep_sec)
 
-    while len(history) > 1:
-        backward_hist()
-        _log.debug('history=[%d]', len(history))
-        time.sleep(0.1)
-        
-
-def back_turn():
-    _log.debug('history=[%d]', len(history))
-
-    cur_turn = history[-1]['turn']
-
-    while True:
-        if len(history) <= 1:
-            break
-        if history[-2]['turn'] != cur_turn:
-            break
-        backward_hist()
-        time.sleep(.5)
-
-
-def fwd_all():
-    _log.debug('fwd_hist=(%d)', len(fwd_hist))
+    count = 0
 
     while len(fwd_hist) > 0:
-        forward_hist()
-        _log.debug('fwd_hist=(%d)', len(fwd_hist))
-        time.sleep(0.1)
-        
+        history.append(fwd_hist.pop())
+        bg._gameinfo = copy.deepcopy(history[-1])
+
+        _log.debug('history=(%d), fwd_hist=(%d)', len(history), len(fwd_hist))
+
+        emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
+                      'data': bg._gameinfo}, broadcast=True)
+
+        count += 1
+        if n > 0 and count >= n:
+            break
+
+        time.sleep(sleep_sec)
+
+    return
+
 
 @app.route('/')
 def index():
@@ -144,24 +134,28 @@ def handle_json(msg):
 
     append_history = msg['history']
 
-    if msg['type'] == 'back_all':
-        back_all()
-        return
-
-    if msg['type'] == 'back_turn':
-        back_turn()
-        return
-
     if msg['type'] == 'back':
         backward_hist()
+        return
+
+    if msg['type'] == 'back2':
+        backward_hist(10, sleep_sec=0.5)
+        return
+
+    if msg['type'] == 'back_all':
+        backward_hist(0)
         return
 
     if msg['type'] == 'forward':
         forward_hist()
         return
 
+    if msg['type'] == 'fwd2':
+        forward_hist(10, sleep_sec=0.5)
+        return
+
     if msg['type'] == 'fwd_all':
-        fwd_all()
+        forward_hist(0)
         return
 
     if msg['type'] == 'put_checker':
