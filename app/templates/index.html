@@ -13,17 +13,11 @@
       type="text/javascript"
       src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js">
     </script>
-    <script type="text/javascript" src="/static/ytbg.js?p=(new Date()).getTime();"></script>
-    <link rel="stylesheet" type="text/css" href="/static/ytbg.css?p=(new Date()).getTime();">
+    <script type="text/javascript" src="/static/ytbg.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/ytbg.css">
     <link href="https://use.fontawesome.com/releases/v5.0.6/css/all.css" rel="stylesheet">
   </head>
   <body>
-    <div id="buttons">
-      <div id="button-undo"><image src="/static/images/button-bak.png"></div>
-      <div id="button-inverse"><image
-                                 src="/static/images/button-inverse.png"></div>
-      <div id="button-redo"><image src="/static/images/button-fwd.png"></div>
-    </div>
     <div id="board"><image src="/static/images/board-base.png">
         <div class="onboardtext"
              id="p0text"><image src="/static/images/checker-White.png"></div>
@@ -77,12 +71,21 @@
     <div style="display:table;width:100%;height:10px">
       <div id="name" style="display:table-cell;">
         &nbsp;&nbsp;
-        <i style="font-size:40px;color:#FFF;vertical-align:middle;"
-           class="fas fa-bars" onClick="back_all();"></i>
         &nbsp;&nbsp;
         <strong>{{ name }}, Version {{ version }}</strong>&nbsp;/&nbsp;
         <strong id="version">Version Number</strong>
       </div>
+    </div>
+    <div id="buttons">
+      <div style="display:table;width:100%;height:10px">
+        <i style="font-size:40px;color:#FFF;vertical-align:middle;"
+           class="fas fa-bars"></i>
+      </div>
+      <div id="button-fwd_all"><image src="/static/images/button-fwd3.png"></div>
+      <div id="button-back_all"><image src="/static/images/button-bak3.png"></div>
+      <div id="button-inverse"><image src="/static/images/button-inverse.png"></div>
+      <div id="button-undo"><image src="/static/images/button-bak.png"></div>
+      <div id="button-redo"><image src="/static/images/button-fwd.png"></div>
     </div>
   </body>
 </html>

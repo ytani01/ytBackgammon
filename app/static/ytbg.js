@@ -235,8 +235,8 @@ class BoardItem extends ImageItem {
  * button on board
  */
 class BoardButton extends BoardItem {
-    constructor(id, board) {
-        super(id, board, 0, 0);
+    constructor(id, board, x, y) {
+        super(id, board, x, y);
     }
 } // class BoardButton
 
@@ -244,12 +244,8 @@ class BoardButton extends BoardItem {
  *
  */
 class InverseButton extends BoardButton {
-    constructor(id, board) {
-        super(id, board);
-
-        this.x = this.board.x + this.board.w + 30;
-        this.y = this.board.y + this.board.h / 2 - this.h / 2;
-        this.move(this.x, this.y);
+    constructor(id, board, x, y) {
+        super(id, board, x, y);
     }
 
     on_mouse_down(e) {
@@ -262,8 +258,8 @@ class InverseButton extends BoardButton {
  *
  */
 class EmitButton extends BoardButton {
-    constructor(id, board, type) {
-        super(id, board);
+    constructor(id, board, type, x, y) {
+        super(id, board, x, y);
 
         this.type = type;
     }
@@ -278,12 +274,8 @@ class EmitButton extends BoardButton {
  *
  */
 class UndoButton extends EmitButton {
-    constructor(id, board) {
-        super(id, board, "back");
-
-        this.x = this.board.x + this.board.w + 20;
-        this.y = this.board.y + this.board.h - this.w - 50;
-        this.move(this.x, this.y);
+    constructor(id, board, x, y) {
+        super(id, board, "back", x, y);
     }
 } // UndoButton
 
@@ -291,14 +283,28 @@ class UndoButton extends EmitButton {
  *
  */
 class RedoButton extends EmitButton {
-    constructor(id, board) {
-        super(id, board, "forward");
-
-        this.x = this.board.x + this.board.w + 20;
-        this.y = this.board.y + 50;
-        this.move(this.x, this.y);
+    constructor(id, board, x, y) {
+        super(id, board, "forward", x, y);
     }
 } // RedoButton
+
+/**
+ *
+ */
+class BackAllButton extends EmitButton {
+    constructor(id, board, x, y) {
+        super(id, board, "back_all", x, y);
+    }
+} // BackAllButton
+
+/**
+ *
+ */
+class FwdAllButton extends EmitButton {
+    constructor(id, board, x, y) {
+        super(id, board, "fwd_all", x, y);
+    }
+} // FwdAllButton
 
 /**
  *                    x0
@@ -1024,14 +1030,30 @@ class Board extends ImageItem {
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
 
         // Buttons
-        this.button_undo = new UndoButton("button-undo", this);
-        this.button_redo = new RedoButton("button-redo", this);
-        this.button_inverse = new InverseButton("button-inverse", this);
+        const bx0 = this.x + this.w + 20;
+        this.button_fwd_all = new FwdAllButton(
+            "button-fwd_all", this, bx0,
+            20);
+        this.button_back_all = new BackAllButton(
+            "button-back_all", this, bx0,
+            this.button_fwd_all.y + this.button_fwd_all.h + 5);
+
+        this.button_undo = new UndoButton(
+            "button-undo", this, bx0, this.h);
+        this.button_undo.move(bx0, this.y + this.h - this.button_undo.h - 25);
+        this.button_redo = new RedoButton(
+            "button-redo", this, bx0,
+            this.button_undo.y - this.button_undo.h - 20);
+
+        this.button_inverse = new InverseButton(
+            "button-inverse", this, bx0, 0);
+        this.button_inverse.move(bx0,
+                                 this.y + this.h / 2 - this.button_inverse.h / 2);
         
         // <body>
         let body_el = document.body;
         body_el.style.width = (this.button_undo.x + this.button_undo.w + 100) + "px";
-        body_el.style.height = (this.h + 100) + "px";
+        body_el.style.height = (this.y + this.h + 10) + "px";
 
         // OnBoardText
         this.txt = [];
@@ -1169,16 +1191,15 @@ class Board extends ImageItem {
      * emit message to server
      * @param {string} type - message type
      * @param {Object} data - message data
+     * @param {boolean} hist_flag
      */
-    emit_msg(type, data, history=true) {
-        console.log(`Board.emit_msg(type=${type}, `
-                    + `data=${JSON.stringify(data)}), `,
-                    + `history=${history}`);
+    emit_msg(type, data, hist_flag=true) {
+        console.log(`Board.emit_msg(type=${type}, data=${JSON.stringify(data)}), hist_flag=${hist_flag}`);
         this.ws.emit('json', {
             src: this.player,
             type: type,
             data: data,
-            history: history
+            history: hist_flag
         });
     }
 
@@ -1717,15 +1738,19 @@ const forward_hist = () => {
 
 const back_turn = () => {
     console.log('back_turn');
-
     emit_msg('back_turn', {}, false);
 };
 
 const back_all = () => {
     console.log('back_all()');
-
     emit_msg('back_all', {}, false);
 };
+
+const fwd_all = () => {
+    console.log('back_all()');
+    emit_msg('fwd_all', {}, false);
+};
+    
 
 /**
  *

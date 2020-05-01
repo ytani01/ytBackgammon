@@ -11,7 +11,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.15'
+VERSION = '0.16'
 
 _log = get_logger(__name__, True)
 
@@ -54,6 +54,7 @@ def forward_hist():
 
     bg._gameinfo = copy.deepcopy(history[-1])
 
+    _log.debug('history=(%d), fwd_hist=(%d)', len(history), len(fwd_hist))
     emit('json', {'src': 'server', 'dst': '', 'type': 'gameinfo',
                   'data': bg._gameinfo}, broadcast=True)
     return
@@ -65,7 +66,7 @@ def back_all():
     while len(history) > 1:
         backward_hist()
         _log.debug('history=[%d]', len(history))
-        time.sleep(.2)
+        time.sleep(0.1)
         
 
 def back_turn():
@@ -80,6 +81,15 @@ def back_turn():
             break
         backward_hist()
         time.sleep(.5)
+
+
+def fwd_all():
+    _log.debug('fwd_hist=(%d)', len(fwd_hist))
+
+    while len(fwd_hist) > 0:
+        forward_hist()
+        _log.debug('fwd_hist=(%d)', len(fwd_hist))
+        time.sleep(0.1)
         
 
 @app.route('/')
@@ -150,6 +160,10 @@ def handle_json(msg):
         forward_hist()
         return
 
+    if msg['type'] == 'fwd_all':
+        fwd_all()
+        return
+
     if msg['type'] == 'put_checker':
         bg.put_checker(msg['data']['p1'], msg['data']['p2'])
         if msg['data']['p2'] >= 26:
@@ -162,8 +176,8 @@ def handle_json(msg):
     if msg['type'] == 'dice':
         bg.dice(msg['data'])
 
-    fwd_hist = []
     if append_history:
+        fwd_hist = []
         history.append(copy.deepcopy(bg._gameinfo))
         _log.debug('history=(%d)', len(history))
 
