@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.18";
+const VERSION = "0.19";
 
 /**
  * base class for backgammon
@@ -1393,13 +1393,14 @@ class Board extends ImageItem {
             if ( da.active ) {
                 this.set_turn( 1 - this.player );
                 da.clear(true);
-            } else {
-                if ( this.turn == this.player ) {
-                    da.roll();
-                } else if ( this.turn >= 2 ) {
-                    this.set_turn(this.player);
-                    da.roll();
-                }
+                return;
+            }
+
+            if ( this.turn == this.player ) {
+                da.roll();
+            } else if ( this.turn >= 2 ) {
+                this.set_turn(this.player);
+                da.roll();
             }
             let dice_values = da.get();
             console.log(`Board.on_mouse_down> dice_values=${JSON.stringify(dice_values)}`);

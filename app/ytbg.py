@@ -2,7 +2,7 @@
 #
 #
 from ytBackgammonServer import ytBackgammonServer
-from flask import Flask, render_template, request
+from flask import Flask, request
 from flask_socketio import SocketIO
 import copy
 import time

@@ -9,6 +9,7 @@ __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
 from ytBackgammon import ytBackgammon
+from flask import render_template
 from flask_socketio import emit
 import copy
 import time
@@ -112,10 +113,8 @@ class ytBackgammonServer:
         self._log.error('event[args]=%a', request.event["args"])
 
     def on_json(self, request, msg):
-        _log.info('request.sid=%s', request.sid)
-        _log.info('msg=%s', msg)
-
-        append_history = msg['history']
+        self._log.info('request.sid=%s', request.sid)
+        self._log.info('msg=%s', msg)
 
         if msg['type'] == 'back':
             self.backward_hist()
@@ -141,10 +140,12 @@ class ytBackgammonServer:
             self.forward_hist(0)
             return
 
+        #
+        #
+        #
         if msg['type'] == 'put_checker':
             self._bg.put_checker(msg['data']['p1'], msg['data']['p2'])
             if msg['data']['p2'] >= 26:
-
                 self._log.debug('hit')
                 append_history = False
 
@@ -154,10 +155,16 @@ class ytBackgammonServer:
         if msg['type'] == 'dice':
             self._bg.dice(msg['data'])
 
-        if append_history:
+        #
+        # append history or not
+        #
+        if msg['history']:
             self._fwd_hist = []
             self.add_history(self._bg._gameinfo)
 
+        #
+        # broadcast
+        #
         emit('json', msg, broadcast=True)
 
     def app_top(self):
