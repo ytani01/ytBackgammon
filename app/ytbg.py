@@ -44,7 +44,7 @@ class ytBackgammonServer:
 
         if gameinfo:
             self._history.append(copy.deepcopy(gameinfo))
-            self._log.debug('history=(%d)%s', len(self._history))
+            self._log.debug('history=(%d)', len(self._history))
 
     def backward_hist(self, n=1, sleep_sec=0.1):
         """

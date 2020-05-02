@@ -67,9 +67,6 @@ class ytBackgammon:
         }
         self._log.debug('_gameinfo=%s', self._gameinfo)
 
-        json_data = json.dumps(self._gameinfo)
-        self._log.debug('json_data=%a', json_data)
-
         self.player = None
 
     def put_checker(self, p1, p2):
