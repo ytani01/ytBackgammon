@@ -3,7 +3,7 @@ from MyLogger import get_logger
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
-class Backgammon:
+class ytBackgammon:
     _log = get_logger(__name__, False)
 
     def __init__(self, svr_ver='', debug=False):
