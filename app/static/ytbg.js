@@ -27,7 +27,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.17";
+const VERSION = "0.18";
 
 /**
  * base class for backgammon
@@ -1517,12 +1517,7 @@ class DiceArea extends BoardArea {
 
         this.active = false;
 
-        let file_prefix = "dice-";
-        if ( player == 0 ) {
-            file_prefix += "White-";
-        } else {
-            file_prefix += "Red-";
-        }
+        let prefix = "dice" + this.player;
 
         this.dice = [];
         for (let i=0; i < 4; i++) {
@@ -1531,11 +1526,11 @@ class DiceArea extends BoardArea {
             if ( this.player == 1 ) {
                 x2 = this.x + this.w - x1;
             }
-            this.dice.push(new Dice("dice" + this.player + i,
+            this.dice.push(new Dice(prefix + i,
                                     this.board, this.player,
                                     x2,
                                     this.y + this.h / 4 * ((i * 2 + 1) % 4),
-                                    file_prefix));
+                                    prefix));
         } // for(i)
     }
 
@@ -1545,7 +1540,7 @@ class DiceArea extends BoardArea {
      * @param {boolean} [emit=true] - emit flag
      */
     set(dice_value, emit=true) {
-        console.log(`DiceArea.set(dive_value=${JSON.stringify(dice_value)}, emit=${emit})`);
+        console.log(`DiceArea[${this.player}].set(dive_value=${JSON.stringify(dice_value)}, emit=${emit})`);
         
         this.clear();
         
