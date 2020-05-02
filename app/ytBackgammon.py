@@ -1,3 +1,12 @@
+#
+# (c) Yoichi Tanibayashi
+#
+"""
+ytBackgammon.py
+"""
+__author__ = 'Yoichi Tanibayashi'
+__date__   = '2020/05'
+
 import json
 from MyLogger import get_logger
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])

@@ -4,7 +4,7 @@
  *   |
  *   +- BackgammonArea .. have (w, h) / without image
  *        |
- *        +- ImageItem .. have image
+ *        +- ImageItem .. have image, mouse handler
  *        |    |
  *        |    +- BoardItem .. on board
  *        |    |    |
@@ -12,7 +12,11 @@
  *        |    |    |    +- InverseButton
  *        |    |    |    +- EmitButton
  *        |    |    |         +- BackButton
- *        |    |    |         +- FwdButton
+ *        |    |    |         +- Back2Button
+ *        |    |    |         +- BackAllButton
+ *        |    |    |         +- FwdButton 
+ *        |    |    |         +- Fwd2Button 
+ *        |    |    |         +- FwdAllButton 
  *        |    |    +- Cube
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
@@ -27,7 +31,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.19";
+const VERSION = "0.20";
 
 /**
  * base class for backgammon
@@ -782,10 +786,12 @@ class Checker extends PlayerItem {
 
         console.log(`Checker.on_mouse_down> this.id=${this.id}, (x,y)=${x},${y})`);
         
+        /*
         // check player
         if ( this.player == 1 - this.board.player ) {
             return;
         }
+        */
 
         // check active dices
         const active_dice = this.board.get_active_dice(this.player);
@@ -1385,26 +1391,41 @@ class Board extends ImageItem {
         console.log(`Board.on_mouse_down> (x,y)=(${x},${y})`);
 
         // dice area
-        let da = this.dice_area[this.player];
-        if ( da.in_this(x, y) ) {
+        for (let player=0; player < 2; player++) {
+            let da = this.dice_area[player];
+            let da2 = this.dice_area[1 - player];
+            if ( ! da.in_this(x, y) ) {
+                continue;
+            }
+
             if ( ! this.cube.accepted ) {
                 return;
             }
+            
             if ( da.active ) {
-                this.set_turn( 1 - this.player );
+                this.set_turn( 1 - player );
                 da.clear(true);
                 return;
             }
+            
+            //
+            // ! da.active
+            //
 
-            if ( this.turn == this.player ) {
-                da.roll();
-            } else if ( this.turn >= 2 ) {
-                this.set_turn(this.player);
-                da.roll();
+            if ( da2.active ) {
+                continue;
             }
+
+            if ( this.turn >= 2 ) {
+                this.set_turn(player);
+            } else if ( player != this.turn ) {
+                continue;
+            }
+            da.roll();
             let dice_values = da.get();
-            console.log(`Board.on_mouse_down> dice_values=${JSON.stringify(dice_values)}`);
-        }
+            console.log(`Board.on_mouse_down> dice_area:player=${player}, dice_values=${JSON.stringify(dice_values)}`);
+            return;
+        } // for(player)
     }
 
     /**

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 #
+# (c) Yoichi Tanibayashi
 #
+"""
+ytbg.py
+"""
+__author__ = 'Yoichi Tanibayashi'
+__date__   = '2020/05'
+
 from ytBackgammonServer import ytBackgammonServer
 from flask import Flask, request
 from flask_socketio import SocketIO
