@@ -7,6 +7,7 @@ ytBackgammon.py
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
+import copy
 from MyLogger import get_logger
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -76,6 +77,10 @@ class ytBackgammon:
         self._log.debug('_gameinfo=%s', self._gameinfo)
 
         self.player = None
+
+    def set_gameinfo(self, gameinfo):
+        self._log.debug('gameinfo=%s', gameinfo)
+        self._gameinfo = copy.deepcopy(gameinfo)
 
     def put_checker(self, p1, p2):
         self._log.debug('p1=%s, p2=%s', p1, p2)

@@ -22,7 +22,8 @@ class ytBackgammonServer:
     def __init__(self, svr_name, svr_ver, debug=False):
         self._dbg = debug
         __class__._log = get_logger(__class__.__name__, self._dbg)
-        self._log.debug('svr_name=%s, svr_ver=%s', svr_name, svr_ver)
+        self._log.debug('svr_name=%s, svr_ver=%s',
+                        svr_name, svr_ver)
 
         self._svr_name = svr_name
         self._svr_ver = svr_ver
@@ -39,6 +40,7 @@ class ytBackgammonServer:
         self._log.debug('gameinfo=%s', gameinfo)
 
         if gameinfo:
+            self._fwd_hist = []
             self._history.append(copy.deepcopy(gameinfo))
             self._log.debug('history=(%d)', len(self._history))
 
@@ -128,7 +130,7 @@ class ytBackgammonServer:
             self.backward_hist(0)
             return
 
-        if msg['type'] == 'forward':
+        if msg['type'] == 'fwd':
             self.forward_hist()
             return
 
@@ -138,6 +140,14 @@ class ytBackgammonServer:
 
         if msg['type'] == 'fwd_all':
             self.forward_hist(0)
+            return
+
+        if msg['type'] == 'set_gameinfo':
+            self._bg.set_gameinfo(msg['data'])
+            self.add_history(self._bg._gameinfo)
+            emit('json',
+                 {'type': 'gameinfo', 'data': self._bg._gameinfo},
+                 broadcast=True)
             return
 
         #
@@ -158,7 +168,6 @@ class ytBackgammonServer:
         # append history or not
         #
         if msg['history']:
-            self._fwd_hist = []
             self.add_history(self._bg._gameinfo)
 
         #
@@ -169,7 +178,8 @@ class ytBackgammonServer:
     def app_top(self):
         self._log.debug('')
         return render_template('top.html',
-                               name=self._svr_name, version=self._svr_ver)
+                               name=self._svr_name,
+                               version=self._svr_ver)
 
     def app_index(self):
         self._log.debug('')

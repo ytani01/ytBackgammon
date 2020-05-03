@@ -31,7 +31,8 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.20";
+const VERSION = "0.30";
+const GAMEINFO_FILE = "gameinfo.json";
 
 /**
  * base class for backgammon
@@ -138,12 +139,13 @@ class ImageItem extends BackgammonArea {
     /**
      * @param {number} deg
      */
-    rotate(deg, center=false) {
-        console.log(`rotate(deg=${deg}, center=${center})`);
+    rotate(deg, center=false, sec=0) {
+        console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
         this.el.style.transformOrigin = "top left";
         if ( center ) {
             this.el.style.transformOrigin = "center center";
         }
+        this.el.style.transitionDuration = sec + "s";
         this.el.style.transform = `rotate(${deg}deg)`;
     }
 
@@ -306,7 +308,7 @@ class BackAllButton extends EmitButton {
  */
 class FwdButton extends EmitButton {
     constructor(id, board, x, y) {
-        super(id, board, "forward", x, y);
+        super(id, board, "fwd", x, y);
     }
 } // FwdButton
 
@@ -613,7 +615,7 @@ class Dice extends ImageItem {
      */
     roll() {
         this.set(Math.floor(Math.random() * 6) + 1);
-        this.rotate(Math.floor(Math.random() * 90 - 45), true);
+        this.rotate(Math.floor(Math.random() * 90 - 45), true, 1);
         return this.value;
     }
 } // class Dice
@@ -810,18 +812,21 @@ class Checker extends PlayerItem {
             }
         }
 
+        /*
         if ( this.board.all_inner(this.player) ) {
             // bearing off の場合
             const pip = this.pip();
             const dice_idx = active_dice.indexOf(pip);
             if ( dice_idx < 0 ) {
-                if ( pip < Math.min(...active_dice) ) {
-                    if ( ! this.is_last_man() ) {
+                // ピッタリのダイスが無い場合
+                if ( this.is_last_man() ) {
+                    if ( pip > Math.max(...active_dice) ) {
                         return;
                     }
                 }
             }
         }
+        */
 
         // クリックされたポイントの先端のチェッカーに持ち換える
         let ch = this;
@@ -871,14 +876,18 @@ class Checker extends PlayerItem {
 
         let dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
         if ( dice_value == 0 ) {
+            // ダイスの目と一致しない場合
             // bearing off の確認
 
             let cancel_flag = true;
 
             if ( dst_p == this.goal_point(ch.player) ) {
+                // dst_p がゴールポイント
                 if ( this.board.all_inner(ch.player) ) {
-                    dice_value = Math.min(...active_dice);
+                    // 全てがインナーにある
+                    dice_value = Math.max(...active_dice);
                     if ( ch.pip() < dice_value ) {
+                        // 大きい方の目よりゴールに近い
                         if ( ch.is_last_man() ) {
                             cancel_flag = false;
                         }
@@ -1047,10 +1056,12 @@ class Board extends ImageItem {
         [this.tx, this.ty] = [568, 245];
         [this.dx, this.dy] = [620, 245];
 
+        this.gameinfo = undefined;
+
         // Title
         const name_el = document.getElementById("name");
         name_el.style.width = this.w + "px";
-        name_el.style.left = "10px";
+        name_el.style.left = "50px";
         name_el.style.top = this.h + "px";
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
@@ -1315,12 +1326,94 @@ class Board extends ImageItem {
     }
 
     /**
+     * generate game information
+     * @return {gameinfo} - game information object
+     */
+    gen_gameinfo() {
+        console.log(`Board.gen_gameinfo()`);
+        
+        let cube_side = this.cube.player;
+        if ( cube_side === undefined ) {
+            cube_side = -1;
+        }
+        
+        let point = [];
+        for (let i=0; i < this.point.length; i++) {
+            let ch = this.point[i].checkers;
+            point[i] = Array(ch.length);
+            if ( ch.length > 0 ) {
+                point[i].fill(ch[0].player);
+            }
+        } // for(i)
+        console.log(`point=${JSON.stringify(point)}`);
+
+        let gameinfo = {
+            server_version: this.gameinfo.server_version,
+            game_num: this.gameinfo.game_num,
+            match_score: this.gameinfo.match_score,
+            score: this.gameinfo.score,
+            turn: this.turn,
+            text: [ "", "" ],
+            board: {
+                cube: {
+                    side: cube_side,
+                    value: this.cube.value,
+                    accepted: this.cube.accepted
+                },
+                dice: [
+                    this.dice_area[0].get(),
+                    this.dice_area[1].get()
+                ],
+                point: point
+            }
+        };
+        
+        return gameinfo;
+    }
+
+    /**
+     * write game information to file
+     */
+    write_gameinfo() {
+        console.log(`Boad.write_gameinfo()`);
+
+        const gameinfo_json = JSON.stringify(this.gen_gameinfo());
+        console.log(`Board.write_gameinfo():gameinfo_json=${gameinfo_json}`);
+
+        const blob_gameinfo = new Blob([gameinfo_json],
+                                       {"type": "application/json"});
+        document.getElementById("write_gameinfo").download = GAMEINFO_FILE;
+        document.getElementById("write_gameinfo").href
+            = window.URL.createObjectURL(blob_gameinfo);
+        
+    }
+
+    /**
+     *
+     */
+    read_gameinfo() {
+        let file = document.getElementById("read_gameinfo").files[0];
+        console.log(`Board.read_gameinfo> file.name=${file.name}`);
+
+        const reader = new FileReader();
+        reader.onloadend = (e) => {
+            const gameinfo = JSON.parse(e.target.result);
+            console.log(`Board.read_gameinfo> gameinfo=${gameinfo}`);
+            this.load_gameinfo(gameinfo);
+            this.emit_msg('set_gameinfo', gameinfo);
+        };
+        reader.readAsText(file);
+    }
+
+    /**
      * load all game information
      * @param {Object} gameinfo - game information object
      */
     load_gameinfo(gameinfo) {
-        console.log(`Board.load_info()`);
+        console.log(`Board.load_gameinfo()`);
 
+        this.gameinfo = gameinfo;
+        
         // escape checkers
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
@@ -1376,12 +1469,10 @@ class Board extends ImageItem {
         
         this.player = 1 - this.player;
 
-        this.el.style.transformOrigin = (this.w / 2) + "px "
-            + (this.h / 2) + "px";
         if ( this.player == 0 ) {
-            this.el.style.transform = "rotate(0deg)";
+            this.rotate(0, true, 0.5);
         } else {
-            this.el.style.transform = "rotate(180deg)";
+            this.rotate(180, true, 0.5);
         }
     }
 
@@ -1425,6 +1516,7 @@ class Board extends ImageItem {
             }
             da.roll();
             let dice_values = da.get();
+
             console.log(`Board.on_mouse_down> dice_area:player=${player}, dice_values=${JSON.stringify(dice_values)}`);
             return;
         } // for(player)
@@ -1707,6 +1799,7 @@ class DiceArea extends BoardArea {
 } // DiceArea
 
 let ws = undefined;
+let board = undefined;
 
 /**
  *
@@ -1720,26 +1813,26 @@ window.onload = function () {
         player = 1;
     }
 
-    let board = new Board("board", 0, 44, player, ws);
+    board = new Board("board", 40, 44, player, ws);
 
-    ws.on('connect', function() {
-        console.log('ws.on(connected)');
+    ws.on("connect", function() {
+        console.log("ws.on(connected)");
 
     });
 
-    ws.on('disconnect', function() {
-        console.log('ws.on(disconnected)');
+    ws.on("disconnect", function() {
+        console.log("ws.on(disconnected)");
     });
 
-    ws.on('json', function(msg) {
+    ws.on("json", function(msg) {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
-        if ( msg.type == 'gameinfo' ) {
+        if ( msg.type == "gameinfo" ) {
             board.load_gameinfo(msg.data);
             return;
-        } // 'gameinfo'
+        } // "gameinfo"
 
-        if ( msg.type == 'put_checker' ) {
+        if ( msg.type == "put_checker" ) {
             console.log(`board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
@@ -1747,17 +1840,17 @@ window.onload = function () {
             let ch = board.search_checker(msg.data.ch);
             board.put_checker(ch, msg.data.p2, false);
             return;
-        } // 'put_checker'
+        } // "put_checker"
 
-        if ( msg.type == 'cube' ) {
+        if ( msg.type == "cube" ) {
             board.cube.set(msg.data.value,
                            msg.data.side,
                            msg.data.accepted,
                            false);
             return;
-        } // 'cube'
+        } // "cube"
 
-        if ( msg.type == 'dice' ) {
+        if ( msg.type == "dice" ) {
             console.log(`board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
@@ -1769,43 +1862,71 @@ window.onload = function () {
                 board.txt[1].off();
             }
             return;
-        } // 'dice'
+        } // "dice"
     });
 }; // window.onload
 
-const backward_hist = () => {
-    console.log('backward_hist()');
-};
+const nav = document.getElementById("nav-input");
 
-const forward_hist = () => {
-    console.log('forward_hist()');
+const backward_hist = () => {
+    nav.checked=false;
+    console.log("backward_hist()");
+    emit_msg("back", {}, false);
 };
 
 const back2 = () => {
-    console.log('back2');
-    emit_msg('back2', {}, false);
-};
-
-const fwd2 = () => {
-    console.log('fwd2');
-    emit_msg('fwd2', {}, false);
+    nav.checked=false;
+    console.log("back2");
+    emit_msg("back2", {}, false);
 };
 
 const back_all = () => {
-    console.log('back_all()');
-    emit_msg('back_all', {}, false);
+    nav.checked=false;
+    console.log("back_all()");
+    emit_msg("back_all", {}, false);
+};
+
+const forward_hist = () => {
+    nav.checked=false;
+    console.log("forward_hist()");
+    emit_msg("fwd", {}, false);
+};
+
+const fwd2 = () => {
+    nav.checked=false;
+    console.log("fwd2");
+    emit_msg("fwd2", {}, false);
 };
 
 const fwd_all = () => {
-    console.log('back_all()');
-    emit_msg('fwd_all', {}, false);
+    nav.checked=false;
+    console.log("back_all()");
+    emit_msg("fwd_all", {}, false);
 };
     
+const board_inverse = () => {
+    nav.checked=false;
+    board.inverse();
+};
+
+const write_gameinfo = () => {
+    nav.checked=false;
+    board.write_gameinfo();
+};
+
+const read_gameinfo = () => {
+    nav.checked=false;
+    board.read_gameinfo();
+};
+
+const clear_filename = () => {
+    document.getElementById("read_gameinfo").value="";
+};
 
 /**
  *
  */
 const emit_msg = (type, data, history=false) => {
     console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
-    ws.emit('json', {src: "player", type: type, data: data, history: history});        
+    ws.emit("json", {src: "player", type: type, data: data, history: history});        
 };

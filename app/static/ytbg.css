@@ -3,7 +3,7 @@
 }
 
 body {
-    background-color: #AAA;
+    background-color: #DDD;
 }
 
 div, span {
@@ -24,7 +24,7 @@ div, span {
 
 header {
   padding:10px;
-  background: skyblue;
+  background: #DDD;
 }
 
 #nav-drawer {
@@ -61,6 +61,29 @@ header {
   bottom: -16px;
 }
 
+#nav-close span, #nav-close span:before, #nav-close span:after {
+  position: absolute;
+  height: 0px;
+  width: 25px;
+  border-radius: 3px;
+  background: #DDD;
+  display: block;
+  content: '';
+  cursor: pointer;
+}
+#nav-close span:before {
+    bottom: -16px;
+    height: 5px;
+    transform-origin: center;
+    transform: rotate(45deg);
+}
+#nav-close span:after {
+    bottom: -16px;
+    height: 5px;
+    transform-origin: center;
+    transform: rotate(-45deg);
+}
+
 /*閉じる用の薄黒カバー*/
 #nav-close {
   display: none;/*はじめは隠しておく*/
@@ -73,6 +96,9 @@ header {
   background: black;
   opacity: 0;
   transition: .3s ease-in-out;
+  margin-left: 220px;
+  color: white;
+  font-size: 22px;
 }
 
 /*中身*/
@@ -83,7 +109,7 @@ header {
   left: 0;
   z-index: 9999;/*最前面に*/
   width: 90%;/*右側に隙間を作る（閉じるカバーを表示）*/
-  max-width: 330px;/*最大幅（調整してください）*/
+  max-width: 220px;/*最大幅（調整してください）*/
   height: 100%;
   background: #fff;/*背景色*/
   transition: .3s ease-in-out;/*滑らかに表示*/
@@ -101,4 +127,45 @@ header {
   -webkit-transform: translateX(0%);
   transform: translateX(0%);/*中身を表示（右へスライド）*/
   box-shadow: 6px 0 25px rgba(0,0,0,.15);
+}
+
+#nav-title {
+    position: relative;
+    font-size: 20px;
+    font-weight: bold;
+    background-color: #8BF;
+    color: #333;
+}
+
+#nav {
+    list-style: none;
+    padding-inline-start: 15px;
+    text-align: left;
+    background-color: #DDD;
+}
+
+#nav li {
+/*    width: 140px; */
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 5px;
+    margin-bottom: 15px;
+}
+
+#nav li a {
+    display: block;
+    width: 100%;
+    text-decoration: none;
+    color: #555;
+}
+
+#nav li input {
+    display: none;
+}
+
+#nav li label {
+    display: block;
+    width: 100%;
+    text-decoration: none;
+    color: #555;
 }
