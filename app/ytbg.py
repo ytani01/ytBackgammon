@@ -11,8 +11,6 @@ __date__   = '2020/05'
 from ytBackgammonServer import ytBackgammonServer
 from flask import Flask, request
 from flask_socketio import SocketIO
-import copy
-import time
 from MyLogger import get_logger
 import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])

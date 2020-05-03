@@ -147,7 +147,6 @@ class ytBackgammonServer:
             self._bg.put_checker(msg['data']['p1'], msg['data']['p2'])
             if msg['data']['p2'] >= 26:
                 self._log.debug('hit')
-                append_history = False
 
         if msg['type'] == 'cube':
             self._bg.cube(msg['data'])

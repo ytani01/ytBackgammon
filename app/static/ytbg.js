@@ -1043,13 +1043,15 @@ class Board extends ImageItem {
         this.turn = -1;
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
-        this.by = [46, 535];
-        [this.tx, this.ty] = [570, 270];
-        [this.dx, this.dy] = [620, 267];
+        this.by = [20, 509];
+        [this.tx, this.ty] = [568, 245];
+        [this.dx, this.dy] = [620, 245];
 
         // Title
         const name_el = document.getElementById("name");
         name_el.style.width = this.w + "px";
+        name_el.style.left = "10px";
+        name_el.style.top = this.h + "px";
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
 
@@ -1718,7 +1720,7 @@ window.onload = function () {
         player = 1;
     }
 
-    let board = new Board("board", 0, 20, player, ws);
+    let board = new Board("board", 0, 44, player, ws);
 
     ws.on('connect', function() {
         console.log('ws.on(connected)');

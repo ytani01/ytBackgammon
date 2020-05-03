@@ -7,7 +7,6 @@ ytBackgammon.py
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
-import json
 from MyLogger import get_logger
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -21,7 +20,7 @@ class ytBackgammon:
         self._log.debug('svr_ver=%a', svr_ver)
 
         self.svr_ver = svr_ver
-        
+
         self._gameinfo = {
             'server_version': self.svr_ver,
             'game_num': 0,
