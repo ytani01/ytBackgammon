@@ -31,7 +31,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.31";
+const VERSION = "0.32";
 const GAMEINFO_FILE = "gameinfo.json";
 
 /**
@@ -522,8 +522,13 @@ class OnBoardText extends PlayerItem {
     }
 
     on() {
-        this.el.style.borderColor = "rgba(255, 0, 255, 0.7)";
-        this.el.style.color = "rgba(255, 0, 255, 0.7)";
+        this.el.style.borderColor = "rgba(0, 128, 255, 0.8)";
+        this.el.style.color = "rgba(0, 128, 255, 0.8)";
+    }
+
+    red() {
+        this.el.style.borderColor = "rgba(255, 0, 0, 0.8)";
+        this.el.style.color = "rgba(255, 0, 0, 0.8)";
     }
 
     off() {
@@ -788,13 +793,6 @@ class Checker extends PlayerItem {
 
         console.log(`Checker.on_mouse_down> this.id=${this.id}, (x,y)=${x},${y})`);
         
-        /*
-        // check player
-        if ( this.player == 1 - this.board.player ) {
-            return;
-        }
-        */
-
         // check active dices
         const active_dice = this.board.get_active_dice(this.player);
         if ( active_dice.length == 0 ) {
@@ -812,21 +810,12 @@ class Checker extends PlayerItem {
             }
         }
 
-        /*
-        if ( this.board.all_inner(this.player) ) {
-            // bearing off の場合
-            const pip = this.pip();
-            const dice_idx = active_dice.indexOf(pip);
-            if ( dice_idx < 0 ) {
-                // ピッタリのダイスが無い場合
-                if ( this.is_last_man() ) {
-                    if ( pip > Math.max(...active_dice) ) {
-                        return;
-                    }
-                }
-            }
+        // 移動可能か確認
+        const dst_p = this.board.get_dst_point(this.player, this.cur_point);
+        console.log(`dst_p=${JSON.stringify(dst_p)}`);
+        if ( dst_p.length == 0 ) {
+            return;
         }
-        */
 
         // クリックされたポイントの先端のチェッカーに持ち換える
         let ch = this;
@@ -864,6 +853,7 @@ class Checker extends PlayerItem {
         console.log(`Checker.on_mouse_up> dst_p=${dst_p}`);
 
         if ( dst_p == ch.cur_point ) {
+            // XXX T.B.D. 自動ムーブの検討
             this.cancel_move(ch);
             return;
         }
@@ -1307,6 +1297,29 @@ class Board extends ImageItem {
     }
 
     /**
+     * クローズアウトしている？
+     *
+     */
+    closeout(player) {
+        let [from_p, to_p] = [1, 6];
+        if ( player == 1 ) {
+            [from_p, to_p] = [19, 24];
+        }
+
+        for (let p=from_p; p <= to_p; p++) {
+            const checkers = this.point[p].checkers;
+            if ( checkers.length < 2 ) {
+                return false;
+            }
+            if ( checkers[0].player != player ) {
+                return false;
+            }
+        }
+        console.log(`Board.closeout(player=${player}) ==> true`);
+        return true;
+    } // Board.closeout()
+
+    /**
      * 使えるダイスを取得
      * @return {number[]}
      */
@@ -1323,6 +1336,83 @@ class Board extends ImageItem {
 
         console.log(`Board.get_active_dice()> active_dice=${JSON.stringify(active_dice)}`);
         return active_dice;
+    }
+
+    /**
+     * ポイントとダイスの目から行き先のポイントを計算
+     * @param {number} player
+     * @param {number} src_p
+     * @param {number} dicenum
+     * @return {number} - destination point
+     */
+    calc_dst_point(player, src_p, dicenum) {
+        let dst_p = undefined;
+        
+        if ( player == 0 ) {
+            if ( src_p == 26 ) {
+                src_p = 25;
+            }
+            dst_p = src_p - dicenum;
+            if ( dst_p < 0 ) {
+                dst_p = 0;
+            }
+            return dst_p;
+        }
+
+        // player1
+        if ( src_p == 27 ) {
+            src_p = 0;
+        }
+        dst_p = src_p + dicenum;
+        if ( dst_p > 25 ) {
+            dst_p = 25;
+        }
+        return dst_p;
+    }
+
+    /**
+     * 移動可能なポイントの取得
+     * @param {number} player
+     * @param {number} src_p
+     * @return {number[]} 
+     */
+    get_dst_point(player, src_p) {
+        console.log(`Board.get_dst_point(player=${player},src_p=${src_p})`);
+
+        let dst_p = [];
+
+        let dice = this.get_active_dice(player);
+        if ( dice.length == 0 ) {
+            return dst_p;
+        }
+        if ( dice.length == 4 ) {
+            dice = [dice[0]];
+        }
+        console.log(`Board.get_dst_point> dice=${JSON.stringify(dice)}`);
+        for (let d=0; d < dice.length; d++) {
+            const dst_p1 = this.calc_dst_point(player, src_p, dice[d]);
+            console.log(`Board.get_dst_point> dst_p1=${dst_p1}`);
+
+            if ( player == 0 && dst_p1 == 0 ) {
+                if ( ! this.all_inner(player) ) {
+                    continue;
+                }
+            }
+            if ( player == 1 && dst_p1 == 25 ) {
+                if ( ! this.all_inner(player) ) {
+                    continue;
+                }
+            }
+
+            const checkers = this.point[dst_p1].checkers;
+            if ( checkers.length >= 2 && checkers[0].player != player) {
+                continue;
+            }
+
+            dst_p.push(dst_p1);
+        }
+
+        return dst_p;
     }
 
     /**
@@ -1501,12 +1591,16 @@ class Board extends ImageItem {
                 return;
             }
             
-            //
-            // ! da.active
-            //
+            // da.active == false
 
             if ( da2.active ) {
                 continue;
+            }
+
+            if ( this.closeout(1 - player) ) { // closed out?
+                console.log(`Board.on_mouse_down> closed out`);
+                this.set_turn(1 - player);
+                return;
             }
 
             if ( this.turn >= 2 ) {
