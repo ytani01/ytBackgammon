@@ -31,7 +31,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.30";
+const VERSION = "0.31";
 const GAMEINFO_FILE = "gameinfo.json";
 
 /**
@@ -960,7 +960,7 @@ class Checker extends PlayerItem {
             if ( hit_ch.player == 0 ) {
                 bar_p = 26;
             }
-            ch.board.put_checker(hit_ch, bar_p);
+            ch.board.put_checker(hit_ch, bar_p, true, false);
             hit_ch.calc_z();
         }
 
@@ -1239,7 +1239,7 @@ class Board extends ImageItem {
      * @param {boolean} hist_flag
      */
     emit_msg(type, data, hist_flag=true) {
-        console.log(`Board.emit_msg(type=${type}, data=${JSON.stringify(data)}), hist_flag=${hist_flag}`);
+        console.log(`Board.emit_msg(type=${type}, data=${JSON.stringify(data)}, hist_flag=${hist_flag})`);
         this.ws.emit('json', {
             src: this.player,
             type: type,
@@ -1449,16 +1449,16 @@ class Board extends ImageItem {
         // turn
         this.set_turn(gameinfo.turn);
 
-        // cube
-        let c = gameinfo.board.cube;
-        console.log(`gameinfo.board.cube=${JSON.stringify(c)}`);
-        this.cube.set(c.value, c.side, c.accepted, false);
-
         // dice
         let d = gameinfo.board.dice;
         console.log(`gameinfo.board.dice=${JSON.stringify(d)}`);
         this.dice_area[0].set(d[0], false);
         this.dice_area[1].set(d[1], false);
+
+        // cube
+        let c = gameinfo.board.cube;
+        console.log(`gameinfo.board.cube=${JSON.stringify(c)}`);
+        this.cube.set(c.value, c.side, c.accepted, false);
     }
 
     /**
@@ -1556,8 +1556,8 @@ class Board extends ImageItem {
      * @param {number} p - point index
      * @param {boolean} [emit=true] - emit flag
      */
-    put_checker(ch, p, emit=true) {
-        console.log(`Board.put_checker(ch.id=${ch.id}, p=${p}, emit=${emit})`);
+    put_checker(ch, p, emit=true, add_hist=true) {
+        console.log(`Board.put_checker(ch.id=${ch.id}, p=${p}, emit=${emit}, add_hist=${add_hist})`);
 
         let prev_p = undefined;
         if ( ch.cur_point !== undefined ) {
@@ -1580,14 +1580,16 @@ class Board extends ImageItem {
         po.checkers.push(ch);
 
         if ( this.dice_area[ch.player].check_disable() ) {
-            const dice_values = this.dice_area[this.player].get();
-            this.emit_msg('dice', { turn: this.turn,
-                                    player: ch.player,
-                                    dice: dice_values }, false);
+            const dice_values = this.dice_area[ch.player].get();
+            if ( emit ) { // XXX OK ?
+                this.emit_msg('dice', { turn: this.turn,
+                                        player: ch.player,
+                                        dice: dice_values }, false);
+            }
         }
 
         if ( emit ) {
-            this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p});
+            this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p}, add_hist);
         }
     }
 } // class Board
