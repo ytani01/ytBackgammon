@@ -31,7 +31,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.33";
+const VERSION = "0.40";
 const GAMEINFO_FILE = "gameinfo.json";
 
 /**
@@ -362,6 +362,8 @@ class Cube extends BoardItem {
         this.player = undefined;
         this.value = 1;
         this.accepted = false;
+
+        this.move_sec = 0.3;
         
         this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
         this.y0 = this.board.h / 2;
@@ -405,13 +407,13 @@ class Cube extends BoardItem {
         this.el.firstChild.src = filename;
 
         if ( this.player === undefined ) {
-            this.move(this.x0, this.y0, true);
+            this.move(this.x0, this.y0, true, this.move_sec);
         } else if ( accepted ) {
             this.player = player;
-            this.move(this.x0, this.y2[this.player], true);
+            this.move(this.x0, this.y2[this.player], true, this.move_sec);
         } else {
             this.player = player;
-            this.move(this.x0, this.y1[this.player], true);
+            this.move(this.x0, this.y1[this.player], true, this.move_sec);
         }
 
         if ( emit ) {
@@ -953,12 +955,13 @@ class Checker extends PlayerItem {
             if ( hit_ch.player == 0 ) {
                 bar_p = 26;
             }
-            ch.board.put_checker(hit_ch, bar_p, true, false);
+
+            ch.board.put_checker(hit_ch, bar_p, 0.2);
             hit_ch.calc_z();
         }
 
         // move_checker
-        ch.board.put_checker(this, dst_p);
+        ch.board.put_checker(this, dst_p, 0.2);
         ch.calc_z();
 
         ch.board.moving_checker = undefined;
@@ -1131,52 +1134,52 @@ class Board extends ImageItem {
             if ( p == 0 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, -1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, -1, cn));
             }
             if ( p >= 1 && p <= 6 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 6 - p;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, -1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, -1, cn));
             }
             if ( p >= 7 && p <= 12 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 12 - p;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, -1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, -1, cn));
             }
             if ( p >= 13 && p <= 18 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0];
                 let xn = p - 13;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, 1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, 1, cn));
             }
             if ( p >= 19 && p <= 24 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0];
                 let xn = p - 19;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, 1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, 1, cn));
             }
             if ( p == 25 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, 1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, 1, cn));
             }
             if ( p == 26 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, 1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, 1, cn));
             }
             if ( p == 27 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0];
                 let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, -1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, -1, cn));
             }
         } // for
 
@@ -1502,7 +1505,7 @@ class Board extends ImageItem {
      * load all game information
      * @param {Object} gameinfo - game information object
      */
-    load_gameinfo(gameinfo) {
+    load_gameinfo(gameinfo, sec=0) {
         console.log(`Board.load_gameinfo()`);
 
         this.gameinfo = gameinfo;
@@ -1523,21 +1526,14 @@ class Board extends ImageItem {
         } // for(i)
 
         // put checkers
-        let p = gameinfo.board.point;
-        let p_idx = [0, 0];
-        for (let i=0; i < p.length; i++) {
-            if ( p[i].length == 0 ) {
-                continue;
-            }
-
-            for (let j=0; j < p[i].length; j++) {
-                let player = p[i][0];
-                let ch = this.checker[player][p_idx[player]];
-                this.put_checker(ch, i, false);
+        const ch_point = gameinfo.board.checker;
+        for (let p=0; p < 2; p++) {
+            for (let c=0; c < 15; c++) {
+                const ch = this.checker[p][c];
+                this.put_checker(ch, ch_point[p][c][0], sec, false);
                 ch.el.hidden = false;
-                p_idx[player]++;
-            } // for (j)
-        } // for(i)
+            } // for (c)
+        } // for (p)
 
         // turn
         this.set_turn(gameinfo.turn);
@@ -1654,44 +1650,37 @@ class Board extends ImageItem {
      * 
      * @param {Checker} ch - Checker
      * @param {number} p - point index
+     * @param {number} sec
      * @param {boolean} [emit=true] - emit flag
+     * @param {boolean} [add_hist=true] - add history flag
      */
-    put_checker(ch, p, emit=true, add_hist=true) {
-        console.log(`Board.put_checker(ch.id=${ch.id}, p=${p}, emit=${emit}, add_hist=${add_hist})`);
+    put_checker(ch, p, sec=0, emit=true, add_hist=true) {
+        console.log(`Board.put_checker(ch.id=${ch.id}, p=${p}, sec=${sec}, emit=${emit}, add_hist=${add_hist})`);
 
-        let prev_p = undefined;
-        if ( ch.cur_point !== undefined ) {
-            prev_p = ch.cur_point;
-            console.log(`Board.put_checker> prev_p=${prev_p}`);
-            ch = this.point[prev_p].checkers.pop();
-            console.log(`Board.put_checker> ch.id=${ch.id}`);
+        if (ch.cur_point !== undefined ) {
+            const checkers = this.point[ch.cur_point].checkers;
+            const ch_i = checkers.indexOf(ch);
+            checkers.splice(ch_i, 1);
         }
 
-        let po = this.point[p];
-        let ch_n = po.checkers.length;
-        let z = Math.floor(ch_n / po.max_n);
-        let n = ch_n % po.max_n;
-        let x = po.cx;
-        let y = po.y0 + (ch.h / 2 + ch.h * n * 0.75 + ch.h / 5 * z) * po.direction;
-        ch.move(x, y, true, 0.2);
-        ch.calc_z();
+        const idx = this.point[p].add(ch, sec);
         ch.cur_point = p;
-
-        po.checkers.push(ch);
 
         if ( this.dice_area[ch.player].check_disable() ) {
             const dice_values = this.dice_area[ch.player].get();
-            if ( emit ) { // XXX OK ?
-                this.emit_msg('dice', { turn: this.turn,
+            if ( emit ) {
+                this.emit_msg('dice', { turn:   this.turn,
                                         player: ch.player,
-                                        dice: dice_values }, false);
+                                        dice:   dice_values }, false);
             }
         }
 
         if ( emit ) {
-            this.emit_msg('put_checker', {ch: ch.id, p1: prev_p, p2: p}, add_hist);
+            this.emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
+                                           p:  p, idx: idx }, add_hist);
         }
-    }
+    } // Board.put_checker()
+
 } // class Board
 
 /**
@@ -1708,8 +1697,9 @@ class BoardArea extends BackgammonArea {
  * 
  */
 class BoardPoint extends BoardArea {
-    constructor(board, x, y, w, h, direction, max_n) {
+    constructor(board, x, y, w, h, id, direction, max_n) {
         super(board, x, y, w, h);
+        this.id = id;
         this.direction = direction; // up: +1, down: -1
         this.max_n = max_n;
 
@@ -1722,6 +1712,25 @@ class BoardPoint extends BoardArea {
         }
 
         this.checkers = [];
+    }
+
+    /**
+     * @param {Checker} ch
+     * @param {number} sec
+     * @return {number} - position index
+     */
+    add(ch, sec=0) {
+        const n = this.checkers.length;
+        const x = this.cx;
+        const y = parseInt(Math.round(this.y0
+                                      + (ch.h * (n % this.max_n) * 0.7 + ch.h / 2 )
+                                      * this.direction));
+        console.log(`BoardPoint.add(ch.id=${ch.id})> n=${n}, y=${y}`);
+        ch.move(x, y, true, sec);
+        ch.set_z(n);
+        ch.cur_point = this.id;
+        this.checkers.push(ch);
+        return n;
     }
 } // class BoardPoint
 
@@ -1930,7 +1939,7 @@ window.onload = function () {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
         if ( msg.type == "gameinfo" ) {
-            board.load_gameinfo(msg.data);
+            board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
             return;
         } // "gameinfo"
 
@@ -1939,8 +1948,10 @@ window.onload = function () {
             if ( board.turn == -1 ) {
                 return;
             }
-            let ch = board.search_checker(msg.data.ch);
-            board.put_checker(ch, msg.data.p2, false);
+            const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
+            console.log(`ws.on(json)> ch_id=${ch_id}`);
+            let ch = board.search_checker(ch_id);
+            board.put_checker(ch, msg.data.p, 0.2, false);
             return;
         } // "put_checker"
 

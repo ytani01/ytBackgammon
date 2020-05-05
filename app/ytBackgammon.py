@@ -42,35 +42,15 @@ class ytBackgammon:
                     [0, 0, 0, 0],
                     [0, 0, 0, 0]
                 ],
-                'point': [
-                    [],
-                    [1, 1],
-                    [],
-                    [],
-                    [],
-                    [],
-                    [0, 0, 0, 0, 0],
-                    [],
-                    [0, 0, 0],
-                    [],
-                    [],
-                    [],
-                    [1, 1, 1, 1, 1],
-                    [0, 0, 0, 0, 0],
-                    [],
-                    [],
-                    [],
-                    [1, 1, 1],
-                    [],
-                    [1, 1, 1, 1, 1],
-                    [],
-                    [],
-                    [],
-                    [],
-                    [0, 0],
-                    [],
-                    [],
-                    []
+                'checker': [
+                    [ [ 6, 0], [ 6, 1], [ 6, 2], [ 6, 3], [ 6, 4],
+                      [ 8, 0], [ 8, 1], [ 8, 2],
+                      [13, 0], [13, 1], [13, 2], [13, 3], [13, 4],
+                      [24, 0], [24, 1] ],
+                    [ [19, 0], [19, 1], [19, 2], [19, 3], [19, 4],
+                      [17, 0], [17, 1], [17, 2],
+                      [12, 0], [12, 1], [12, 2], [12, 3], [12, 4],
+                      [ 1, 0], [ 1, 1] ]
                 ],
             }
         }
@@ -82,16 +62,23 @@ class ytBackgammon:
         self._log.debug('gameinfo=%s', gameinfo)
         self._gameinfo = copy.deepcopy(gameinfo)
 
-    def put_checker(self, p1, p2):
-        self._log.debug('p1=%s, p2=%s', p1, p2)
-        self._log.debug('_gameinfo[board][point]=%a',
-                        self._gameinfo['board']['point'])
-
-        ch = self._gameinfo['board']['point'][p1].pop()
-        self._gameinfo['board']['point'][p2].append(ch)
-
-        self._log.debug('_gameinfo[board][point]=%a',
-                        self._gameinfo['board']['point'])
+    def put_checker(self, ch_id, p, idx):
+        """
+        Parameters
+        ----------
+        ch_id: int
+            checker ID number (ex. 012, 101 ..)
+        p: int
+            point index
+        idx: int
+            position index
+        """
+        self._log.debug('ch_id=%d, p=%s, idx=%s', ch_id, p, idx)
+        player = int(ch_id / 100)
+        ch_i = ch_id % 100
+        self._gameinfo['board']['checker'][player][ch_i] = [p, idx]
+        self._log.debug('_gameinfo[board][point][%d][%d]=[%d,%d]',
+                        player, ch_i, p, idx);
 
     def cube(self, msg):
         self._log.debug('msg=%s', msg)
@@ -104,8 +91,9 @@ class ytBackgammon:
     def dice(self, msg):
         """
         msg = {
-            'dice': [d1, d2, d3, d4],
-            'turn': turn
+            'turn': turn,
+            'player': player,
+            'dice': [d1, d2, d3, d4]
         }
         """
         self._log.debug('msg=%s', msg)
