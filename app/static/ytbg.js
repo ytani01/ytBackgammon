@@ -962,12 +962,12 @@ class Checker extends PlayerItem {
                 bar_p = 26;
             }
 
-            ch.board.put_checker(hit_ch, bar_p, 0.2);
+            ch.board.put_checker(hit_ch, bar_p, 0.3);
             hit_ch.calc_z();
         }
 
         // move_checker
-        ch.board.put_checker(this, dst_p, 0.2);
+        ch.board.put_checker(this, dst_p, 0.3);
         ch.calc_z();
 
         ch.board.moving_checker = undefined;
@@ -1937,6 +1937,8 @@ window.onload = function () {
     ws = io.connect(url);
 
     console.log(`onload> location.pathname=${location.pathname}`);
+
+    //setTimeout("location.reload()",5000);
 
     let player = 0;
     if ( location.pathname.slice(-1) == "2" ) {
