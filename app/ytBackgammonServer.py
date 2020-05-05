@@ -259,7 +259,7 @@ class ytBackgammonServer:
             """
             data: {}
             """
-            self.backward_hist(20, sleep_sec=0.5)
+            self.backward_hist(0, sleep_sec=0.5)
             return
 
         if msg['type'] == 'back_all':
@@ -280,7 +280,7 @@ class ytBackgammonServer:
             """
             data: {}
             """
-            self.forward_hist(20, sleep_sec=0.5)
+            self.forward_hist(0, sleep_sec=0.5)
             return
 
         if msg['type'] == 'fwd_all':

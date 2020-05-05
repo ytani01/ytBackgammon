@@ -181,7 +181,6 @@ class ImageItem extends BackgammonArea {
      */
     get_xy(e) {
         e = this.touch2mouse(e);
-
         let [origin_x, origin_y] = [this.x, this.y];
         if ( this.board ) {
             [origin_x, origin_y] = [this.board.x, this.board.y];
@@ -1047,6 +1046,7 @@ class Board extends ImageItem {
      * @param {io.connect} ws - websocket
      */
     constructor(id, x, y, player, ws) {
+        console.log(`Board(id=${id},x=${x},y=${y},plyaer=${player})`);
         super(id, x, y);
 
         this.player = player;
@@ -1211,6 +1211,7 @@ class Board extends ImageItem {
 
         this.el.ondragstart = this.null_handler.bind(this);
 
+        //this.rotate(360, true, 0.5);
         if ( this.player == 1 ) {
             this.player = 0;
             this.inverse();
