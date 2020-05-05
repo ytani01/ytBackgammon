@@ -35,6 +35,7 @@ class ytBackgammonServer:
         self._client_sid = []
         self._history = []
         self._fwd_hist = []
+        self._cur_sn = 0;
 
         self._bg = ytBackgammon(self._svr_ver, debug=self._dbg)
         self.repeat_flag = False
@@ -42,14 +43,41 @@ class ytBackgammonServer:
         if self.load_data() < 1:
             self.add_history(self._bg._gameinfo)
 
+    def new_game(self):
+        """
+        """
+        self._log.debug('')
+        self._bg.init_gameinfo()
+        self.add_history(self._bg._gameinfo)
+
     def add_history(self, gameinfo=None):
         self._log.debug('gameinfo=%s', gameinfo)
 
         if gameinfo:
             self._fwd_hist = []
+            self._cur_sn += 1
+            gameinfo['sn'] = self._cur_sn
             self._history.append(copy.deepcopy(gameinfo))
             self.save_data()
             self._log.debug('history=(%d)', len(self._history))
+
+    def emit_gameinfo(self, sec=0):
+        """
+        Parameters
+        ----------
+        sec: int
+            for animation
+        """
+        emit('json',
+             {
+                 'src': 'server', 'dst': 'all', 'type': 'gameinfo',
+                 'data': {
+                     'gameinfo': self._bg._gameinfo,
+                     'sec': sec,
+                     'hist_i': len(self._history),
+                     'hist_n': len(self._history) + len(self._fwd_hist)
+                 }
+             }, broadcast=True)
 
     def backward_hist(self, n=1, sleep_sec=0.1):
         """
@@ -78,10 +106,7 @@ class ytBackgammonServer:
 
             self._log.debug('_history=(%d), _fwd_hist=(%d)',
                             len(self._history), len(self._fwd_hist))
-            emit('json', {
-                'src': 'server', 'dst': 'all', 'type': 'gameinfo',
-                'data': { 'gameinfo': self._bg._gameinfo, 'sec': sec }
-            }, broadcast=True)
+            self.emit_gameinfo(sec)
 
             count += 1
             if n > 0 and count >= n:
@@ -112,10 +137,8 @@ class ytBackgammonServer:
 
             self._log.debug('_history=(%d), _fwd_hist=(%d)',
                             len(self._history), len(self._fwd_hist))
-            emit('json', {
-                'src': 'server', 'dst': 'all', 'type': 'gameinfo',
-                'data': { 'gameinfo': self._bg._gameinfo, 'sec': sec }
-            }, broadcast=True)
+            self.emit_gameinfo(sec)
+
             count += 1
             if n > 0 and count >= n:
                 break
@@ -126,15 +149,62 @@ class ytBackgammonServer:
         self.save_data()
         return
 
+    def hist_ent2str(self, h):
+        j_str = ''
+        j_str += '    {\n'
+        j_str += '      "sn": %d,\n' % h['sn']
+        j_str += '      "server_version": "%s",\n' % h['server_version']
+        j_str += '      "game_num": %d,\n' % h['game_num']
+        j_str += '      "match_score": %d,\n' % h['match_score']
+        j_str += '      "score": %s,\n' % h['score']
+        j_str += '      "turn": %d,\n' % h['turn']
+        j_str += '      "text": %s,\n' % json.dumps(h['text'])
+        j_str += '      "board": {\n'
+        j_str += '        "cube": {\n'
+        j_str += '          "side": %d,\n' % h['board']['cube']['side']
+        j_str += '          "value": %d,\n' % h['board']['cube']['value']
+        j_str += '          "accepted": %d\n' % h['board']['cube']['accepted']
+        j_str += '        },\n'
+        j_str += '        "dice": %s,\n' % h['board']['dice']
+        j_str += '        "checker": [\n'
+        j_str += '          %s,\n' % h['board']['checker'][0]
+        j_str += '          %s \n' % h['board']['checker'][1]
+        j_str += '        ]\n'
+        j_str += '      }\n'
+        j_str += '    },\n'
+        return j_str
+
     def save_data(self):
         self._log.debug('')
 
         data = {'history': self._history, 'fwd_hist': self._fwd_hist}
 
+        j_str = '{\n'
+        j_str += '  "history": [\n'
+
+        for h in self._history:
+            j_str += self.hist_ent2str(h)
+
+        j_str = j_str.rstrip(',\n') + '\n'
+        j_str += '  ],\n'
+        j_str += '  "fwd_hist": [\n'
+
+        for h in self._fwd_hist:
+            j_str += self.hist_ent2str(h)
+
+        j_str = j_str.rstrip(',\n') + '\n'
+        j_str += '  ]\n'
+        j_str += '}\n'
+  
         with open(self.DATAFILE_NAME, "w") as f:
-            json.dump(data, f, indent=2)
+            f.write(j_str)
 
     def load_data(self):
+        """
+        Returns
+        -------
+        len(self._history)
+        """
         self._log.debug('')
 
         try:
@@ -160,8 +230,7 @@ class ytBackgammonServer:
 
         self._client_sid.append(copy.deepcopy(request.sid))
 
-        emit('json', { 'src': 'server', 'dst': '', 'type': 'gameinfo',
-                       'data': { 'gameinfo': self._bg._gameinfo, 'sec': 0} })
+        self.emit_gameinfo(0)
 
     def on_disconnect(self, request):
         self._log.info('request.sid=%a', request.sid)
@@ -221,15 +290,21 @@ class ytBackgammonServer:
             self.forward_hist(0)
             return
 
+        if msg['type'] == 'new':
+            """
+            data: {}
+            """
+            self.new_game()
+            self.emit_gameinfo(5)
+            return
+
         if msg['type'] == 'set_gameinfo':
             """
             data: gameinfo
             """
             self._bg.set_gameinfo(msg['data'])
             self.add_history(self._bg._gameinfo)
-            emit('json',
-                 {'type': 'gameinfo', 'data': self._bg._gameinfo},
-                 broadcast=True)
+            self.emit_gameinfo(0)
             return
 
         #

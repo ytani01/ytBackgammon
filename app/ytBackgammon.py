@@ -22,7 +22,14 @@ class ytBackgammon:
 
         self.svr_ver = svr_ver
 
+        self._gameinfo = None
+        self.init_gameinfo()
+
+        self.player = None
+
+    def init_gameinfo(self):
         self._gameinfo = {
+            'sn': 0,
             'server_version': self.svr_ver,
             'game_num': 0,
             'match_score': 0,
@@ -55,9 +62,7 @@ class ytBackgammon:
             }
         }
         self._log.debug('_gameinfo=%s', self._gameinfo)
-
-        self.player = None
-
+        
     def set_gameinfo(self, gameinfo):
         self._log.debug('gameinfo=%s', gameinfo)
         self._gameinfo = copy.deepcopy(gameinfo)

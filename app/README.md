@@ -1,6 +1,6 @@
-# 
+# ytBackgammon -- ネット共有型バックギャモンボード
 
-## ボード情報
+## 
 
 
 ## References 

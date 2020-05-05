@@ -31,7 +31,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.40";
+const VERSION = "0.41";
 const GAMEINFO_FILE = "gameinfo.json";
 
 /**
@@ -567,6 +567,8 @@ class Dice extends ImageItem {
         this.el.style.cursor = "pointer";
 
         this.move(x, y, true);
+        [this.x0, this.y0] = [this.x, this.y];
+        
     }
 
     /**
@@ -595,9 +597,10 @@ class Dice extends ImageItem {
 
     /**
      * @param {number} val - dice number, 11-16 .. disable
+     * @param {boolean} [roll_flag=false]
      */
-    set(val) {
-        console.log(`Dice.set(val=${val})>`);
+    set(val, roll_flag=false) {
+        console.log(`Dice.set(val=${val},roll_flag=${roll_flag})>`);
         this.value = val;
         this.el.hidden = true;
         this.enable();
@@ -617,6 +620,9 @@ class Dice extends ImageItem {
             return;
         }
 
+        if ( roll_flag ) {
+            this.rotate(Math.floor(Math.random() * 720 - 360), true, .5);
+        }
         this.el.firstChild.src = this.get_filename(val);
     }
     
@@ -625,7 +631,6 @@ class Dice extends ImageItem {
      */
     roll() {
         this.set(Math.floor(Math.random() * 6) + 1);
-        this.rotate(Math.floor(Math.random() * 90 - 45), true, 1);
         return this.value;
     }
 } // class Dice
@@ -858,7 +863,9 @@ class Checker extends PlayerItem {
         console.log(`Checker.on_mouse_up> dst_p=${dst_p}`);
 
         if ( dst_p == ch.cur_point ) {
-            // XXX T.B.D. 自動ムーブの検討
+            // XXX T.B.D. ワンタッチでのムーブ??
+            let active_dice = this.board.get_active_dice(this.player);
+            
             this.cancel_move(ch);
             return;
         }
@@ -1271,6 +1278,9 @@ class Board extends ImageItem {
             
         // turn == 0 or 1
         this.txt[turn].on();
+        if ( this.closeout(1 - turn) ) {
+            this.txt[turn].red();
+        }
     }
 
     /**
@@ -1506,7 +1516,7 @@ class Board extends ImageItem {
      * @param {Object} gameinfo - game information object
      */
     load_gameinfo(gameinfo, sec=0) {
-        console.log(`Board.load_gameinfo()`);
+        console.log(`Board.load_gameinfo(gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
 
         this.gameinfo = gameinfo;
         
@@ -1527,13 +1537,17 @@ class Board extends ImageItem {
 
         // put checkers
         const ch_point = gameinfo.board.checker;
-        for (let p=0; p < 2; p++) {
-            for (let c=0; c < 15; c++) {
-                const ch = this.checker[p][c];
-                this.put_checker(ch, ch_point[p][c][0], sec, false);
-                ch.el.hidden = false;
-            } // for (c)
-        } // for (p)
+        for (let i=0; i < 15; i++) {
+            for (let p=0; p < 2; p++) {
+                for (let c=0; c < 15; c++) {
+                    const ch = this.checker[p][c];
+                    if ( ch_point[p][c][1] == i ) {
+                        this.put_checker(ch, ch_point[p][c][0], sec, false);
+                        ch.el.hidden = false;
+                    }
+                } // for (c)
+            } // for (p)
+        } // for(i)
 
         // turn
         this.set_turn(gameinfo.turn);
@@ -1765,9 +1779,10 @@ class DiceArea extends BoardArea {
      * Set dice values
      * @param {number[][]} dice_value
      * @param {boolean} [emit=true] - emit flag
+     * @param {boolean} [roll_flag=false] 
      */
-    set(dice_value, emit=true) {
-        console.log(`DiceArea[${this.player}].set(dive_value=${JSON.stringify(dice_value)}, emit=${emit})`);
+    set(dice_value, emit=true, roll_flag=false) {
+        console.log(`DiceArea[${this.player}].set(dive_value=${JSON.stringify(dice_value)},emit=${emit},roll_flag=${roll_flag})`);
         
         this.clear();
         
@@ -1775,7 +1790,7 @@ class DiceArea extends BoardArea {
             if ( dice_value[i] < 1 ) {
                 continue;
             }
-            this.dice[i].set(dice_value[i]);
+            this.dice[i].set(dice_value[i], roll_flag);
             this.active = true;
         } // for(i)
 
@@ -1883,7 +1898,8 @@ class DiceArea extends BoardArea {
          */
         this.emit_msg('dice', { turn: this.board.turn,
                                 player: this.player,
-                                dice: dice_values }, true);
+                                dice: dice_values,
+                                roll: true}, true);
 
         return dice_values;
     }
@@ -1919,8 +1935,10 @@ window.onload = function () {
     let url = "http://" + document.domain + ":" + location.port + "/";
     ws = io.connect(url);
 
+    console.log(`onload> location.pathname=${location.pathname}`);
+
     let player = 0;
-    if ( location.pathname == "/p2" ) {
+    if ( location.pathname.slice(-1) == "2" ) {
         player = 1;
     }
 
@@ -1928,7 +1946,6 @@ window.onload = function () {
 
     ws.on("connect", function() {
         console.log("ws.on(connected)");
-
     });
 
     ws.on("disconnect", function() {
@@ -1970,7 +1987,7 @@ window.onload = function () {
                 return;
             }
             board.set_turn(msg.data.turn);
-            board.dice_area[msg.data.player].set(msg.data.dice, false);
+            board.dice_area[msg.data.player].set(msg.data.dice, false, msg.data.roll);
             if ( board.turn < 0 ) {
                 board.txt[0].off();
                 board.txt[1].off();
@@ -1981,6 +1998,12 @@ window.onload = function () {
 }; // window.onload
 
 const nav = document.getElementById("nav-input");
+
+const new_game = () => {
+    nav.checked=false;
+    console.log("new_game()");
+    emit_msg("new", {}, false);
+};
 
 const backward_hist = () => {
     nav.checked=false;

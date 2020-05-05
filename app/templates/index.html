@@ -33,10 +33,6 @@
       css_el.setAttribute("href", css_url);
       head_el.appendChild(css_el);
     </script>
-    <!--
-    <script type="text/javascript" src="/static/ytbg.js?1"></script>
-    <link rel="stylesheet" type="text/css" href="/static/ytbg.css?1">
-    -->
   </head>
   <body>
     <header>
@@ -46,6 +42,9 @@
         <label class="nav-unshown" id="nav-close" for="nav-input"><span></span></label>
         <div id="nav-content">
           <div id="nav-title">メニュー</div>
+          <ul id="nav">
+            <li><a href="#" onClick="new_game();">New Game</a>
+          </ul>
           <ul id="nav">
             <li><a href="#" onClick="board_inverse();">ボード回転</a>
           </ul>
@@ -126,6 +125,13 @@
       <div id="name" style="display:table-cell;">
         <strong>{{ name }}, Version {{ version }}</strong>&nbsp;/&nbsp;
         <strong id="version">Version Number</strong>
+      </div>
+      <div id="history_info">
+        [
+        <span id="hist_n"></span>
+        /
+        <span id="hist_max"></span>
+        ]
       </div>
     </div>
     <div id="buttons">
