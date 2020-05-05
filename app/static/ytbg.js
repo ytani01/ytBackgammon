@@ -31,7 +31,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.32";
+const VERSION = "0.33";
 const GAMEINFO_FILE = "gameinfo.json";
 
 /**
@@ -125,9 +125,10 @@ class ImageItem extends BackgammonArea {
      * @param {number} y
      * @param {boolean} center - center flag
      */
-    move(x, y, center=false) {
+    move(x, y, center=false, sec=0) {
         [this.x, this.y] = [x, y];
 
+        this.el.style.transitionDuration = sec + "s";
         this.el.style.left = this.x + "px";
         this.el.style.top = this.y + "px";
         if ( center ) {
@@ -482,7 +483,9 @@ class Cube extends BoardItem {
                    + ", this.board.player=" + this.board.player);
 
         if ( this.player !== undefined && this.player != this.board.player ) {
-            this.double_cancel();
+            if ( ! this.accepted ) {
+                this.double_cancel();
+            }
             return;
         }
 
@@ -1246,8 +1249,8 @@ class Board extends ImageItem {
      *       1 : player 1
      *   >=  2 : all on
      */
-    set_turn(turn) {
-        console.log(`Board.set_turn(turn=${turn})`);
+    set_turn(turn, emit=false) {
+        console.log(`Board.set_turn(turn=${turn}, emit=${emit})`);
         this.turn = turn;
         
         this.txt[0].off();
@@ -1586,7 +1589,7 @@ class Board extends ImageItem {
             }
             
             if ( da.active ) {
-                this.set_turn( 1 - player );
+                this.set_turn(1 - player, true);
                 da.clear(true);
                 return;
             }
@@ -1600,6 +1603,9 @@ class Board extends ImageItem {
             if ( this.closeout(1 - player) ) { // closed out?
                 console.log(`Board.on_mouse_down> closed out`);
                 this.set_turn(1 - player);
+                this.emit_msg("dice", { turn: (1-player),
+                                        player: (1-player),
+                                        dice: [0, 0, 0,0] }, true);
                 return;
             }
 
@@ -1667,7 +1673,7 @@ class Board extends ImageItem {
         let n = ch_n % po.max_n;
         let x = po.cx;
         let y = po.y0 + (ch.h / 2 + ch.h * n * 0.75 + ch.h / 5 * z) * po.direction;
-        ch.move(x, y, true);
+        ch.move(x, y, true, 0.2);
         ch.calc_z();
         ch.cur_point = p;
 
@@ -1947,6 +1953,7 @@ window.onload = function () {
         } // "cube"
 
         if ( msg.type == "dice" ) {
+            console.log(`msg.type=${msg.type}`);
             console.log(`board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;

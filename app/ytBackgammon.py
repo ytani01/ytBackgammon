@@ -102,6 +102,12 @@ class ytBackgammon:
                         self._gameinfo['board']['cube'])
 
     def dice(self, msg):
+        """
+        msg = {
+            'dice': [d1, d2, d3, d4],
+            'turn': turn
+        }
+        """
         self._log.debug('msg=%s', msg)
         self._gameinfo['board']['dice'][msg['player']] = msg['dice']
         self._gameinfo['turn'] = msg['turn']
