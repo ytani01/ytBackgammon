@@ -21,6 +21,7 @@
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
  *        |    |         +- OnBoardText
+ *        |    |         +- BannerText
  *        |    |         +- Dice
  *        |    |         +- Checker
  *        |    +- Board
@@ -31,7 +32,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.41";
+const VERSION = "0.43";
 const GAMEINFO_FILE = "gameinfo.json";
 
 /**
@@ -112,6 +113,7 @@ class ImageItem extends BackgammonArea {
         this.el.onmouseup = this.on_mouse_up.bind(this);
         this.el.ontouchend = this.on_mouse_up.bind(this);
         this.el.onmousemove = this.on_mouse_move.bind(this);
+        this.el.ontouchmove = this.on_mouse_move.bind(this);
         this.el.ondragstart = this.null_handler.bind(this);
 
         this.move(this.x, this.y, false);
@@ -128,6 +130,7 @@ class ImageItem extends BackgammonArea {
     move(x, y, center=false, sec=0) {
         [this.x, this.y] = [x, y];
 
+        this.el.style.transitionTimingTunction = "liner";
         this.el.style.transitionDuration = sec + "s";
         this.el.style.left = this.x + "px";
         this.el.style.top = this.y + "px";
@@ -155,6 +158,7 @@ class ImageItem extends BackgammonArea {
      * @param {MouseEvent} e
      */
     touch2mouse(e) {
+        // console.log(`ImageItem.touch2mouse()`);
         e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
@@ -375,9 +379,7 @@ class Cube extends BoardItem {
 
         this.el.style.cursor = "pointer";
 
-        this.move(this.x0,
-                  this.board.h / 2,
-                  true);
+        this.move(this.x0, this.board.h / 2, true);
     }
 
     /**
@@ -421,7 +423,7 @@ class Cube extends BoardItem {
                 side = -1;
             }
 
-            this.emit_msg('cube', {side: side,
+            this.emit_msg("cube", {side: side,
                                          value: this.value,
                                          accepted: this.accepted});
         }
@@ -512,17 +514,20 @@ class PlayerItem extends BoardItem {
  *
  */
 class OnBoardText extends PlayerItem {
-    constructor(id, board, player, x, y,) {
+    constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
 
-        this.el.style.removeProperty('width');
-        this.el.style.removeProperty('height');
+        this.el.style.removeProperty("width");
+        this.el.style.removeProperty("height");
 
         this.player_name = `Player ${player + 1}`;
     }
 
     set_text(txt) {
-        this.el.innerHTML = this.player_name + "<br />" + txt;
+        this.el.innerHTML = "";
+        if ( txt.length > 0 ) {
+            this.el.innerHTML = "&nbsp;" + txt + "&nbsp;";
+        }
     }
 
     on() {
@@ -544,12 +549,70 @@ class OnBoardText extends PlayerItem {
 /**
  *
  */
-class Dice extends ImageItem {
+class BannerText extends OnBoardText {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+        console.log(`BannerText(id=${id},player=${player},x=${x},y=${y})`);
+
+        this.el.style.fontFamily = "sans-serif";
+        this.el.style.fontStyle = "italic";
+        this.el.style.fontSize = "50px";
+        this.el.style.fontWeight = "900";
+
+        this.el.style.opacity = 0.8;
+        this.el.style.color = "red";
+        this.el.style.backgroundColor = "lightsteelblue";
+    }
+
+    /**
+     * @param {string} txt
+     */
+    set_text(txt) {
+        super.set_text(txt);
+        if ( txt.length == 0 ) {
+            this.off();
+        }
+    }
+
+    on() {
+        this.el.hidden = false;
+    }
+
+    off() {
+        this.el.hidden = true;
+    }
+
+    on_mouse_down(e) {
+        let [x, y] = this.get_xy(e);
+        this.off();
+
+        /*
+        if ( this.board.closeout(1 - this.player) ) {
+            console.log(`BannerText.on_mouse_down>Pass(close out)`);
+            this.board.set_turn(1 - player);
+            this.board.set_banner(player, "Pass", true);
+            this.emit_msg("dice", { turn: (1-player),
+                                    player: (1-player),
+                                    dice: [0, 0, 0, 0],
+                                    roll: false }, true);
+        }
+        */
+    }
+} // class BannerText
+
+/**
+ *
+ */
+class Dice extends PlayerItem {
     constructor(id, board, player, x, y, file_prefix) {
         super(id, board, player, x, y);
         console.log(`Dice> (x,y)=(${x},${y})`);
         this.file_prefix = file_prefix;
 
+        [this.x1, this.y1] = [this.x, this.y];
+        console.log(`Dice> x1=${this.x1}, y1=${this.y1}`);
+        [this.x0, this.y0] = [0, 0];
+        
         /**
          * ダイスの値
          * @type {number}
@@ -565,25 +628,23 @@ class Dice extends ImageItem {
         this.el.style.backgroundColor = "#000";
         this.el.style.cursor = "pointer";
 
-        this.move(x, y, true);
-        [this.x0, this.y0] = [this.x, this.y];
-        
+        this.move(this.x0, this.y0, true);
     }
 
     /**
      *
      */
     enable() {
-        this.image_el.style.opacity = 1.0;
         this.value = this.value % 10;
+        this.image_el.style.opacity = 1.0;
     }
 
     /**
      *
      */
     disable() {
-        this.image_el.style.opacity = 0.5;
         this.value = this.value % 10 + 10;
+        this.image_el.style.opacity = 0.5;
     }
 
     /**
@@ -595,43 +656,54 @@ class Dice extends ImageItem {
     }
 
     /**
+     * 
+     */
+    clear() {
+        this.set(0);
+    }
+
+    /**
      * @param {number} val - dice number, 11-16 .. disable
      * @param {boolean} [roll_flag=false]
      */
     set(val, roll_flag=false) {
         console.log(`Dice.set(val=${val},roll_flag=${roll_flag})>`);
         this.value = val;
-        this.el.hidden = true;
+
         this.enable();
 
-        if (val < 1) {
+        if (val % 10 < 1) {
+            this.move(this.x0, this.y0, 1);
+            this.el.hidden = true;
             return;
         }
-
-        this.el.hidden = false;
 
         if (val > 10) {
             this.disable();
-            this.value = val;
         }
 
-        if ( val % 10 < 1 || val % 10 > 6 ) {
-            return;
-        }
+        this.el.firstChild.src = this.get_filename(val % 10);
+        this.el.hidden = false;
 
         if ( roll_flag ) {
+            //this.move(this.x0, this.y0, true, 0);
             this.rotate(Math.floor(Math.random() * 720 - 360), true, .5);
+            this.move(this.x1, this.y1, true, 1);
+        } else {
+            this.move(this.x1, this.y1, true, 0);
         }
-        this.el.firstChild.src = this.get_filename(val);
-    }
-    
-    /**
-     *
-     */
-    roll() {
-        this.set(Math.floor(Math.random() * 6) + 1);
-        return this.value;
-    }
+    } // Dice.set()
+
+    on_mouse_down(e) {
+        let [x, y] = this.get_xy(e);
+        console.log(`Dice.on_mouse_down> x=${x},y=${y}`);
+
+        const da = this.board.dice_area[this.player];
+
+        this.board.set_turn(1 - this.player, false);
+        da.clear(true);
+    } // Dice.on_mouse_down()
+
 } // class Dice
 
 /**
@@ -800,7 +872,7 @@ class Checker extends PlayerItem {
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
 
-        console.log(`Checker.on_mouse_down> this.id=${this.id}, (x,y)=${x},${y})`);
+        console.log(`Checker.on_mouse_down> this.id=${this.id},(x,y)=${x},${y})`);
         
         // check active dices
         const active_dice = this.board.get_active_dice(this.player);
@@ -829,11 +901,10 @@ class Checker extends PlayerItem {
         // クリックされたポイントの先端のチェッカーに持ち換える
         let ch = this;
         if ( ch.cur_point !== undefined ) {
-            let point = ch.board.point[ch.cur_point];
-            ch = point.checkers.slice(-1)[0];
+            ch = this.board.point[ch.cur_point].checkers.slice(-1)[0];
             console.log(`Checker.on_mouse_down> ch.id=${ch.id}`);
         }
-        ch.board.moving_checker = ch;
+        this.board.moving_checker = ch;
 
         [ch.src_x, ch.src_y] = [ch.x, ch.y];
 
@@ -846,15 +917,14 @@ class Checker extends PlayerItem {
      */
     on_mouse_up(e) {
         let [x, y] = this.get_xy(e);
-        console.log("Checker.on_mouse_up> ");
+        console.log(`Checker.on_mouse_up> this.id=${this.id},x=${x},y=${y}`);
 
-        let ch = this.board.moving_checker;
+        const ch = this.board.moving_checker;
         if ( ch === undefined ) {
             return;
         }
 
-        console.log("Checker.on_mouse_up> ch.id=" + ch.id
-                    + ", (x,y)=(" + x + "," + y + ")");
+        console.log(`Checker.on_mouse_up> ch.id=${ch.id}`);
 
         ch.move(x, y, true);
 
@@ -863,7 +933,7 @@ class Checker extends PlayerItem {
 
         if ( dst_p == ch.cur_point ) {
             // XXX T.B.D. ワンタッチでのムーブ??
-            let active_dice = this.board.get_active_dice(this.player);
+            let active_dice = this.board.get_active_dice(ch.player);
             
             this.cancel_move(ch);
             return;
@@ -907,37 +977,53 @@ class Checker extends PlayerItem {
          */
         let can_move = false;
         let hit_ch = undefined;
-        let checkers = undefined;
+        let checkers = ch.board.point[dst_p].checkers;
 
-        if ( dst_p >= 0 && dst_p <= ch.board.point.length) {
-            checkers = ch.board.point[dst_p].checkers;
-            if ( dst_p == this.goal_point(ch.player) ) {
-                if ( this.board.all_inner(ch.player) ) {
-                    can_move = true;
-                }
-            } else if ( dst_p == 26 || dst_p == 27 ) {
-                // cannnot move
-            } else if ( checkers.length == 0 ) {
+        if ( dst_p == this.goal_point(ch.player) ) {
+            if ( this.board.all_inner(ch.player) ) {
                 can_move = true;
-            } else if ( checkers[0].player == ch.player ) {
-                can_move = true;
-            } else if ( checkers.length == 1 ) {
-                /**
-                 * hit
-                 */
-                can_move = true;
-                hit_ch = checkers[0];
             }
+        } else if ( dst_p >= 26 ) {
+            // bar point: cannnot move
+        } else if ( checkers.length == 0 ) {
+            can_move = true;
+        } else if ( checkers[0].player == ch.player ) {
+            can_move = true;
+        } else if ( checkers.length == 1 ) {
+            /**
+             * hit !
+             */
+            can_move = true;
+            hit_ch = checkers[0];
+            console.log(`Checker.on_mouse_up()> hit_ch.id=${hit_ch.id}`);
         }
             
         if ( ! can_move ) {
+            console.log(`Checker.on_mouse_up()> cancel`);
             this.cancel_move(ch);
             return;
         }
 
         // 移動OK. 以降、移動後の処理
 
-        const da = this.board.dice_area[this.player];
+        const da = this.board.dice_area[ch.player];
+
+        if ( hit_ch !== undefined ) {
+            // hit
+            console.log(`Checker.on_mouse_up> hit_ch.id=${hit_ch.id}`);
+
+            let bar_p = 26;
+            if ( hit_ch.player == 1 ) {
+                bar_p = 27;
+            }
+
+            ch.board.put_checker(hit_ch, bar_p, 0.3, true, false);
+            hit_ch.calc_z();
+        }
+
+        // move_checker
+        ch.board.put_checker(ch, dst_p, 0.3, true, false);
+        ch.calc_z();
 
         // 使ったダイスを使用済みする
         for (let i=0; i < 4; i++) {
@@ -947,52 +1033,25 @@ class Checker extends PlayerItem {
             }
         } // for(i)
 
-        // emit dice values to server
-        // const dice_values = this.board.dice_area[this.player].get();
-        this.emit_msg('dice', { turn: this.board.turn,
-                                player: this.player,
-                                dice: da.get() }, false);
-
-        if ( hit_ch !== undefined ) {
-            // hit
-            console.log(`Checker.on_mouse_up> hit_ch.id=${hit_ch.id}`);
-
-            let bar_p = 27;
-            if ( hit_ch.player == 0 ) {
-                bar_p = 26;
-            }
-
-            ch.board.put_checker(hit_ch, bar_p, 0.3);
-            hit_ch.calc_z();
+        // バーポイントにある場合、もう一つのダイスが使えるか確認
+        let bar_p = 26;
+        if ( ch.player == 1 ) {
+            bar_p = 27;
+        }
+        if ( this.board.point[bar_p].checkers.length > 0 ) {
+            console.log(`Checker.on_mouse_up> T.B.D.`);
         }
 
-        // move_checker
-        ch.board.put_checker(this, dst_p, 0.3);
-        ch.calc_z();
+        // emit dice values to server
+        // const dice_values = this.board.dice_area[this.player].get();
+        this.emit_msg("dice", { turn: this.board.turn,
+                                player: this.player,
+                                dice: da.get(),
+                                roll: false}, true);
 
         ch.board.moving_checker = undefined;
 
-        if ( this.board.game_is_finished(this.player) ) {
-            /**
-             * ゲーム終了処理
-             *
-             * XXX T.B.D XXX
-             */
-            // ダイスを全て使用済みにする
-            for (let i=0; i < 4; i++) {
-                if ( da.dice[i].value > 0 ) {
-                    da.dice[i].disable();
-                }
-            } // for(i)
-
-            this.board.set_turn(-1);
-
-            this.emit_msg('dice', { turn: this.board.turn,
-                                    player: this.player,
-                                    dice: da.get() }, true);
-        }
-        
-    } // on_mouse_up()
+    } // Checker.on_mouse_up()
 
     /**
      *
@@ -1057,6 +1116,7 @@ class Board extends ImageItem {
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [20, 509];
         [this.tx, this.ty] = [568, 245];
+        [this.tx2, this.ty2] = [this.bx[4]+20, this.by[0]+205];
         [this.dx, this.dy] = [620, 245];
 
         this.gameinfo = undefined;
@@ -1111,9 +1171,20 @@ class Board extends ImageItem {
             "p1text", this, 1, this.w - this.tx, this.h - this.ty));
         this.txt[1].rotate(180);
 
-        for ( let p=0; p < 2; p++ ) {
-            this.txt[p].set_text("");
+        for (let p=0; p < 2; p++) {
+            this.txt[p].set_text(`Player ${p+1}`);
             this.txt[p].on();
+        }
+
+        // BannerText
+        this.banner = [];
+        this.banner.push(new BannerText(
+            "p0banner", this, 0, this.tx2, this.ty2));
+        this.banner.push(new BannerText(
+            "p1banner", this, 1, this.w - this.tx2, this.h - this.ty2));
+        this.banner[1].rotate(180);
+        for (let p=0; p < 2; p++) {
+            this.set_banner(p, "", true);
         }
 
         // Checkers
@@ -1199,18 +1270,6 @@ class Board extends ImageItem {
         this.dice_area.push(new DiceArea(this, this.bx[2], this.dy,
                                          da_w, da_h, 1));
 
-        // Event handlers
-        this.el.onmousedown = this.on_mouse_down.bind(this);
-        this.el.ontouchstart = this.on_mouse_down.bind(this);
-
-        this.el.onmouseup = this.null_handler.bind(this);
-        this.el.ontouchend = this.null_handler.bind(this);
-
-        this.el.onmousemove = this.on_mouse_move.bind(this);
-        this.el.ontouchmove = this.on_mouse_move.bind(this);
-
-        this.el.ondragstart = this.null_handler.bind(this);
-
         //this.rotate(360, true, 0.5);
         if ( this.player == 1 ) {
             this.player = 0;
@@ -1244,7 +1303,7 @@ class Board extends ImageItem {
      */
     emit_msg(type, data, hist_flag=true) {
         console.log(`Board.emit_msg(type=${type}, data=${JSON.stringify(data)}, hist_flag=${hist_flag})`);
-        this.ws.emit('json', {
+        this.ws.emit("json", {
             src: this.player,
             type: type,
             data: data,
@@ -1281,6 +1340,7 @@ class Board extends ImageItem {
         this.txt[turn].on();
         if ( this.closeout(1 - turn) ) {
             this.txt[turn].red();
+            this.set_banner(turn, "Close out", true);
         }
     }
 
@@ -1299,6 +1359,34 @@ class Board extends ImageItem {
         } // for(i)
         return true;
     }
+
+    /**
+     * @param {number} player - winner
+     */
+    finish_game(player) {
+        // ダイスを全て使用済みにする
+        const da = this.dice_area[player];
+        for (let i=0; i < 4; i++) {
+            if ( da.dice[i].value > 0 ) {
+                da.dice[i].disable();
+            }
+        } // for(i)
+        
+        this.set_turn(-1);
+        this.emit_msg("dice", { turn:   this.turn,
+                                player: player,
+                                dice:   da.get(),
+                                roll:   false }, false);
+
+        this.set_banner(player, "Win !", true);
+    }
+    
+    /**
+     * @param {number} player
+     */
+    pass(player) {
+        this.set_banner(player, "Pass", true);
+    } // Board.pass()
     
     /**
      * @param {number} player
@@ -1391,7 +1479,7 @@ class Board extends ImageItem {
      * 移動可能なポイントの取得
      * @param {number} player
      * @param {number} src_p
-     * @return {number[]} 
+     * @return {number[]} - distination points
      */
     get_dst_point(player, src_p) {
         console.log(`Board.get_dst_point(player=${player},src_p=${src_p})`);
@@ -1507,7 +1595,7 @@ class Board extends ImageItem {
             const gameinfo = JSON.parse(e.target.result);
             console.log(`Board.read_gameinfo> gameinfo=${gameinfo}`);
             this.load_gameinfo(gameinfo);
-            this.emit_msg('set_gameinfo', gameinfo);
+            this.emit_msg("set_gameinfo", gameinfo);
         };
         reader.readAsText(file);
     }
@@ -1563,6 +1651,10 @@ class Board extends ImageItem {
         let c = gameinfo.board.cube;
         console.log(`gameinfo.board.cube=${JSON.stringify(c)}`);
         this.cube.set(c.value, c.side, c.accepted, false);
+
+        // banner
+        this.set_banner(0, gameinfo.board.banner[0], false);
+        this.set_banner(1, gameinfo.board.banner[1], false);
     }
 
     /**
@@ -1587,6 +1679,10 @@ class Board extends ImageItem {
         let [x, y] = this.get_xy(e);
         console.log(`Board.on_mouse_down> (x,y)=(${x},${y})`);
 
+        for (let p=0; p < 2; p++) {
+            this.set_banner(p, "", true);
+        }
+
         // dice area
         for (let player=0; player < 2; player++) {
             let da = this.dice_area[player];
@@ -1599,9 +1695,10 @@ class Board extends ImageItem {
                 return;
             }
             
+            console.log(`Board.on_mouse_down> da.active=${da.active}`);
             if ( da.active ) {
-                this.set_turn(1 - player, true);
-                da.clear(true);
+                // this.set_turn(1 - player, true);
+                // da.clear(true);
                 return;
             }
             
@@ -1614,9 +1711,11 @@ class Board extends ImageItem {
             if ( this.closeout(1 - player) ) { // closed out?
                 console.log(`Board.on_mouse_down> closed out`);
                 this.set_turn(1 - player);
+                this.set_banner(player, "Pass", true);
                 this.emit_msg("dice", { turn: (1-player),
                                         player: (1-player),
-                                        dice: [0, 0, 0,0] }, true);
+                                        dice: [0, 0, 0, 0],
+                                        roll: false }, true);
                 return;
             }
 
@@ -1628,10 +1727,10 @@ class Board extends ImageItem {
             da.roll();
             let dice_values = da.get();
 
-            console.log(`Board.on_mouse_down> dice_area:player=${player}, dice_values=${JSON.stringify(dice_values)}`);
+            console.log(`Board.on_mouse_down>dice_area:player=${player},dice_values=${JSON.stringify(dice_values)}`);
             return;
         } // for(player)
-    }
+    } // Board.on_mouse_down()
 
     /**
      * @param {MouseEvent} e
@@ -1644,7 +1743,7 @@ class Board extends ImageItem {
         }
 
         this.moving_checker.move(x, y, true);
-    }
+    } // Board.on_mouse_down()
 
     /**
      * checker position(x, y) to  piont index
@@ -1670,31 +1769,64 @@ class Board extends ImageItem {
      * @param {boolean} [add_hist=true] - add history flag
      */
     put_checker(ch, p, sec=0, emit=true, add_hist=true) {
-        console.log(`Board.put_checker(ch.id=${ch.id}, p=${p}, sec=${sec}, emit=${emit}, add_hist=${add_hist})`);
+        console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec},emit=${emit},add_hist=${add_hist})`);
 
         if (ch.cur_point !== undefined ) {
+            // chがあったポイントからチェッカーを削除
+            //
+            // 前提: chは、ポイントの先端のチェッカー
+            //
             const checkers = this.point[ch.cur_point].checkers;
             const ch_i = checkers.indexOf(ch);
             checkers.splice(ch_i, 1);
         }
 
+        // 移動先ポイントに chを加える
         const idx = this.point[p].add(ch, sec);
         ch.cur_point = p;
 
-        if ( this.dice_area[ch.player].check_disable() ) {
-            const dice_values = this.dice_area[ch.player].get();
-            if ( emit ) {
-                this.emit_msg('dice', { turn:   this.turn,
-                                        player: ch.player,
-                                        dice:   dice_values }, false);
+        /*
+        if ( p <= 25 ) { // ヒットされた移動の場合、ダイスチェックは不要
+            if ( this.dice_area[ch.player].check_disable() ) {
+                const dice_values = this.dice_area[ch.player].get();
+                if ( emit ) {
+                    this.emit_msg("dice", { turn:   this.turn,
+                                            player: ch.player,
+                                            dice:   dice_values,
+                                            roll:   false }, false);
+                }
             }
         }
+        */
 
+        if ( this.game_is_finished(ch.player) ) {
+            this.finish_game(ch.player);
+        }
+        
         if ( emit ) {
             this.emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
                                            p:  p, idx: idx }, add_hist);
         }
     } // Board.put_checker()
+
+    /**
+     * @param {number} player
+     * @param {string} txt
+     * @param {boolean} emit
+     */
+    set_banner(player, txt, emit=false) {
+        this.banner[player].set_text(txt);
+        if ( txt.length > 0 ) {
+            this.banner[player].on();
+        } else {
+            this.banner[player].off();
+        }
+
+        if ( emit ) {
+            this.emit_msg("set_banner", { player: player,
+                                          text:   txt }, false);
+        }
+    } // Board.set_banner()
 
 } // class Board
 
@@ -1735,12 +1867,14 @@ class BoardPoint extends BoardArea {
      * @return {number} - position index
      */
     add(ch, sec=0) {
+        console.log(`BoardPoint.add(ch.id=${ch.id},sec=${sec})`);
         const n = this.checkers.length;
+        const n2 = n % this.max_n;
         const x = this.cx;
         const y = parseInt(Math.round(this.y0
-                                      + (ch.h * (n % this.max_n) * 0.7 + ch.h / 2 )
+                                      + (ch.h * n2 * 0.7 + ch.h / 2)
                                       * this.direction));
-        console.log(`BoardPoint.add(ch.id=${ch.id})> n=${n}, y=${y}`);
+        console.log(`BoardPoint.add()> n=${n},y=${y}`);
         ch.move(x, y, true, sec);
         ch.set_z(n);
         ch.cur_point = this.id;
@@ -1796,11 +1930,12 @@ class DiceArea extends BoardArea {
         } // for(i)
 
         if ( emit ) {
-            this.emit_msg('dice', { turn: this.board.turn,
+            this.emit_msg("dice", { turn: this.board.turn,
                                     player: this.player,
-                                    dice: dice_value }, true);
+                                    dice: dice_value,
+                                    roll: roll_flag}, true);
         }
-    }
+    } // DiceArea.set()
 
     /**
      * Get dice values list
@@ -1813,44 +1948,50 @@ class DiceArea extends BoardArea {
         }
         console.log(`DiceArea.get> values=${JSON.stringify(values)}`);
         return values;
-    }
+    } // DiceArea.get()
 
     /**
      * 使えないダイスを確認してdisable()する
      * @return {boolean} - modified
      */
     check_disable() {
+        console.log(`DiceArea.check_disable()`);
         let modified = false;
         
-        for (let i=0; i < 4; i++) {
-            let dice_value = this.dice[i].value;
-            if ( dice_value < 1 || dice_value > 6 ) {
-                continue;
-            }
-
+        let bar_p = 26;
+        if ( this.player == 1 ) {
+            bar_p = 27;
+        }
+        if ( this.board.point[bar_p].checkers.length > 0 ) {
             // ヒットされている場合は、復活できるか確認
-            let bar_p = 26;
-            if ( this.player == 1 ) {
-                bar_p = 27;
+            for (let d=0; d < 4; d++) {
+                this.dice[d].disable();
             }
-            if ( this.board.point[bar_p].checkers.length > 0 ) {
+            modified = true;
+            for (let d=0; d < 4; d++) {
+                const dice_value = this.dice[d].value % 10;
+                if ( dice_value < 1 ) {
+                    continue;
+                }
                 let dst_p = dice_value;
                 if ( this.player == 0 ) {
                     dst_p = 25 - dice_value;
                 }
-
                 let checkers = this.board.point[dst_p].checkers;
-                if ( checkers.length > 1 && checkers[0].player != this.player ) {
-                    this.dice[i].disable();
-                    modified = true;
-                    continue;
+                if ( checkers.length <= 1 || checkers[0].player == this.player ) {
+                    modified = false;
                 }
+            } // for(d)
+            if ( ! modified ) {
+                for (let d=0; d < 4; d++) {
+                    this.dice[d].enable();
+                } // for(d)
             }
+            return modified;
+        }
 
-            // 全てのチェッカーで、移動できるかのチェック
-            // XXX T.B.D. XXX
-            
-        } // for(i)
+        // 全てのチェッカーで、移動できるかのチェック
+        // XXX T.B.D. XXX
 
         return modified;
     }
@@ -1862,45 +2003,41 @@ class DiceArea extends BoardArea {
     roll() {
         console.log("DiceArea.roll()");
         this.clear();
+        console.log(`DiceArea.roll()> ${this.get()}`);
 
         let d1 = Math.floor(Math.random()  * 4);
         let d2 = d1;
         while ( d1 == d2 ) {
             d2 = Math.floor(Math.random()  * 4);
         }
-        console.log(`[d1, d2]=[${d1}, ${d2}]`);
+        console.log(`DiceArea.roll> [d1, d2]=[${d1}, ${d2}]`);
 
         this.active = true;
 
-        const value1 = this.dice[d1].roll();
-        const value2 = this.dice[d2].roll();
+        const value1 = Math.floor(Math.random() * 6) + 1;
+        const value2 = Math.floor(Math.random() * 6) + 1;
 
-        if ( value1 == value2 ) {
+        if ( value1 != value2 ) {
+            this.dice[d1].set(value1);
+            this.dice[d2].set(value2);
+        } else {
             for ( let d = 0; d < 4; d++ ) {
                 this.dice[d].set(value1);
             }
         }
 
-        if ( this.check_disable() ) {
-            for (let i=0; i < 4; i++) {
-                const dice_value = this.dice[i].value;
-                if ( dice_value >= 1 && dice_value <= 6 ) {
-                    for (let j=0; j < 4; j++) {
-                        this.dice[j].enable();
-                    } // for(j)
-                    break;
-                }
-            } // for(i)
-        }
+        const modified = this.check_disable();
+        console.log(`DiceArea.roll()> ${this.get()}`);
+
         const dice_values = this.get();
 
         /**
          * emit
          */
-        this.emit_msg('dice', { turn: this.board.turn,
+        this.emit_msg("dice", { turn: this.board.turn,
                                 player: this.player,
-                                dice: dice_values,
-                                roll: true}, true);
+                                dice: this.get(),
+                                roll: true }, true);
 
         return dice_values;
     }
@@ -1911,16 +2048,15 @@ class DiceArea extends BoardArea {
     clear(emit=false) {
         console.log("DiceArea.clear()");
         for ( let d=0; d < 4; d++ ) {
-            this.dice[d].set(0);
-            this.dice[d].el.hidden = true;
-            this.dice[d].enable();
+            this.dice[d].clear();
         }
         this.active = false;
 
         if ( emit ) {
-            this.emit_msg('dice', { turn: this.board.turn,
+            this.emit_msg("dice", { turn: this.board.turn,
                                     player: this.player,
-                                    dice: [0, 0, 0, 0] }, true);
+                                    dice: [0, 0, 0, 0],
+                                    roll: false }, true);
         }
         return [];
     }
@@ -1959,23 +2095,25 @@ window.onload = function () {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
         if ( msg.type == "gameinfo" ) {
+            console.log(`w.on(json)gameinfo>`);
             board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
             return;
         } // "gameinfo"
 
         if ( msg.type == "put_checker" ) {
-            console.log(`board.turn=${board.turn}`);
+            console.log(`ws.on(json)put_checker> board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
             }
             const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
-            console.log(`ws.on(json)> ch_id=${ch_id}`);
+            console.log(`ws.on(json)put_checker)> ch_id=${ch_id}`);
             let ch = board.search_checker(ch_id);
             board.put_checker(ch, msg.data.p, 0.2, false);
             return;
         } // "put_checker"
 
         if ( msg.type == "cube" ) {
+            console.log(`ws.on(json)cube>`);
             board.cube.set(msg.data.value,
                            msg.data.side,
                            msg.data.accepted,
@@ -1984,8 +2122,7 @@ window.onload = function () {
         } // "cube"
 
         if ( msg.type == "dice" ) {
-            console.log(`msg.type=${msg.type}`);
-            console.log(`board.turn=${board.turn}`);
+            console.log(`ws.on(json)dice> board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
             }
@@ -1997,6 +2134,14 @@ window.onload = function () {
             }
             return;
         } // "dice"
+
+        if ( msg.type == "set_banner" ) {
+            console.log(`ws.on(json)set_banner> player=${msg.data.player},text=${msg.data.text}`);
+
+            board.set_banner(msg.data.player, msg.data.text, false);
+            return;
+        } // set_banner
+        console.log("ws.on(json)???");
     });
 }; // window.onload
 
@@ -2005,6 +2150,8 @@ const nav = document.getElementById("nav-input");
 const new_game = () => {
     nav.checked=false;
     console.log("new_game()");
+    board.set_banner(0, "", true);
+    board.set_banner(1, "", true);
     emit_msg("new", {}, false);
 };
 

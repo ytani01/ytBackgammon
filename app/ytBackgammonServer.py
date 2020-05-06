@@ -91,9 +91,9 @@ class ytBackgammonServer:
         self._log.debug('n=%d, sleep_sec=%s', n, sleep_sec)
 
         count = 0
-        sec = 0
-        if n > 0:
-            sec = self.SEC_CHECKER_MOVE
+        sec = self.SEC_CHECKER_MOVE
+        if n == 0:
+            sec = 0
             
         while self.repeat_flag:
             self.repeat_flag = False
@@ -106,6 +106,7 @@ class ytBackgammonServer:
 
             self._log.debug('_history=(%d), _fwd_hist=(%d)',
                             len(self._history), len(self._fwd_hist))
+
             self.emit_gameinfo(sec)
 
             count += 1
@@ -122,9 +123,9 @@ class ytBackgammonServer:
         self._log.debug('n=%s, sleep_sec=%s', n, sleep_sec)
 
         count = 0
-        sec = 0
-        if n > 0:
-            sec = self.SEC_CHECKER_MOVE
+        sec = self.SEC_CHECKER_MOVE
+        if n == 0:
+            sec = 0
             
         while self.repeat_flag:
             self.repeat_flag = False
@@ -169,6 +170,10 @@ class ytBackgammonServer:
         j_str += '        "checker": [\n'
         j_str += '          %s,\n' % h['board']['checker'][0]
         j_str += '          %s \n' % h['board']['checker'][1]
+        j_str += '        ],\n'
+        j_str += '        "banner": [\n'
+        j_str += '           "%s"\n' % h['board']['banner'][0]
+        j_str += '           "%s"\n' % h['board']['banner'][1]
         j_str += '        ]\n'
         j_str += '      }\n'
         j_str += '    },\n'
@@ -259,7 +264,7 @@ class ytBackgammonServer:
             """
             data: {}
             """
-            self.backward_hist(0, sleep_sec=0.5)
+            self.backward_hist(0, sleep_sec=.5)
             return
 
         if msg['type'] == 'back_all':
@@ -280,7 +285,7 @@ class ytBackgammonServer:
             """
             data: {}
             """
-            self.forward_hist(0, sleep_sec=0.5)
+            self.forward_hist(0, sleep_sec=.5)
             return
 
         if msg['type'] == 'fwd_all':
@@ -295,7 +300,7 @@ class ytBackgammonServer:
             data: {}
             """
             self.new_game()
-            self.emit_gameinfo(5)
+            self.emit_gameinfo(3)
             return
 
         if msg['type'] == 'set_gameinfo':
@@ -331,6 +336,12 @@ class ytBackgammonServer:
             """
             self._bg.dice(msg['data'])
 
+        if msg['type'] == 'set_banner':
+            """
+            data: {'player': int, 'text': str}
+            """
+            self._bg.set_banner(msg['data'])
+            
         #
         # append history or not
         #

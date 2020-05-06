@@ -59,6 +59,7 @@ class ytBackgammon:
                       [12, 0], [12, 1], [12, 2], [12, 3], [12, 4],
                       [ 1, 0], [ 1, 1] ]
                 ],
+                'banner': ["", ""]
             }
         }
         self._log.debug('_gameinfo=%s', self._gameinfo)
@@ -104,4 +105,10 @@ class ytBackgammon:
         self._log.debug('msg=%s', msg)
         self._gameinfo['board']['dice'][msg['player']] = msg['dice']
         self._gameinfo['turn'] = msg['turn']
+
+    def set_banner(self, data):
+        """
+        data = {'player': int, 'text': str}
+        """
+        self._gameinfo['board']['banner'][data['player']] = data['text']
 ###
