@@ -260,7 +260,7 @@ class InverseButton extends BoardButton {
 
     on_mouse_down(e) {
         const [x, y] = this.get_xy(e);
-        this.board.inverse();
+        this.board.inverse(0.5);
     }
 } // class InverseButton
 
@@ -1273,7 +1273,7 @@ class Board extends ImageItem {
         //this.rotate(360, true, 0.5);
         if ( this.player == 1 ) {
             this.player = 0;
-            this.inverse();
+            this.inverse(0);
         }
     }
 
@@ -1660,15 +1660,15 @@ class Board extends ImageItem {
     /**
      *
      */
-    inverse() {
-        console.log(`Board.inverse()`);
+    inverse(sec) {
+        console.log(`Board.inverse(sec=${sec})`);
         
         this.player = 1 - this.player;
 
         if ( this.player == 0 ) {
-            this.rotate(0, true, 0.5);
+            this.rotate(0, true, sec);
         } else {
-            this.rotate(180, true, 0.5);
+            this.rotate(180, true, sec);
         }
     }
 
@@ -2193,7 +2193,7 @@ const fwd_all = () => {
     
 const board_inverse = () => {
     nav.checked=false;
-    board.inverse();
+    board.inverse(0.5);
 };
 
 const write_gameinfo = () => {
