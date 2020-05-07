@@ -16,14 +16,17 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.42'
+VERSION = '0.43'
 
 _log = get_logger(__name__, True)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
+
 socketio = SocketIO(app)
-svr = ytBackgammonServer(MY_NAME, VERSION, True)
+
+svr_id = "0"
+svr = None
 
 
 @app.route('/')
@@ -31,13 +34,14 @@ def top():
     _log.debug('')
     return svr.app_top()
 
-@app.route('/' + VERSION + 'p1')
+
+@app.route('/p1')
 def index_p1():
     _log.debug('')
     return svr.app_index()
 
 
-@app.route('/' + VERSION + 'p2')
+@app.route('/p2')
 def index_p2():
     _log.debug('')
     return svr.app_index()
@@ -64,13 +68,18 @@ def handle_json(msg):
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('server_id', type=str)
 @click.option('--port', '-p', 'port', type=int, default=5001,
               help='port number')
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag')
-def main(port, debug):
+def main(server_id, port, debug):
+    global svr_id, svr
     _log = get_logger(__name__, debug)
-    _log.info('port=%s', port)
+    _log.info('server_id=%s, port=%s', server_id, port)
+
+    svr_id = server_id
+    svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, True)
 
     try:
         socketio.run(app, host='0.0.0.0', port=int(port), debug=debug)
