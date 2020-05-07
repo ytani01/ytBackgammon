@@ -1,8 +1,11 @@
 # ytBackGammon
 
-## Javascript
+## 実装
 
-[Backgammon board (Javascript version)](https://ytani01.github.io/ytBackgammon/)
+* [ネットワーク共有型バックギャモンボード: テストサイト](http://www.ytani.net:8080/ytbackgammon/)
+
+* [単なるバックギャモンボード](https://ytani01.github.io/ytBackgammon/)
+
 
 ## Memo
 
