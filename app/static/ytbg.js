@@ -32,7 +32,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.47";
+const VERSION = "0.48";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -163,6 +163,13 @@ class BackgammonBase {
         return (25 - point);
     }
 
+    bar_point(player) {
+        let bar_p = 26;
+        if ( player == 1 ) {
+            bar_p = 27;
+        }
+        return bar_p;
+    }
 } // class BackgammonBase
 
 /**
@@ -965,6 +972,21 @@ class Checker extends PlayerItem {
     } // Checker.cancel_move()
 
     /**
+     * 移動可能なポイントの取得
+     *
+     * @param {Checker} ch
+     * @param {number[]} available_dice
+     * @return {number[]} points
+     */
+    get_available_points(ch, available_dice) {
+        console.log(``);
+        // T.B.D.
+        // see get_dst_points()
+
+        return [];
+    } // Checker.get_available_points()
+
+    /**
      *
      */
     on_mouse_down(e) {
@@ -990,7 +1012,7 @@ class Checker extends PlayerItem {
         }
 
         // 移動可能か確認
-        const dst_p = this.board.get_dst_point(this.player, this.cur_point);
+        const dst_p = this.board.get_dst_points(this.player, this.cur_point);
         console.log(`dst_p=${JSON.stringify(dst_p)}`);
         if ( dst_p.length == 0 ) {
             return;
@@ -1008,17 +1030,7 @@ class Checker extends PlayerItem {
 
         ch.move(x, y, true);
         ch.set_z(1000);
-    }
-
-    /**
-     * @param {Checker} ch
-     * @param {number[]} available_dice
-     */
-    get_available_point(ch, available_dice) {
-        // T.B.D. //
-
-        return [];
-    }
+    } // Checker.on_mosue_down()
 
     /**
      * @param {MouseEvent} e
@@ -1036,7 +1048,7 @@ class Checker extends PlayerItem {
 
         ch.move(x, y, true);
 
-        const dst_p = ch.board.chpos2point(ch);
+        let dst_p = ch.board.chpos2point(ch);
         console.log(`Checker.on_mouse_up> dst_p=${dst_p}`);
 
         const active_dice = this.board.get_active_dice(ch.player);
@@ -1046,10 +1058,16 @@ class Checker extends PlayerItem {
             //
             // XXX T.B.D. ワンタッチでのムーブ??
             //
-            const available_p = this.get_available_point(ch, active_dice);
+            const available_p = this.board.get_dst_points(ch.player, ch.cur_point);
             if ( available_p.length == 0 ) {
                 this.cancel_move(ch);
                 return;
+            }
+            console.log(`Checker.on_mouse_up>available_p=${JSON.stringify(available_p)}`);
+            if ( ch.player == 0 ) {
+                dst_p = Math.min(...available_p);
+            } else {
+                dst_p = Math.max(...available_p);
             }
         }
 
@@ -1137,20 +1155,24 @@ class Checker extends PlayerItem {
         ch.calc_z();
 
         // 使ったダイスを使用済みする
-        for (let i=0; i < 4; i++) {
-            if ( da.dice[i].value == dice_value ) {
-                da.dice[i].disable();
+        //for (let i=0; i < 4; i++) {
+        for (let d of da.dice) {
+            if ( d.value == dice_value ) {
+                d.disable();
                 break;
             }
         } // for(i)
 
-        // バーポイントにある場合、もう一つのダイスが使えるか確認
-        let bar_p = 26;
-        if ( ch.player == 1 ) {
-            bar_p = 27;
-        }
+        // まだ、バーポイントに残っている場合、もう一つのダイスが使えるか確認
+        let bar_p = this.bar_point(ch.player);
         if ( this.board.point[bar_p].checkers.length > 0 ) {
             console.log(`Checker.on_mouse_up> T.B.D.`);
+            let ch2 = this.board.point[bar_p].checkers[0];
+            if ( this.board.get_dst_points(ch2.player, bar_p).length == 0 ) {
+                for (let d of da.dice) {
+                    d.disable();
+                }
+            }
         }
 
         // emit dice values to server
@@ -1464,10 +1486,11 @@ class Board extends ImageItem {
         // turn == 0 or 1
         this.txt[turn].on();
         if ( this.closeout(1 - turn) ) {
+            console.log(`Board.set_turn>close out!`);
             this.txt[turn].red();
             this.set_banner(turn, "Close out", true);
         }
-    }
+    } // Board.set_turn()
 
     /**
      * cals pip count
@@ -1479,6 +1502,7 @@ class Board extends ImageItem {
         for (let ch of this.checker[player]) {
             count += ch.pip();
         } // for(ch)
+        console.log(`Board.pip_count>count=${count}`);
         return count;
     } // Board.pip_count()
 
@@ -1538,13 +1562,19 @@ class Board extends ImageItem {
             }
         }
         return true;
-    }
+    } // Board.all_inner()
 
     /**
      * クローズアウトしている？
      *
      */
     closeout(player) {
+        console.log(`Board.closeout(player=${player})`);
+
+        if (this.point[this.bar_point(1-player)].checkers.length == 0) {
+            return false;
+        }
+
         let [from_p, to_p] = [1, 6];
         if ( player == 1 ) {
             [from_p, to_p] = [19, 24];
@@ -1569,7 +1599,7 @@ class Board extends ImageItem {
      */
     get_active_dice(player) {
         return this.dice_area[player].get_active_dice();
-    }
+    } // Board.get_active_dice
 
     /**
      * 移動可能なポイントの取得
@@ -1577,8 +1607,8 @@ class Board extends ImageItem {
      * @param {number} src_p
      * @return {number[]} - distination points
      */
-    get_dst_point(player, src_p) {
-        console.log(`Board.get_dst_point(player=${player},src_p=${src_p})`);
+    get_dst_points(player, src_p) {
+        console.log(`Board.get_dst_points(player=${player},src_p=${src_p})`);
 
         let dst_p = [];
 
@@ -1586,13 +1616,14 @@ class Board extends ImageItem {
         if ( dice_vals.length == 0 ) {
             return [];
         }
+
         if ( dice_vals.length == 4 ) {
             dice_vals = [dice_vals[0]];
         }
-        console.log(`Board.get_dst_point>dice_vals=${JSON.stringify(dice_vals)}`);
+        console.log(`Board.get_dst_points>dice_vals=${JSON.stringify(dice_vals)}`);
         for (let dice_val of dice_vals) {
             const dst_p1 = this.calc_dst_point(player, src_p, dice_val);
-            console.log(`Board.get_dst_point> dst_p1=${dst_p1}`);
+            console.log(`Board.get_dst_points> dst_p1=${dst_p1}`);
 
             if ( player == 0 && dst_p1 == 0 ) {
                 if ( ! this.all_inner(player) ) {
@@ -1613,8 +1644,9 @@ class Board extends ImageItem {
             dst_p.push(dst_p1);
         }
 
+        console.log(`Board.get_dst_points>dst_p=${JSON.stringify(dst_p)}`);
         return dst_p;
-    }
+    } // Board.get_dst_points()
 
     /**
      * generate game information
