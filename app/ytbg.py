@@ -16,7 +16,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.43'
+VERSION = '0.45'
 
 _log = get_logger(__name__, True)
 
@@ -32,7 +32,7 @@ svr = None
 @app.route('/')
 def top():
     _log.debug('')
-    return svr.app_top()
+    return svr.app_index()
 
 
 @app.route('/p1')

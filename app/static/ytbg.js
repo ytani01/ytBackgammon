@@ -32,8 +32,66 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.43";
+const VERSION = "0.44";
 const GAMEINFO_FILE = "gameinfo.json";
+
+/**
+ *
+ */
+class CookieBase {
+    constructor() {
+        this.cookie = undefined;
+
+        this.data = {};
+        this.load();
+    }
+
+    /**
+     * @return {Object} data
+     */
+    load() {
+        const allcookie = document.cookie;
+        console.log(`load> allcookie="${allcookie}"`);
+
+        if ( allcookie.length == 0 ) {
+            return {};
+        }
+
+        for (let ent of allcookie.split("; ")) {
+            let [k, v] = ent.split('=');
+            console.log(`k=${k},v=${v}`);
+            this.data[k] = v;
+        } // for(i)
+
+        return this.data;
+    } // load()
+
+    save() {
+        if ( Object.keys(this.data) ) {
+            return;
+        }
+
+        let allcookie = "";
+        for (let key in this.data) {
+            allcookie += `${key}=${this.data[key]};`;
+        } // for (key)
+
+        document.cookie = allcookie;
+    }
+
+    set(key, value) {
+        document.cookie = `${key}=${encodeURIComponent(value)};`;
+    }
+    
+    get(key) {
+        if ( this.data[key] === undefined ) {
+            return undefined;
+        }
+
+        return decodeURIComponent(this.data[key]);
+    } // get()
+} // class CookieBase
+
 
 /**
  * base class for backgammon
@@ -1104,13 +1162,22 @@ class Board extends ImageItem {
      * @param {number} player - 0 or 1
      * @param {io.connect} ws - websocket
      */
-    constructor(id, x, y, player, ws) {
-        console.log(`Board(id=${id},x=${x},y=${y},plyaer=${player})`);
+    constructor(id, x, y, ws) {
+        console.log(`Board(id=${id},x=${x},y=${y})`);
         super(id, x, y);
 
-        this.player = player;
         this.ws = ws;
         
+        this.svr_id = document.getElementById("server-id").innerHTML;
+        console.log(`Board> svr_id=${this.svr_id}`);
+
+        this.cookie_name = `board${this.svr_id}_player`;
+        this.cookie = new CookieBase();
+
+        if ( this.load_player() === undefined ) {
+            this.set_player(0);
+        }
+
         this.turn = -1;
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
@@ -1275,6 +1342,24 @@ class Board extends ImageItem {
             this.player = 0;
             this.inverse(0);
         }
+    }
+
+    /**
+     * load player number from cookie
+     */
+    load_player() {
+        this.player = this.cookie.get(this.cookie_name);
+        return this.player;
+    }
+
+    /**
+     * set player number and save to cookie
+     *
+     * @param {number} player
+     */
+    set_player(player) {
+        this.player = player;
+        this.cookie.set(this.cookie_name, this.player);
     }
 
     /**
@@ -1663,8 +1748,8 @@ class Board extends ImageItem {
     inverse(sec) {
         console.log(`Board.inverse(sec=${sec})`);
         
-        this.player = 1 - this.player;
-
+        this.set_player(1 - this.player);
+        
         if ( this.player == 0 ) {
             this.rotate(0, true, sec);
         } else {
@@ -2064,87 +2149,6 @@ class DiceArea extends BoardArea {
 
 let ws = undefined;
 let board = undefined;
-
-/**
- *
- */
-window.onload = function () {
-    let url = "http://" + document.domain + ":" + location.port + "/";
-    ws = io.connect(url);
-
-    console.log(`onload> location.pathname=${location.pathname}`);
-
-    //setTimeout("location.reload()",5000);
-
-    let player = 0;
-    if ( location.pathname.slice(-1) == "2" ) {
-        player = 1;
-    }
-
-    board = new Board("board", 40, 44, player, ws);
-
-    ws.on("connect", function() {
-        console.log("ws.on(connected)");
-    });
-
-    ws.on("disconnect", function() {
-        console.log("ws.on(disconnected)");
-    });
-
-    ws.on("json", function(msg) {
-        console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
-
-        if ( msg.type == "gameinfo" ) {
-            console.log(`w.on(json)gameinfo>`);
-            board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
-            return;
-        } // "gameinfo"
-
-        if ( msg.type == "put_checker" ) {
-            console.log(`ws.on(json)put_checker> board.turn=${board.turn}`);
-            if ( board.turn == -1 ) {
-                return;
-            }
-            const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
-            console.log(`ws.on(json)put_checker)> ch_id=${ch_id}`);
-            let ch = board.search_checker(ch_id);
-            board.put_checker(ch, msg.data.p, 0.2, false);
-            return;
-        } // "put_checker"
-
-        if ( msg.type == "cube" ) {
-            console.log(`ws.on(json)cube>`);
-            board.cube.set(msg.data.value,
-                           msg.data.side,
-                           msg.data.accepted,
-                           false);
-            return;
-        } // "cube"
-
-        if ( msg.type == "dice" ) {
-            console.log(`ws.on(json)dice> board.turn=${board.turn}`);
-            if ( board.turn == -1 ) {
-                return;
-            }
-            board.set_turn(msg.data.turn);
-            board.dice_area[msg.data.player].set(msg.data.dice, false, msg.data.roll);
-            if ( board.turn < 0 ) {
-                board.txt[0].off();
-                board.txt[1].off();
-            }
-            return;
-        } // "dice"
-
-        if ( msg.type == "set_banner" ) {
-            console.log(`ws.on(json)set_banner> player=${msg.data.player},text=${msg.data.text}`);
-
-            board.set_banner(msg.data.player, msg.data.text, false);
-            return;
-        } // set_banner
-        console.log("ws.on(json)???");
-    });
-}; // window.onload
-
 const nav = document.getElementById("nav-input");
 
 const new_game = () => {
@@ -2217,3 +2221,80 @@ const emit_msg = (type, data, history=false) => {
     console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
     ws.emit("json", {src: "player", type: type, data: data, history: history});        
 };
+
+/**
+ *
+ */
+window.onload = function () {
+    console.log("window.onload>");
+    
+    let url = "http://" + document.domain + ":" + location.port + "/";
+    ws = io.connect(url);
+
+    console.log(`onload> location.pathname=${location.pathname}`);
+
+    //setTimeout("location.reload()",5000);
+
+    board = new Board("board", 40, 44, ws);
+
+    ws.on("connect", function() {
+        console.log("ws.on(connected)");
+    });
+
+    ws.on("disconnect", function() {
+        console.log("ws.on(disconnected)");
+    });
+
+    ws.on("json", function(msg) {
+        console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
+
+        if ( msg.type == "gameinfo" ) {
+            console.log(`w.on(json)gameinfo>`);
+            board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
+            return;
+        } // "gameinfo"
+
+        if ( msg.type == "put_checker" ) {
+            console.log(`ws.on(json)put_checker> board.turn=${board.turn}`);
+            if ( board.turn == -1 ) {
+                return;
+            }
+            const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
+            console.log(`ws.on(json)put_checker)> ch_id=${ch_id}`);
+            let ch = board.search_checker(ch_id);
+            board.put_checker(ch, msg.data.p, 0.2, false);
+            return;
+        } // "put_checker"
+
+        if ( msg.type == "cube" ) {
+            console.log(`ws.on(json)cube>`);
+            board.cube.set(msg.data.value,
+                           msg.data.side,
+                           msg.data.accepted,
+                           false);
+            return;
+        } // "cube"
+
+        if ( msg.type == "dice" ) {
+            console.log(`ws.on(json)dice> board.turn=${board.turn}`);
+            if ( board.turn == -1 ) {
+                return;
+            }
+            board.set_turn(msg.data.turn);
+            board.dice_area[msg.data.player].set(msg.data.dice, false, msg.data.roll);
+            if ( board.turn < 0 ) {
+                board.txt[0].off();
+                board.txt[1].off();
+            }
+            return;
+        } // "dice"
+
+        if ( msg.type == "set_banner" ) {
+            console.log(`ws.on(json)set_banner> player=${msg.data.player},text=${msg.data.text}`);
+
+            board.set_banner(msg.data.player, msg.data.text, false);
+            return;
+        } // set_banner
+        console.log("ws.on(json)???");
+    });
+}; // window.onload

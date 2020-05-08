@@ -379,6 +379,6 @@ class ytBackgammonServer:
 
     def app_index(self):
         self._log.debug('')
-        return render_template('index.html',
+        return render_template('index.html', server_id=self._svr_id,
                                name=self._svr_name, version=self._svr_ver)
-###
+##
