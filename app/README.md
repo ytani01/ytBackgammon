@@ -1,6 +1,10 @@
 # ytBackgammon -- ネット共有型バックギャモンボード
 
-## 
+http://www.ytani.net:8080/ytbackgammon/
+
+## Usage
+
+## Install
 
 
 ## References 
