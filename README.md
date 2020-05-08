@@ -4,7 +4,9 @@
 
 * [ネットワーク共有型バックギャモンボード: テストサイト](http://www.ytani.net:8080/ytbackgammon/)
   
-  詳しくはこちら：[source](app/)
+  詳しくは[こちら](app/)
+
+### Deprecated (旧試作)
 
 * [単なるバックギャモンボード](https://ytani01.github.io/ytBackgammon/)
 
