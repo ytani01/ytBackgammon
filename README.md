@@ -11,11 +11,6 @@
 
 ## Memo
 
-### Flask + Webscoket
-
-* [Flask-Socket-IO](https://github.com/miguelgrinberg/Flask-SocketIO)
-  - [Flask-SocketIOでWebSocketアプリケーション](https://qiita.com/nanakenashi/items/6497caf1c56c36f47be9)
-  
 ### install browserMqtt.js
 
 ```
