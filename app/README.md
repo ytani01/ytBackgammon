@@ -4,8 +4,8 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## 実装
 
-  Server: Python3, flask, flask_socketio on FreeBSD and Linux
-  Client: javascript 
+* Server: Python3, flask, flask_socketio on FreeBSD and Linux
+* Client: javascript 
 
 
 ## Usage
