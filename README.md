@@ -13,6 +13,8 @@
 
 ### install browserMqtt.js
 
+`結局、使ってません`
+
 ```
 ### make package.json
 $ mkdir work
@@ -35,7 +37,6 @@ $ cp browserMqtt.js ${jsdir}
 * [GNU Backgammon Manual  V0.16](https://www.gnu.org/software/gnubg/manual/html_node/)
 * [11 Technical Notes](https://www.gnu.org/software/gnubg/manual/html_node/Technical-Notes.html#Technical-Notes)
 * [11.3 Python scripting](https://www.gnu.org/software/gnubg/manual/html_node/Python-scripting.html#Python-scripting)
-* [いらすとや(フリー素材)](https://www.irasutoya.com/2019/05/blog-post_951.html)
 
 ### MQTT.js
 
