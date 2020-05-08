@@ -21,6 +21,7 @@
       const head_el = document.getElementsByTagName("head")[0];
 
       const js_url = "/static/ytbg.js?ts=" + ts;
+      // const js_url = "/static/ytbg.js"; // for debug
       const script_el = document.createElement("script");
       console.log(`js_url=${js_url}`);
       script_el.setAttribute("type", "text/javascript");
@@ -39,15 +40,13 @@
   <body>
     <header>
       <div id="server-id" style="display:none;">{{server_id}}</div>
+      <div id="user-name"><input type="text"></div>
       <div id="nav-drawer">
         <input id="nav-input" type="checkbox" class="nav-unshown">
         <label id="nav-open" for="nav-input"><span></span></label>
         <label class="nav-unshown" id="nav-close" for="nav-input"><span></span></label>
         <div id="nav-content">
           <div id="nav-title">メニュー</div>
-          <ul id="nav">
-            <li><a href="#" onClick="new_game();">New Game</a>
-          </ul>
           <ul id="nav">
             <li><a href="#" onClick="board_inverse();">ボード回転</a>
           </ul>
@@ -70,6 +69,9 @@
                        accept="application/json"
                        onClick="clear_filename();"
                        onChange="read_gameinfo();"></label>
+          </ul>
+          <ul id="nav">
+            <li><a href="#" onClick="new_game();">New Game</a>
           </ul>
         </div>
       </div>
