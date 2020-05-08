@@ -32,7 +32,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.46";
+const VERSION = "0.47";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -226,6 +226,14 @@ class ImageItem extends BackgammonArea {
         this.move(this.x, this.y, false);
 
         this.e = undefined; // MouseEvent
+    } // constructor()
+
+    on() {
+        this.el.hidden = false;
+    }
+
+    off() {
+        this.el.hidden = true;
     }
 
     /**
@@ -354,6 +362,8 @@ class BoardItem extends ImageItem {
 
 /**
  * button on board
+ *
+ * T.B.D. この中間クラスはいらないかも？
  */
 class BoardButton extends BoardItem {
     constructor(id, board, x, y) {
@@ -448,24 +458,24 @@ class FwdAllButton extends EmitButton {
 /**
  *                    x0
  *                    |
- *                    v
- *            y ->+-----------------------------------------------------
- *                |       13 14 15 16 17 18     19 20 21 22 23 24       |
- *        by[0] ->|  -------------------------------------------------  |
+ *                    |
+ *            y ->+---|-------------------------------------------------
+ *                |   v   13 14 15 16 17 18     19 20 21 22 23 24       |
+ *        by[0] --->+-+-----------------------------------------------  |
  *                | |   ||p0          p1   |   |p1             p0||   | |
- * y2[1] ------------>  ||p0          p1   |   |p1 tx     dx   p0||   | |
+ * y2[1] ------------>+ ||p0          p1   |   |p1 tx     dx   p0||   | |
  *                | |   ||p0          p1   |27 |p1 |      |      ||25 | |
- * y1[1] ------------>  ||p0               |   |p1 |      v      ||   | |
+ * y1[1] ------------>+ ||p0               |   |p1 |      v      ||   | |
  *                | |   ||p0               |   |p1 v      +------+<-------dy
  *                | |   ||         ty ------------>+------| Dice ||   | |
- * y0 --------------->  ||                 |---|   |Text  | Area ||---| |
+ * y0 --------------->+ ||                 |---|   |Text  | Area ||---| |
  *                | |   ||                 |   |    ------|      ||   | |
  *                | |   ||p1               |   |p0         ------||   | |
- * y1[0] ------------>  ||p1               |   |p0               ||   | |
+ * y1[0] ------------>+ ||p1               |   |p0               ||   | |
  *                | |   ||p1          p0   |26 |p0               || 0 | |
- * y2[0] ------------>  ||p1          p0   |   |p0             p1||   | |
+ * y2[0] ------------>+ ||p1          p0   |   |p0             p1||   | |
  *                | |   ||p1          p0   |   |p0             p1||   | |
- *        by[1] ->|  -------------------------------------------------  |
+ *        by[1] --->+-------------------------------------------------  |
  *                |       12 11 10  9  8  7      6  5  4  3  2  1       |
  *                 ----------------------------------------------------- 
  */
@@ -534,9 +544,11 @@ class Cube extends BoardItem {
                 side = -1;
             }
 
-            emit_msg("cube", {side: side,
-                                         value: this.value,
-                                         accepted: this.accepted});
+            emit_msg("cube",
+                     { side: side,
+                       value: this.value,
+                       accepted: this.accepted },
+                     true);
         }
     }
 
@@ -685,14 +697,6 @@ class BannerText extends OnBoardText {
         if ( txt.length == 0 ) {
             this.off();
         }
-    }
-
-    on() {
-        this.el.hidden = false;
-    }
-
-    off() {
-        this.el.hidden = true;
     }
 
     on_mouse_down(e) {
@@ -1007,6 +1011,16 @@ class Checker extends PlayerItem {
     }
 
     /**
+     * @param {Checker} ch
+     * @param {number[]} available_dice
+     */
+    get_available_point(ch, available_dice) {
+        // T.B.D. //
+
+        return [];
+    }
+
+    /**
      * @param {MouseEvent} e
      */
     on_mouse_up(e) {
@@ -1025,20 +1039,23 @@ class Checker extends PlayerItem {
         const dst_p = ch.board.chpos2point(ch);
         console.log(`Checker.on_mouse_up> dst_p=${dst_p}`);
 
+        const active_dice = this.board.get_active_dice(ch.player);
+        console.log(`Checker.on_mouse_up> active_dice=${JSON.stringify(active_dice)}`);
+
         if ( dst_p == ch.cur_point ) {
+            //
             // XXX T.B.D. ワンタッチでのムーブ??
-            let active_dice = this.board.get_active_dice(ch.player);
-            
-            this.cancel_move(ch);
-            return;
+            //
+            const available_p = this.get_available_point(ch, active_dice);
+            if ( available_p.length == 0 ) {
+                this.cancel_move(ch);
+                return;
+            }
         }
 
         /**
          * ダイスの目による判定
          */
-        let active_dice = this.board.get_active_dice(this.player);
-        console.log(`Checker.on_mouse_up> active_dice=${JSON.stringify(active_dice)}`);
-
         let dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
         if ( dice_value == 0 ) {
             // ダイスの目と一致しない場合
@@ -1168,10 +1185,10 @@ class Checker extends PlayerItem {
  *           |   bx[1]              |   bx[4]             |bx[6]
  *         x |   |bx[2]             |   |                 ||   bx[7]
  *         | |   ||                 |   |                 ||   |
- *         v v   vv                 v   v                 vv   v
- *     y ->+-----------------------------------------------------
- *         |       13 14 15 16 17 18     19 20 21 22 23 24       |
- * by[0] ->|  -------------------------------------------------  |
+ *         v |   vv                 |   |                 ||   |
+ *     y ->+-|----------------------|---|-----------------||---|-
+ *         | v     13 14 15 16 17 18v   v19 20 21 22 23 24vv   v |
+ * by[0] --->+----------------------+---+-----------------++---+ |
  *         | |   ||p0          p1   |   |p1             p0||   | |
  *         | |   ||p0          p1   |   |p1 tx     dx   p0||   | |
  *         | |   ||p0          p1   |27 |p1 |      |      ||25 | |
@@ -1185,7 +1202,7 @@ class Checker extends PlayerItem {
  *         | |   ||p1          p0   |26 |p0               || 0 | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
- * by[1] ->|  -------------------------------------------------  |
+ * by[1] --->+-------------------------------------------------  |
  *         |       12 11 10  9  8  7      6  5  4  3  2  1       |
  *          ----------------------------------------------------- 
  *
