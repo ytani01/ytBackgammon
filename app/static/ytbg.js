@@ -39,6 +39,10 @@ let ws = undefined;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
+let sound1 = new Audio("/static/sounds/computerbeep_12.mp3");
+let sound2 = new Audio("/static/sounds/computerbeep_43.mp3");
+let sound3 = new Audio("/static/sounds/computerbeep_58.mp3");
+
 /**
  *
  */
@@ -2005,7 +2009,8 @@ class BoardPoint extends BoardArea {
         console.log(`BoardPoint.add(ch.id=${ch.id},sec=${sec})`);
         const n = this.checkers.length;
         const n2 = n % this.max_n;
-        const x = this.cx;
+        const n3 = Math.floor(n / this.max_n);
+        const x = this.cx - ch.h * 0.1 * n3;
         const y = parseInt(Math.round(this.y0
                                       + (ch.h * n2 * 0.7 + ch.h / 2)
                                       * this.direction));
@@ -2015,7 +2020,7 @@ class BoardPoint extends BoardArea {
         ch.cur_point = this.id;
         this.checkers.push(ch);
         return n;
-    }
+    } // BoardPoint.add()
 } // class BoardPoint
 
 /**
@@ -2345,6 +2350,11 @@ window.onload = () => {
             if ( board.turn == -1 ) {
                 return;
             }
+            if (JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
+                console.log(`sound2.play()`);
+                let playpromise = sound2.play();
+            }
+
             board.set_turn(msg.data.turn);
             board.dice_area[msg.data.player].set(msg.data.dice, false, msg.data.roll);
             if ( board.turn < 0 ) {
