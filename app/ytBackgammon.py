@@ -111,4 +111,10 @@ class ytBackgammon:
         data = {'player': int, 'text': str}
         """
         self._gameinfo['board']['banner'][data['player']] = data['text']
+
+    def set_playername(self, data):
+        """
+        data = {'player': int, 'name': str}
+        """
+        self._gameinfo['text'][data['player']] = data['name']
 ###

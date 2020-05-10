@@ -360,6 +360,9 @@ class ytBackgammonServer:
             # data: {'player': int, 'text': str}
             self._bg.set_banner(msg['data'])
 
+        if msg['type'] == 'set_playername':
+            # data: {'player': int, 'name': str}
+            self._bg.set_playername(msg['data'])
         #
         # append history or not
         #

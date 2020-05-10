@@ -40,8 +40,7 @@
   <body>
     <header>
       <div id="server-id" style="display:none;">{{server_id}}</div>
-      <div id="user-name"><input type="text"></div>
-      <div id="nav-drawer">
+      <div id="nav-drawer" style="display:inline-block;">
         <input id="nav-input" type="checkbox" class="nav-unshown">
         <label id="nav-open" for="nav-input"><span></span></label>
         <label class="nav-unshown" id="nav-close" for="nav-input"><span></span></label>
@@ -75,6 +74,8 @@
           </ul>
         </div>
       </div>
+      &nbsp;Player Name:
+      <div style="display:inline-block;"><input id="player-name" type="text" onInput="emit_playername();"></div>
     </header>
     <div id="board"><image src="/static/images/board-base.png">
         <div class="onboardtext"

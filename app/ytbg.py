@@ -11,17 +11,20 @@ __date__   = '2020/05'
 from ytBackgammonServer import ytBackgammonServer
 from flask import Flask, request
 from flask_socketio import SocketIO
+import json
 from MyLogger import get_logger
 import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.46'
+VERSION = '0.50'
 
 _log = get_logger(__name__, True)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
+app.config['DEBUG'] = False
+app.config['JSON_AS_ASCII'] = False  # XXX 文字化け対策が効かない
 
 socketio = SocketIO(app)
 
@@ -64,6 +67,7 @@ def default_error_handler(e):
 
 @socketio.on('json')
 def handle_json(msg):
+    _log.debug('msg=%s', json.dumps(msg, ensure_ascii=False))
     svr.on_json(request, msg)
 
 

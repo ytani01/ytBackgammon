@@ -32,7 +32,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.48";
+const VERSION = "0.50";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -561,7 +561,7 @@ class Cube extends BoardItem {
                        accepted: this.accepted },
                      true);
         }
-    }
+    } // Cube.set()
 
     /**
      * 
@@ -1792,6 +1792,10 @@ class Board extends ImageItem {
         // banner
         this.set_banner(0, gameinfo.board.banner[0], false);
         this.set_banner(1, gameinfo.board.banner[1], false);
+
+        // player name
+        this.set_playername(0, gameinfo.text[0]);
+        this.set_playername(1, gameinfo.text[1]);
     }
 
     /**
@@ -1821,52 +1825,11 @@ class Board extends ImageItem {
         }
 
         // dice area
-        for (let player=0; player < 2; player++) {
-            let da = this.dice_area[player];
-            let da2 = this.dice_area[1 - player];
-            if ( ! da.in_this(x, y) ) {
-                continue;
+        for (let p=0; p < 2; p++) {
+            if ( this.dice_area[p].in_this(x, y) ) {
+                this.dice_area[p].on_mouse_down(x, y);
             }
-
-            if ( ! this.cube.accepted ) {
-                return;
-            }
-            
-            console.log(`Board.on_mouse_down> da.active=${da.active}`);
-            if ( da.active ) {
-                // this.set_turn(1 - player, true);
-                // da.clear(true);
-                return;
-            }
-            
-            // da.active == false
-
-            if ( da2.active ) {
-                continue;
-            }
-
-            if ( this.closeout(1 - player) ) { // closed out?
-                console.log(`Board.on_mouse_down> closed out`);
-                this.set_turn(1 - player);
-                this.set_banner(player, "Pass", true);
-                emit_msg("dice", { turn: (1-player),
-                                        player: (1-player),
-                                        dice: [0, 0, 0, 0],
-                                        roll: false }, true);
-                return;
-            }
-
-            if ( this.turn >= 2 ) {
-                this.set_turn(player);
-            } else if ( player != this.turn ) {
-                continue;
-            }
-            da.roll();
-            let dice_values = da.get();
-
-            console.log(`Board.on_mouse_down>dice_area:player=${player},dice_values=${JSON.stringify(dice_values)}`);
-            return;
-        } // for(player)
+        } // for(p)
     } // Board.on_mouse_down()
 
     /**
@@ -1880,7 +1843,7 @@ class Board extends ImageItem {
         }
 
         this.moving_checker.move(x, y, true);
-    } // Board.on_mouse_down()
+    } // Board.on_mouse_move()
 
     /**
      * checker position(x, y) to  piont index
@@ -1928,9 +1891,9 @@ class Board extends ImageItem {
                 const dice_values = this.dice_area[ch.player].get();
                 if ( emit ) {
                     emit_msg("dice", { turn:   this.turn,
-                                            player: ch.player,
-                                            dice:   dice_values,
-                                            roll:   false }, false);
+                                       player: ch.player,
+                                       dice:   dice_values,
+                                       roll:   false }, false);
                 }
             }
         }
@@ -1942,7 +1905,8 @@ class Board extends ImageItem {
         
         if ( emit ) {
             emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
-                                           p:  p, idx: idx }, add_hist);
+                                      p:  p,
+                                      idx: idx }, add_hist);
         }
     } // Board.put_checker()
 
@@ -1963,9 +1927,31 @@ class Board extends ImageItem {
 
         if ( emit ) {
             emit_msg("set_banner", { player: player,
-                                          text:   txt }, false);
+                                     text:   txt }, false);
         }
     } // Board.set_banner()
+
+    /**
+     * 
+     */
+    emit_playername() {
+        console.log(`Board.emit_playername(): this.player=${this.player}`);
+        const name = document.getElementById("player-name").value;
+        emit_msg("set_playername", { player: parseInt(this.player),
+                                     name: name }, true);
+    }
+
+    /**
+     * 
+     */
+    set_playername(player, name) {
+        console.log(`Board.set_playername(player=${player},name=${name})`);
+        if ( name == "" ) {
+            name = `Player ${player+1}`;
+            console.log(`Board.set_playername>name=${name}`);
+        }
+        this.txt[player].set_text(name);
+    }
 
 } // class Board
 
@@ -2010,9 +1996,9 @@ class BoardPoint extends BoardArea {
         const n = this.checkers.length;
         const n2 = n % this.max_n;
         const n3 = Math.floor(n / this.max_n);
-        const x = this.cx - ch.h * 0.1 * n3;
+        const x = this.cx - ch.w * 0.05 * n3;
         const y = parseInt(Math.round(this.y0
-                                      + (ch.h * n2 * 0.7 + ch.h / 2)
+                                      + ch.h * (0.5 + n2 * 0.75 + 0.1 * n3)
                                       * this.direction));
         console.log(`BoardPoint.add()> n=${n},y=${y}`);
         ch.move(x, y, true, sec);
@@ -2048,6 +2034,13 @@ class DiceArea extends BoardArea {
                                     this.y + this.h / 4 * ((i * 2 + 1) % 4),
                                     prefix));
         } // for(i)
+    }
+
+    /**
+     *
+     */
+    another_dicearea() {
+        return this.board.dice_area[1 - this.player];
     }
 
     /**
@@ -2151,7 +2144,7 @@ class DiceArea extends BoardArea {
         // XXX T.B.D. XXX
 
         return modified;
-    }
+    } // DiceArea.check_disable()
 
     /**
      * Roll dices
@@ -2197,7 +2190,7 @@ class DiceArea extends BoardArea {
                                 roll: true }, true);
 
         return dice_values;
-    }
+    } // DiceArea.roll()
 
     /**
      *
@@ -2216,7 +2209,48 @@ class DiceArea extends BoardArea {
                                     roll: false }, true);
         }
         return [];
-    }
+    } // DiceArea.clear()
+
+    /**
+     * called from Board.on_mouse_down()
+     */
+    on_mouse_down(x, y) {
+        if ( ! this.board.cube.accepted ) {
+            return;
+        }
+
+        console.log(`DiceArea.on_mouse_down> active=${this.active}`);
+        if ( this.active ) {
+            return;
+        }
+
+        if ( this.another_dicearea().active ) {
+            return;
+        }
+
+        if ( this.board.closeout(1 - this.player) ) {
+            console.log(`DiceArea.on_mouse_down> closed out`);
+            this.board.set_turn(1 - this.player);
+            this.board.set_banner(this.player, "Pass", true);
+            emit_msg("dice", { turn: (1 - this.player),
+                               player: (1 - this.player),
+                               dice: [0, 0, 0, 0],
+                               roall: false }, true);
+            return;
+        }
+
+        if ( this.board.turn >= 2 ) {
+            this.board.set_turn(this.player);
+        }
+        if ( this.player != this.board.turn ) {
+            return;
+        }
+
+        this.roll();
+        let dice_value = this.get();
+        console.log(`DiceArea.on_mouse_down> player=${this.player},dice_value=${JSON.stringify(dice_value)}`);
+        
+    } // DiceArea.on_mouse_down()
 } // DiceArea
 
 /**
@@ -2290,6 +2324,10 @@ const read_gameinfo = () => {
 
 const clear_filename = () => {
     document.getElementById("read_gameinfo").value="";
+};
+
+const emit_playername = () => {
+    board.emit_playername();
 };
 
 /**
@@ -2370,6 +2408,13 @@ window.onload = () => {
             board.set_banner(msg.data.player, msg.data.text, false);
             return;
         } // set_banner
+
+        if ( msg.type == "set_playername" ) {
+            console.log(`ws.on(json)set_playername>player=${msg.data.player},name=${msg.data.name}`);
+            board.set_playername(msg.data.player, msg.data.name);
+            return;
+        }
+        
         console.log("ws.on(json)???");
     });
 }; // window.onload
