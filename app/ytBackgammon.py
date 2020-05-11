@@ -86,35 +86,42 @@ class ytBackgammon:
         self._log.debug('_gameinfo[board][point][%d][%d]=[%d,%d]',
                         player, ch_i, p, idx);
 
-    def cube(self, msg):
-        self._log.debug('msg=%s', msg)
+    def cube(self, data):
+        self._log.debug('data=%s', data)
 
-        self._gameinfo['board']['cube'] = msg
+        self._gameinfo['board']['cube'] = data
 
         self._log.debug('_gameinfo[board][cube]=%a',
                         self._gameinfo['board']['cube'])
 
-    def dice(self, msg):
+    def dice(self, data):
         """
-        msg = {
-            'turn': turn,
+        data = {
             'player': player,
             'dice': [d1, d2, d3, d4]
         }
         """
-        self._log.debug('msg=%s', msg)
-        self._gameinfo['board']['dice'][msg['player']] = msg['dice']
-        self._gameinfo['turn'] = msg['turn']
+        self._log.debug('data=%s', data)
+        self._gameinfo['board']['dice'][data['player']] = data['dice']
+
+    def set_turn(self, data):
+        """
+        data = {'turn': int}
+        """
+        self._log.debug('data=%s', data)
+        self._gameinfo['turn'] = data['turn']
 
     def set_banner(self, data):
         """
         data = {'player': int, 'text': str}
         """
+        self._log.debug('data=%s', data)
         self._gameinfo['board']['banner'][data['player']] = data['text']
 
     def set_playername(self, data):
         """
         data = {'player': int, 'name': str}
         """
+        self._log.debug('data=%s', data)
         self._gameinfo['text'][data['player']] = data['name']
 ###

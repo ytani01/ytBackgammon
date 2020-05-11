@@ -39,8 +39,8 @@ header {
 /*アイコンのスペース*/
 #nav-open {
   display: inline-block;
-  width: 30px;
-  height: 22px;
+  width: 40px;
+  height: 30px;
   vertical-align: middle;
 }
 
@@ -48,7 +48,7 @@ header {
 #nav-open span, #nav-open span:before, #nav-open span:after {
   position: absolute;
   height: 6px;
-  width: 32px;
+  width: 40px;
   border-radius: 3px;
   background: #555;
   display: block;

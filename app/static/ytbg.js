@@ -32,7 +32,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.50";
+const VERSION = "0.54";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -237,15 +237,15 @@ class ImageItem extends BackgammonArea {
         this.move(this.x, this.y, false);
 
         this.e = undefined; // MouseEvent
-    } // constructor()
+    } // ImageItem.constructor()
 
     on() {
         this.el.hidden = false;
-    }
+    } // ImageItem.on()
 
     off() {
         this.el.hidden = true;
-    }
+    } // ImageItem.off()
 
     /**
      * move to (x, y)
@@ -264,7 +264,7 @@ class ImageItem extends BackgammonArea {
             this.el.style.left = (this.x - this.w / 2) + "px";
             this.el.style.top = (this.y - this.h / 2) + "px";
         }
-    }
+    } // ImageItem.move()
 
     /**
      * @param {number} deg
@@ -277,7 +277,7 @@ class ImageItem extends BackgammonArea {
         }
         this.el.style.transitionDuration = sec + "s";
         this.el.style.transform = `rotate(${deg}deg)`;
-    }
+    } // ImageItem.rotate()
 
     /**
      * touch event to mouse event
@@ -292,7 +292,7 @@ class ImageItem extends BackgammonArea {
             e = e.changedTouches[0];
         }
         return e;
-    }
+    } // ImageItem.touch2mouse()
     
     /**
      * only for get_xy() function
@@ -308,7 +308,7 @@ class ImageItem extends BackgammonArea {
         }
         
         return [w - e.pageX + origin_x, h - e.pageY + origin_y];
-    }
+    } // ImageItem.inverse_xy()
 
     /**
      * @param {MouseEvent} e
@@ -330,35 +330,35 @@ class ImageItem extends BackgammonArea {
             [x, y] = this.inverse_xy(e);
         }
         return [x, y];
-    }
+    } // ImageItem.get_xy()
 
     /**
      * @param {MouseEvent} e
      */
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
-    }
+    } // ImageItem.on_mouse_down()
 
     /**
      * @param {MouseEvent} e
      */
     on_mouse_up(e) {
         let [x, y] = this.get_xy(e);
-    }
+    } // ImageItem.on_mouse_up()
 
     /**
      * @param {MouseEvent} e
      */
     on_mouse_move(e) {
         let [x, y] = this.get_xy(e);
-    }
+    } // ImageItem.on_mouse_move()
 
     /**
      * @param {MouseEvent} e
      */
     null_handler(e) {
         return false;
-    }
+    } // ImageItem.null_handler()
 } // class ImageItem
 
 /**
@@ -586,7 +586,7 @@ class Cube extends BoardItem {
 
         this.accepted = false;
         this.set(this.value, player, false);
-    }
+    } // Cube.double()
 
     /**
      *
@@ -595,7 +595,7 @@ class Cube extends BoardItem {
         console.log("Cube.double_accept()");
 
         this.set(this.value, this.player, true);
-    }
+    } // Cube.double_accept()
 
     /**
      *
@@ -609,7 +609,7 @@ class Cube extends BoardItem {
             player = undefined;
         }
         this.set(value, player, true);
-    }
+    } // Cube.double_cancel()
 
     /**
      * @param {MouseEvent} e
@@ -623,7 +623,7 @@ class Cube extends BoardItem {
             if ( ! this.accepted ) {
                 this.double_cancel();
             }
-            return;
+            return false;
         }
 
         if ( this.player === undefined || this.accepted == true ) {
@@ -631,7 +631,8 @@ class Cube extends BoardItem {
         } else {
             this.double_accept();
         }
-    }
+        return false;
+    } // Cube.on_mouse_down
 } // class Cube
 
 /**
@@ -654,15 +655,19 @@ class OnBoardText extends PlayerItem {
         this.el.style.removeProperty("width");
         this.el.style.removeProperty("height");
 
-        this.player_name = `Player ${player + 1}`;
+        this.default_text = `Player ${player + 1}`;
     }
 
+    get_text() {
+        return this.el.innerHTML;
+    } // OnBoardText.get_text()
+    
     set_text(txt) {
-        this.el.innerHTML = "";
+        this.el.innerHTML = this.default_text;
         if ( txt.length > 0 ) {
-            this.el.innerHTML = "&nbsp;" + txt + "&nbsp;";
+            this.el.innerHTML = txt;
         }
-    }
+    } // OnBoardText.set_text()
 
     on() {
         this.el.style.borderColor = "rgba(0, 128, 255, 0.8)";
@@ -697,6 +702,7 @@ class BannerText extends OnBoardText {
         this.el.style.color = "red";
         this.el.style.backgroundColor = "lightsteelblue";
 
+        this.default_text = "";
         this.set_text("");
     }
 
@@ -708,12 +714,15 @@ class BannerText extends OnBoardText {
         if ( txt.length == 0 ) {
             this.off();
         }
-    }
+    } // BannerText.set_text()
 
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
-        this.off();
-    }
+        console.log(`BannerText.on_mouse_down>(x,y)=(${x},${y})`);
+        
+        this.board.emit_banner(this.player, "", true);
+        return false;
+    } // BannerText.on_mouse_down()
 } // class BannerText
 
 /**
@@ -814,12 +823,20 @@ class Dice extends PlayerItem {
         let [x, y] = this.get_xy(e);
         console.log(`Dice.on_mouse_down> x=${x},y=${y}`);
 
+        this.board.set_turn(1 - this.player);
+        this.board.emit_turn(1 - this.player, false);
+
         const da = this.board.dice_area[this.player];
 
-        this.board.set_turn(1 - this.player, false);
+        if ( this.board.closeout(this.player) ) {
+            console.log(`Dice.on_mouse_down>close out!`);
+            this.board.txt[1 - this.player].red();
+            this.board.emit_banner(1 - this.player, "Close out");
+        }
         da.clear(true);
+        console.log(`Dice.on_mouse_down:return false;`);
+        return false;
     } // Dice.on_mouse_down()
-
 } // class Dice
 
 /**
@@ -882,14 +899,14 @@ class Checker extends PlayerItem {
     distance(ch) {
         let [dx, dy] = [ch.x - this.x, ch.y - this.y];
         return Math.sqrt(dx * dx + dy * dy);
-    }
+    } // Checker.distance()
     
     /**
      * @return {number} - pip count
      */
     pip() {
         return super.pip(this.player, this.cur_point);
-    }
+    } // Checker.pip()
 
     /**
      * @return {boolean}
@@ -903,7 +920,7 @@ class Checker extends PlayerItem {
             }
         } // for(i)
         return true;
-    }
+    } // Checker.is_last_man()
 
     /**
      * @return {boolean}
@@ -1181,10 +1198,9 @@ class Checker extends PlayerItem {
 
         // emit dice values to server
         // const dice_values = this.board.dice_area[this.player].get();
-        emit_msg("dice", { turn: this.board.turn,
-                                player: this.player,
-                                dice: da.get(),
-                                roll: false}, true);
+        emit_msg("dice", { player: this.player,
+                           dice: da.get(),
+                           roll: false}, true);
 
         ch.board.moving_checker = undefined;
 
@@ -1221,7 +1237,7 @@ class Checker extends PlayerItem {
  *         | |   ||p0               |   |p1 |      v      ||   | |
  *         | |   ||p0               |   |p1 v      +------+<---------dy
  *         | |   ||         ty ------------>+------| Dice ||   | |
- *         | |   ||                 |---|   |Text  | Area ||---| |
+ *         | |   ||                 |---|   |      | Area ||---| |
  *         | |   ||                 |   |    ------|      ||   | |
  *         | |   ||p1               |   |p0         ------||   | |
  *         | |   ||p1               |   |p0               ||   | |
@@ -1261,7 +1277,7 @@ class Board extends ImageItem {
 
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [20, 509];
-        [this.tx, this.ty] = [568, 245];
+        [this.tx, this.ty] = [this.bx[4]+5, 246];
         [this.tx2, this.ty2] = [this.bx[4]+20, this.by[0]+205];
         [this.dx, this.dy] = [620, 245];
 
@@ -1269,11 +1285,13 @@ class Board extends ImageItem {
 
         // Title
         const name_el = document.getElementById("name");
+        /*
         name_el.style.width = this.w + "px";
-        name_el.style.left = "50px";
-        name_el.style.top = this.h + "px";
+        name_el.style.left = this.x + "px";
+        name_el.style.top = this.y + this.h + "px";
+        */
         const ver_el = document.getElementById("version");
-        ver_el.innerHTML = `<strong>${MY_NAME}</strong>, Version ${VERSION}`;
+        ver_el.innerHTML = `<strong>Client</strong>, Ver. ${VERSION}`;
 
         // Buttons
         const bx0 = this.x + this.w + 20;
@@ -1319,7 +1337,7 @@ class Board extends ImageItem {
         this.txt[1].rotate(180);
 
         for (let p=0; p < 2; p++) {
-            this.txt[p].set_text(`Player ${p+1}`);
+            this.txt[p].set_text("");
             this.txt[p].on();
         }
 
@@ -1463,15 +1481,27 @@ class Board extends ImageItem {
     }
 
     /**
-     * set turn
-     * @param {number} player
+     * @param {number} turn
+     *   <= -1 : all off
+     *       0 : player 0
+     *       1 : player 1
+     *   >=  2 : all on
+     * @param {boolean} add_hist
+     */
+    emit_turn(turn, add_hist=false) {
+        console.log(`Boad.emit_turn(turn=${turn},add_hist=${add_hist})`);
+        emit_msg("set_turn", { turn: turn }, add_hist);
+    }
+
+    /**
+     * @param {number} turn
      *   <= -1 : all off
      *       0 : player 0
      *       1 : player 1
      *   >=  2 : all on
      */
-    set_turn(turn, emit=false) {
-        console.log(`Board.set_turn(turn=${turn}, emit=${emit})`);
+    set_turn(turn) {
+        console.log(`Board.set_turn(turn=${turn})`);
         this.turn = turn;
         
         this.txt[0].off();
@@ -1489,11 +1519,6 @@ class Board extends ImageItem {
             
         // turn == 0 or 1
         this.txt[turn].on();
-        if ( this.closeout(1 - turn) ) {
-            console.log(`Board.set_turn>close out!`);
-            this.txt[turn].red();
-            this.set_banner(turn, "Close out", true);
-        }
     } // Board.set_turn()
 
     /**
@@ -1537,22 +1562,21 @@ class Board extends ImageItem {
             }
         } // for(i)
         
-        this.set_turn(-1);
+        this.emit_turn(-1);
         if ( emit ) {
-            emit_msg("dice", { turn:   this.turn,
-                               player: player,
+            emit_msg("dice", { player: player,
                                dice:   da.get(),
                                roll:   false }, false);
         }
 
-        this.set_banner(player, "Win !", emit);
+        this.emit_banner(player, "Win !");
     }
     
     /**
      * @param {number} player
      */
     pass(player) {
-        this.set_banner(player, "Pass", true);
+        this.emit_banner(player, "Pass");
     } // Board.pass()
     
     /**
@@ -1767,7 +1791,7 @@ class Board extends ImageItem {
                 for (let c=0; c < 15; c++) {
                     const ch = this.checker[p][c];
                     if ( ch_point[p][c][1] == i ) {
-                        this.put_checker(ch, ch_point[p][c][0], sec, false);
+                        this.put_checker(ch, ch_point[p][c][0], sec, false, false);
                         ch.el.hidden = false;
                     }
                 } // for (c)
@@ -1786,17 +1810,18 @@ class Board extends ImageItem {
 
         // cube
         let c = gameinfo.board.cube;
-        console.log(`gameinfo.board.cube=${JSON.stringify(c)}`);
+        console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
         this.cube.set(c.value, c.side, c.accepted, false);
 
         // banner
-        this.set_banner(0, gameinfo.board.banner[0], false);
-        this.set_banner(1, gameinfo.board.banner[1], false);
+        console.log(`Board.load_gameinfo> banner=${JSON.stringify(gameinfo.board.banner)}`);
+        this.set_banner(0, gameinfo.board.banner[0]);
+        this.set_banner(1, gameinfo.board.banner[1]);
 
         // player name
         this.set_playername(0, gameinfo.text[0]);
         this.set_playername(1, gameinfo.text[1]);
-    }
+    } // Board.load_gameinfo()
 
     /**
      *
@@ -1820,9 +1845,11 @@ class Board extends ImageItem {
         let [x, y] = this.get_xy(e);
         console.log(`Board.on_mouse_down> (x,y)=(${x},${y})`);
 
+        /*
         for (let p=0; p < 2; p++) {
-            this.set_banner(p, "", true);
+            this.emit_banner(p, "");
         }
+        */
 
         // dice area
         for (let p=0; p < 2; p++) {
@@ -1897,13 +1924,13 @@ class Board extends ImageItem {
                 }
             }
         }
-        */
 
-        if ( this.game_is_finished(ch.player) ) {
-            this.finish_game(ch.player, true);
-        }
+        */
         
         if ( emit ) {
+            if ( this.game_is_finished(ch.player) ) {
+                this.finish_game(ch.player, true);
+            }
             emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
                                       p:  p,
                                       idx: idx }, add_hist);
@@ -1913,9 +1940,20 @@ class Board extends ImageItem {
     /**
      * @param {number} player
      * @param {string} txt
-     * @param {boolean} emit
+     * @param {boolean} add_history
      */
-    set_banner(player, txt, emit=false) {
+    emit_banner(player, txt, add_hist=false) {
+        console.log(`Board.emit_banner(player=${player},txt=${txt},add_hist=${add_hist})`);
+        emit_msg("set_banner", { player: player,
+                                 text: txt }, add_hist);
+    } // Board.emit_banner()
+    
+    /**
+     * @param {number} player
+     * @param {string} txt
+     */
+    set_banner(player, txt) {
+        console.log(`Board.set_banner(player=${player},txt=${txt})`);
         this.banner[player].set_text(txt);
         this.gameinfo['board']['banner'][player] = txt;
 
@@ -1924,22 +1962,29 @@ class Board extends ImageItem {
         } else {
             this.banner[player].off();
         }
-
-        if ( emit ) {
-            emit_msg("set_banner", { player: player,
-                                     text:   txt }, false);
-        }
     } // Board.set_banner()
 
     /**
      * 
      */
-    emit_playername() {
-        console.log(`Board.emit_playername(): this.player=${this.player}`);
-        const name = document.getElementById("player-name").value;
+    emit_playername(add_hist=true) {
+        const el = document.getElementById("player-name");
+        const name = el.value;
+        const cur_name = this.txt[this.player].get_text();
+        const def_name = this.txt[this.player].default_text;
+        console.log(`Board.emit_playername(): this.player=${this.player},cur_name=${cur_name},name=${name}`);
+
+        el.value = "";
+
+        if ( name == cur_name ) {
+            return;
+        }
+        if ( name == "" && cur_name == def_name ) {
+            return;
+        }
         emit_msg("set_playername", { player: parseInt(this.player),
-                                     name: name }, true);
-    }
+                                     name: name }, add_hist);
+    } // Board.emit_playername()
 
     /**
      * 
@@ -2063,10 +2108,9 @@ class DiceArea extends BoardArea {
         } // for(i)
 
         if ( emit ) {
-            emit_msg("dice", { turn: this.board.turn,
-                                    player: this.player,
-                                    dice: dice_value,
-                                    roll: roll_flag}, true);
+            emit_msg("dice", { player: this.player,
+                               dice: dice_value,
+                               roll: roll_flag}, true);
         }
     } // DiceArea.set()
 
@@ -2151,7 +2195,6 @@ class DiceArea extends BoardArea {
      * @return {number[]} - dice values
      */
     roll() {
-        console.log("DiceArea.roll()");
         this.clear();
         console.log(`DiceArea.roll()> ${this.get()}`);
 
@@ -2184,29 +2227,28 @@ class DiceArea extends BoardArea {
         /**
          * emit
          */
-        emit_msg("dice", { turn: this.board.turn,
-                                player: this.player,
-                                dice: this.get(),
-                                roll: true }, true);
+        emit_msg("dice", { player: this.player,
+                           dice: this.get(),
+                           roll: true }, true);
 
         return dice_values;
     } // DiceArea.roll()
 
     /**
-     *
+     * @param {boolean} emit
      */
     clear(emit=false) {
-        console.log("DiceArea.clear()");
+        console.log(`DiceArea.clear(emit=${emit})`);
+
+        this.active = false;
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].clear();
         }
-        this.active = false;
 
         if ( emit ) {
-            emit_msg("dice", { turn: this.board.turn,
-                                    player: this.player,
-                                    dice: [0, 0, 0, 0],
-                                    roll: false }, true);
+            emit_msg("dice", { player: this.player,
+                               dice: [0, 0, 0, 0],
+                               roll: false }, true);
         }
         return [];
     } // DiceArea.clear()
@@ -2215,11 +2257,13 @@ class DiceArea extends BoardArea {
      * called from Board.on_mouse_down()
      */
     on_mouse_down(x, y) {
+        console.log(`DiceArea.on_mouse_down>this.player=${this.player},active=${this.active}`);
+
         if ( ! this.board.cube.accepted ) {
+            console.log(`DiceArea.on_mouse_down> cube is not accepted .. return`);
             return;
         }
 
-        console.log(`DiceArea.on_mouse_down> active=${this.active}`);
         if ( this.active ) {
             return;
         }
@@ -2230,22 +2274,24 @@ class DiceArea extends BoardArea {
 
         if ( this.board.closeout(1 - this.player) ) {
             console.log(`DiceArea.on_mouse_down> closed out`);
-            this.board.set_turn(1 - this.player);
-            this.board.set_banner(this.player, "Pass", true);
-            emit_msg("dice", { turn: (1 - this.player),
-                               player: (1 - this.player),
+            this.board.emit_turn(1 - this.player);
+            this.board.emit_banner(this.player, "Pass");
+            emit_msg("dice", { player: (1 - this.player),
                                dice: [0, 0, 0, 0],
-                               roall: false }, true);
+                               roll: false }, true);
             return;
         }
 
-        if ( this.board.turn >= 2 ) {
-            this.board.set_turn(this.player);
-        }
+        console.log(`DiceArea.on_mouse_down>turn=${this.board.turn}`);
         if ( this.player != this.board.turn ) {
-            return;
+            if ( this.board.turn < 2 ) {
+                return;
+            }
+            this.board.emit_turn(this.player);
         }
 
+        this.board.emit_banner(0, "");
+        this.board.emit_banner(1, "");
         this.roll();
         let dice_value = this.get();
         console.log(`DiceArea.on_mouse_down> player=${this.player},dice_value=${JSON.stringify(dice_value)}`);
@@ -2266,8 +2312,8 @@ const emit_msg = (type, data, history=false) => {
 const new_game = () => {
     nav.checked=false;
     console.log("new_game()");
-    board.set_banner(0, "", true);
-    board.set_banner(1, "", true);
+    board.set_banner(0, "");
+    board.set_banner(1, "");
     emit_msg("new", {}, false);
 };
 
@@ -2343,7 +2389,11 @@ window.onload = () => {
 
     //setTimeout("location.reload()",5000);
 
-    board = new Board("board", 40, 44, ws);
+    const nav_el = document.getElementById("nav-drawer");
+    board = new Board("board",
+                      nav_el.offsetWidth + 20,
+                      nav_el.offsetHeight + 10,
+                      ws);
 
     ws.on("connect", function() {
         console.log("ws.on(connected)");
@@ -2393,14 +2443,20 @@ window.onload = () => {
                 let playpromise = sound2.play();
             }
 
-            board.set_turn(msg.data.turn);
-            board.dice_area[msg.data.player].set(msg.data.dice, false, msg.data.roll);
+            board.dice_area[msg.data.player].set(msg.data.dice,
+                                                 false, msg.data.roll);
             if ( board.turn < 0 ) {
                 board.txt[0].off();
                 board.txt[1].off();
             }
             return;
         } // "dice"
+
+        if ( msg.type == "set_turn" ) {
+            console.log(`ws.on(json)set_turn> turn=${msg.data.turn}`);
+            board.set_turn(msg.data.turn);
+            return;
+        } // set_turn
 
         if ( msg.type == "set_banner" ) {
             console.log(`ws.on(json)set_banner> player=${msg.data.player},text=${msg.data.text}`);

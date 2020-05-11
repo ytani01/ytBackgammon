@@ -57,7 +57,14 @@ class ytBackgammonServer:
         New game
         """
         self._log.debug('')
+
+        player0_name = self._bg._gameinfo['text'][0]
+        player1_name = self._bg._gameinfo['text'][1]
+
         self._bg.init_gameinfo()
+        self._bg._gameinfo['text'][0] = player0_name
+        self._bg._gameinfo['text'][1] = player1_name
+        
         self.add_history(self._bg._gameinfo)
 
     def add_history(self, gameinfo=None):
@@ -353,8 +360,12 @@ class ytBackgammonServer:
             self._bg.cube(msg['data'])
 
         if msg['type'] == 'dice':
-            # data: {'turn': int, 'player': int, 'dice': [int, int, int, int]
+            # data: {'player': int, 'dice': [int, int, int, int]
             self._bg.dice(msg['data'])
+
+        if msg['type'] == 'set_turn':
+            # data: {'turn': int}
+            self._bg.set_turn(msg['data'])
 
         if msg['type'] == 'set_banner':
             # data: {'player': int, 'text': str}
