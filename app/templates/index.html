@@ -75,20 +75,21 @@
           </ul>
         </div>
       </div>
-      &nbsp; <strong>{{ name }}, Ver. {{ version }}</strong> /
+      &nbsp;
+      <strong>{{ name }} Ver. {{ version }}</strong> /
       <strong id="version">Version Number</strong>
-      &nbsp; [ <span id="hist_n"></span> / <span id="hist_max"></span> ]
-      &nbsp; Player Name:
-      <div  style="display:inline-block;">
-        <input id="player-name" type="text" onChange="emit_playername();">
-        <input type="button" value="Clear" onClick="emit_playername();">
-        &nbsp;
-        Sound <input id="sound-switch" type="checkbox"
-                     onChange="apply_sound_switch();">
-        &nbsp;
-        Free <input id="free-move" type="checkbox"
-                    onChange="apply_free_move();">
-      </div>
+      &nbsp;
+      Name:
+      <input id="player-name" type="text" onChange="emit_playername();">
+      <input type="button" value="Clear" onClick="emit_playername();">
+      &nbsp;
+      Sound <input id="sound-switch" type="checkbox"
+                   onChange="apply_sound_switch();">
+      &nbsp;
+      Free <input id="free-move" type="checkbox"
+                  onChange="apply_free_move();">
+      &nbsp;
+      <span id="dice-histogram" style="font-size:small"></span>
     </header>
     <div id="board"><image src="/static/images/board-base.png">
         <div class="onboardtext"

@@ -38,7 +38,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.57";
+const VERSION = "0.58";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -1341,7 +1341,7 @@ class Board extends ImageItem {
         name_el.style.top = this.y + this.h + "px";
         */
         const ver_el = document.getElementById("version");
-        ver_el.innerHTML = `<strong>Client</strong>, Ver. ${VERSION}`;
+        ver_el.innerHTML = `<strong>Client</strong> Ver. ${VERSION}`;
 
         // Buttons
         const bx0 = this.x + this.w + 20;
@@ -1481,6 +1481,9 @@ class Board extends ImageItem {
         // DiceArea
         let da_w = this.bx[5] - this.dx;
         let da_h = this.h - this.dy * 2;
+        this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+        console.log(`Board.constructor>dice_histogram=${JSON.stringify(this.dice_histogram)}`);
+
         this.dice_area = [];
         this.dice_area.push(new DiceArea(this, this.dx, this.dy,
                                          da_w, da_h, 0));
@@ -2304,6 +2307,28 @@ class DiceArea extends BoardArea {
 
         const value1 = Math.floor(Math.random() * 6) + 1;
         const value2 = Math.floor(Math.random() * 6) + 1;
+
+        // Dice histogram
+        this.board.dice_histogram[this.player][value1 - 1]++;
+        this.board.dice_histogram[this.player][value2 - 1]++;
+        console.log(`DiceArea.roll>dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
+        let histogram_str = "| ";
+        for (let p=0; p < 2; p++) {
+            let sum = 0;
+            for (let i=0; i < 6; i++) {
+                sum += this.board.dice_histogram[p][i];
+            } // for (i)
+            for (let i=0; i < 6; i++) {
+                let a = 0;
+                if ( sum > 0 ) {
+                    a = Math.floor(this.board.dice_histogram[p][i] / sum * 100);
+                }
+                histogram_str += a + " ";
+            } // for (i)
+            histogram_str += "| ";
+        } // for(p)
+        console.log(`histogram_str=${histogram_str}`);
+        document.getElementById("dice-histogram").innerHTML = histogram_str;
 
         if ( value1 != value2 ) {
             this.dice[d1].set(value1);
