@@ -1344,7 +1344,8 @@ class Board extends ImageItem {
         ver_el.innerHTML = `<strong>Client</strong> Ver. ${VERSION}`;
 
         // Buttons
-        const bx0 = this.x + this.w + 20;
+        const bx0 = this.x + this.w + 30;
+        /*
         this.button_back_all = new BackAllButton(
             "button-back_all", this, bx0, 20);
 
@@ -1359,18 +1360,18 @@ class Board extends ImageItem {
         this.button_fwd2 = new Fwd2Button(
             "button-fwd2", this, bx0,
             this.button_fwd_all.y + this.button_fwd_all.h);
-
+        */
         this.button_back = new BackButton("button-back", this, bx0, this.h);
-        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 25);
+        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 50);
 
         this.button_fwd = new FwdButton(
             "button-fwd", this, bx0,
-            this.button_back.y - this.button_back.h - 20);
+            this.button_back.y - this.button_back.h - 40);
         
         this.button_inverse = new InverseButton(
             "button-inverse", this, bx0, 0);
         this.button_inverse.move(
-            bx0, this.y + this.h / 2 - this.button_inverse.h / 2);
+            bx0, this.y + this.h / 2 - this.button_inverse.h);
         
         // <body>
         let body_el = document.body;
@@ -2330,6 +2331,7 @@ class DiceArea extends BoardArea {
         console.log(`histogram_str=${histogram_str}`);
         document.getElementById("dice-histogram").innerHTML = histogram_str;
 
+        // ぞろ目判定
         if ( value1 != value2 ) {
             this.dice[d1].set(value1);
             this.dice[d2].set(value2);
