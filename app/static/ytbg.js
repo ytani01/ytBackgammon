@@ -1,5 +1,11 @@
 /**
  *=====================================================
+ * [Class tree]
+ *
+ * CookieBase
+ *
+ * SoundBase
+ *
  * BackgammonBase .. have (x, y)
  *   |
  *   +- BackgammonArea .. have (w, h) / without image
@@ -32,16 +38,16 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.54";
+const VERSION = "0.56";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
-let sound1 = new Audio("/static/sounds/computerbeep_12.mp3");
-let sound2 = new Audio("/static/sounds/computerbeep_43.mp3");
-let sound3 = new Audio("/static/sounds/computerbeep_58.mp3");
+sound1 = "/static/sounds/computerbeep_12.mp3";
+sound2 = "/static/sounds/computerbeep_43.mp3";
+sound3 = "/static/sounds/computerbeep_58.mp3";
 
 /**
  *
@@ -99,6 +105,27 @@ class CookieBase {
     } // CookieBase.get()
 } // class CookieBase
 
+/**
+ *
+ */
+class SoundBase {
+    constructor(board, soundfile) {
+        console.log(`SoundBase(board.svr_id=${board.svr_id},soundfile=${soundfile}`);
+        this.board = board;
+        this.soundfile = soundfile;
+        this.audio = new Audio(this.soundfile);
+    } // SoundBase.constructor()
+
+    play() {
+        console.log(`SoundBase.play>soundfile=${this.soundfile}`);
+        console.log(`SoundBase.play>sound=${this.board.sound}`);
+        if ( this.board.sound ) {
+            return this.audio.play();
+        } else {
+            return false;
+        }
+    } // SoundBase.play()
+} // class SoundBase
 
 /**
  * base class for backgammon
@@ -1263,12 +1290,22 @@ class Board extends ImageItem {
 
         this.ws = ws;
         
+        // server ID
         this.svr_id = document.getElementById("server-id").innerHTML;
         console.log(`Board> svr_id=${this.svr_id}`);
 
-        this.cookie_name = `board${this.svr_id}_player`;
+        // Cookie
         this.cookie = new CookieBase();
+        this.cookie_board_player = `board${this.svr_id}_player`;
+        this.cookie_sound = `board${this.svr_id}_sound`;
 
+        // sound setup
+        this.el_sound = document.getElementById("sound-switch");
+        this.sound = false;
+        this.load_sound_switch();
+        this.sound_turn_change = new SoundBase(this, sound2);
+
+        // Player name
         if ( this.load_player() === undefined ) {
             this.set_player(0);
         }
@@ -1442,15 +1479,48 @@ class Board extends ImageItem {
             this.player = 0;
             this.inverse(0);
         }
-    }
+    } // Board.constructor()
+
+    /**
+     * @return {boolean} sound
+     */
+    load_sound_switch() {
+        console.log(`Board.load_sound_switch>cookie_sound=${this.cookie_sound}`);
+
+        const s = this.cookie.get(this.cookie_sound);
+        console.log(`Board.load_sound_switch>s=${s}`);
+        if ( s === undefined ) {
+            this.sound = false;
+        } else {
+            this.sound = JSON.parse(s);
+        }
+        console.log(`Board.load_sound_switch>sound=${this.sound}`);
+        this.el_sound.checked = this.sound;
+
+        return this.sound;
+    } // Board.load_sound_switch()
+        
+    /**
+     * @return {boolean} sound
+     */
+    apply_sound_switch() {
+        console.log(`Board.apply_sound_switch>cookie_sound=${this.cookie_sound}`);
+
+        this.sound = document.getElementById("sound-switch").checked;
+        console.log(`Board.apply_sound_switch>sound=${this.sound}`);
+
+        this.cookie.set(this.cookie_sound, this.sound);
+        this.el_sound.checked = this.sound;
+        return this.sound;
+    } // Board.apply_sound_switch()
 
     /**
      * load player number from cookie
      */
     load_player() {
-        this.player = this.cookie.get(this.cookie_name);
+        this.player = this.cookie.get(this.cookie_board_player);
         return this.player;
-    }
+    } // Board.load_player()
 
     /**
      * set player number and save to cookie
@@ -1459,8 +1529,8 @@ class Board extends ImageItem {
      */
     set_player(player) {
         this.player = player;
-        this.cookie.set(this.cookie_name, this.player);
-    }
+        this.cookie.set(this.cookie_board_player, this.player);
+    } // board.set_player()
 
     /**
      * search checker object by checker id
@@ -1478,7 +1548,7 @@ class Board extends ImageItem {
             }
         }
         return undefined;
-    }
+    } // Board.search_checker()
 
     /**
      * @param {number} turn
@@ -1491,7 +1561,7 @@ class Board extends ImageItem {
     emit_turn(turn, add_hist=false) {
         console.log(`Boad.emit_turn(turn=${turn},add_hist=${add_hist})`);
         emit_msg("set_turn", { turn: turn }, add_hist);
-    }
+    } // Board.emit_turn()
 
     /**
      * @param {number} turn
@@ -2376,6 +2446,10 @@ const emit_playername = () => {
     board.emit_playername();
 };
 
+const apply_sound_switch = () => {
+    board.apply_sound_switch();
+};
+
 /**
  *
  */
@@ -2391,7 +2465,7 @@ window.onload = () => {
 
     const nav_el = document.getElementById("nav-drawer");
     board = new Board("board",
-                      nav_el.offsetWidth + 20,
+                      nav_el.offsetWidth  + 20,
                       nav_el.offsetHeight + 10,
                       ws);
 
@@ -2407,7 +2481,7 @@ window.onload = () => {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
         if ( msg.type == "gameinfo" ) {
-            console.log(`w.on(json)gameinfo>`);
+            console.log(`ws.on(json)gameinfo>`);
             board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
             return;
         } // "gameinfo"
@@ -2439,8 +2513,7 @@ window.onload = () => {
                 return;
             }
             if (JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
-                console.log(`sound2.play()`);
-                let playpromise = sound2.play();
+                let playpromise = board.sound_turn_change.play();
             }
 
             board.dice_area[msg.data.player].set(msg.data.dice,

@@ -21,7 +21,7 @@
       const head_el = document.getElementsByTagName("head")[0];
 
       const js_url = "/static/ytbg.js?ts=" + ts;
-      //const js_url = "/static/ytbg.js"; // for debug
+      // const js_url = "/static/ytbg.js"; // for debug
       const script_el = document.createElement("script");
       console.log(`js_url=${js_url}`);
       script_el.setAttribute("type", "text/javascript");
@@ -79,7 +79,13 @@
       <strong id="version">Version Number</strong>
       &nbsp; [ <span id="hist_n"></span> / <span id="hist_max"></span> ]
       &nbsp; Player Name:
-      <div style="display:inline-block;"><input id="player-name" type="text" onChange="emit_playername();"><input type="button" value="Clear" onClick="emit_playername();"></div>
+      <div  style="display:inline-block;">
+        <input id="player-name" type="text" onChange="emit_playername();">
+        <input type="button" value="Clear" onClick="emit_playername();">
+        &nbsp;
+        sound <input id="sound-switch" type="checkbox"
+                     onChange="apply_sound_switch();">
+      </div>
     </header>
     <div id="board"><image src="/static/images/board-base.png">
         <div class="onboardtext"
