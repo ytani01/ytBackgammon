@@ -83,8 +83,11 @@
         <input id="player-name" type="text" onChange="emit_playername();">
         <input type="button" value="Clear" onClick="emit_playername();">
         &nbsp;
-        sound <input id="sound-switch" type="checkbox"
+        Sound <input id="sound-switch" type="checkbox"
                      onChange="apply_sound_switch();">
+        &nbsp;
+        Free <input id="free-move" type="checkbox"
+                    onChange="apply_free_move();">
       </div>
     </header>
     <div id="board"><image src="/static/images/board-base.png">
