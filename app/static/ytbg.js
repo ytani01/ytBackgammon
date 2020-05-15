@@ -15,8 +15,11 @@
  *        |    +- BoardItem .. on board
  *        |    |    |
  *        |    |    +- BoardButton
+ *        |    |    |    |
  *        |    |    |    +- InverseButton
+ *        |    |    |    |
  *        |    |    |    +- EmitButton
+ *        |    |    |         |
  *        |    |    |         +- BackButton
  *        |    |    |         +- Back2Button
  *        |    |    |         +- BackAllButton
@@ -26,6 +29,7 @@
  *        |    |    +- Cube
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
+ *        |    |         |
  *        |    |         +- RollButton
  *        |    |         +- PlayerName
  *        |    |         +- BannerText
@@ -34,7 +38,9 @@
  *        |    +- Board
  *        |         
  *        +- BoardArea .. on board
+ *             |
  *             +- BoardPoint
+ *
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
@@ -137,11 +143,11 @@ class BackgammonBase {
      */
     constructor(x, y) {
         [this.x, this.y] = [x, y];
-    }
+    } // BackgammonBase.constructor()
 
     goal_point(player) {
         return (25 * player);
-    }
+    } // BackgammonBase.goal_point()
 
     /**
      * ポイントとダイスの目から行き先のポイントを計算
@@ -174,6 +180,8 @@ class BackgammonBase {
     } // BackgammonBase.calc_dst_point()
 
     /**
+     * 指定したポイントのPIPカウントを取得
+     *
      * @param {number} player
      * @param {number} point
      * @return {number} - pip count
@@ -194,6 +202,9 @@ class BackgammonBase {
         return (25 - point);
     }
 
+    /**
+     * @param {number} player
+     */
     bar_point(player) {
         let bar_p = 26;
         if ( player == 1 ) {
@@ -1814,13 +1825,15 @@ class Board extends ImageItem {
                 let x0 = this.bx[3];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, 1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                                               p, 1, cn));
             }
             if ( p == 27 ) {
                 let x0 = this.bx[3];
                 let y0 = this.by[0];
                 let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, -1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                                               p, -1, cn));
             }
         } // for
 
@@ -2206,12 +2219,12 @@ class Board extends ImageItem {
      */
     read_gameinfo() {
         let file = document.getElementById("read_gameinfo").files[0];
-        console.log(`Board.read_gameinfo> file.name=${file.name}`);
+        console.log(`Board.read_gameinfo>file.name=${file.name}`);
 
         const reader = new FileReader();
         reader.onloadend = (e) => {
             const gameinfo = JSON.parse(e.target.result);
-            console.log(`Board.read_gameinfo> gameinfo=${gameinfo}`);
+            console.log(`Board.read_gameinfo>gameinfo=${gameinfo}`);
             this.load_gameinfo(gameinfo);
             emit_msg("set_gameinfo", gameinfo);
         };
@@ -2285,7 +2298,7 @@ class Board extends ImageItem {
         console.log(`Board.load_gameinfo> set turn`);
         this.set_turn(gameinfo.turn);
 
-} // Board.load_gameinfo()
+    } // Board.load_gameinfo()
 
     /**
      *
@@ -2301,21 +2314,6 @@ class Board extends ImageItem {
             this.rotate(180, true, sec);
         }
     }
-
-    /**
-     * @param {MouseEvent} e
-    on_mouse_down(e) {
-        let [x, y] = this.get_xy(e);
-        console.log(`Board.on_mouse_down> (x,y)=(${x},${y})`);
-
-        // dice area
-        for (let p=0; p < 2; p++) {
-            if ( this.roll_button[p].in_this(x, y) ) {
-                this.roll_button[p].on_mouse_down(x, y);
-            }
-        } // for(p)
-    } // Board.on_mouse_down()
-     */
 
     /**
      * @param {MouseEvent} e
@@ -2346,7 +2344,6 @@ class Board extends ImageItem {
     }
 
     /**
-     * 
      * @param {Checker} ch - Checker
      * @param {number} p - point index
      * @param {number} sec
@@ -2547,12 +2544,13 @@ const apply_sound_switch = () => {
 
 const apply_free_move = () => {
     board.apply_free_move();
-}
+};
+
 /**
  *
  */
 window.onload = () => {
-    console.log("window.onload>");
+    console.log("window.onload()");
     
     let url = "http://" + document.domain + ":" + location.port + "/";
     ws = io.connect(url);
@@ -2641,4 +2639,5 @@ window.onload = () => {
         
         console.log("ws.on(json)???");
     });
+
 }; // window.onload
