@@ -38,7 +38,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.58";
+const VERSION = "0.59";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -427,15 +427,16 @@ class InverseButton extends BoardButton {
  *
  */
 class EmitButton extends BoardButton {
-    constructor(id, board, type, x, y) {
+    constructor(id, board, type, data, x, y) {
         super(id, board, x, y);
 
         this.type = type;
+        this.data = data;
     }
 
     on_mouse_down(e) {
         const [x, y] = this.get_xy(e);
-        emit_msg(this.type, {});
+        emit_msg(this.type, this.data);
     }
 } // class EmitButton
 
@@ -444,7 +445,7 @@ class EmitButton extends BoardButton {
  */
 class BackButton extends EmitButton {
     constructor(id, board, x, y) {
-        super(id, board, "back", x, y);
+        super(id, board, "back", {n: 1}, x, y);
     }
 } // class BackButton
 
@@ -453,7 +454,7 @@ class BackButton extends EmitButton {
  */
 class Back2Button extends EmitButton {
     constructor(id, board, x, y) {
-        super(id, board, "back2", x, y);
+        super(id, board, "back2", {}, x, y);
     }
 } // class Back2Button
 
@@ -462,7 +463,7 @@ class Back2Button extends EmitButton {
  */
 class BackAllButton extends EmitButton {
     constructor(id, board, x, y) {
-        super(id, board, "back_all", x, y);
+        super(id, board, "back_all", {}, x, y);
     }
 } // class BackAllButton
 
@@ -471,7 +472,7 @@ class BackAllButton extends EmitButton {
  */
 class FwdButton extends EmitButton {
     constructor(id, board, x, y) {
-        super(id, board, "fwd", x, y);
+        super(id, board, "fwd", {n: 1}, x, y);
     }
 } // class FwdButton
 
@@ -850,10 +851,19 @@ class Dice extends PlayerItem {
         let [x, y] = this.get_xy(e);
         console.log(`Dice.on_mouse_down> x=${x},y=${y}`);
 
+        const da = this.board.dice_area[this.player];
+        const da1 = this.board.dice_area[1-this.player];
+
+        if ( this.board.turn >= 2 ) {
+            if ( this.board.dice_area[1-this.player].active ) {
+                da1.clear(true);
+            }
+            da.clear(true);
+            return false;
+        }
+
         this.board.set_turn(1 - this.player);
         this.board.emit_turn(1 - this.player, false);
-
-        const da = this.board.dice_area[this.player];
 
         if ( this.board.closeout(this.player) ) {
             console.log(`Dice.on_mouse_down>close out!`);
@@ -1696,9 +1706,8 @@ class Board extends ImageItem {
      *
      */
     closeout(player) {
-        console.log(`Board.closeout(player=${player})`);
-
         if (this.point[this.bar_point(1-player)].checkers.length == 0) {
+            console.log(`Board.closeout(player=${player}) ==> false`);
             return false;
         }
 
@@ -1710,9 +1719,11 @@ class Board extends ImageItem {
         for (let p=from_p; p <= to_p; p++) {
             const checkers = this.point[p].checkers;
             if ( checkers.length < 2 ) {
+                console.log(`Board.closeout(player=${player}) ==> false`);
                 return false;
             }
             if ( checkers[0].player != player ) {
+                console.log(`Board.closeout(player=${player}) ==> false`);
                 return false;
             }
         }
@@ -2207,10 +2218,10 @@ class DiceArea extends BoardArea {
         } // for(i)
 
         if ( emit ) {
-            emit_msg("dice", { player: this.player,
-                               dice: dice_value,
-                               roll: roll_flag}, true);
+            this.emit_dice(this.player, dice_value, roll_flag, true);
         }
+
+
     } // DiceArea.set()
 
     /**
@@ -2331,8 +2342,29 @@ class DiceArea extends BoardArea {
         console.log(`histogram_str=${histogram_str}`);
         document.getElementById("dice-histogram").innerHTML = histogram_str;
 
+        const another_da = this.another_dicearea();
+
         // ぞろ目判定
-        if ( value1 != value2 ) {
+        if ( this.board.turn >= 2 ) {
+            this.dice[d1].set(value1);
+
+            if ( another_da.active ) {
+                const d0 = this.get_active_dice()[0];
+                const d1 = another_da.get_active_dice()[0];
+                console.log(`DiceArea.roll>da0=${d0},another_da=${d1}`);
+                if ( d0 > d1 ) {
+                    this.board.emit_turn(this.player);
+                    this.emit_dice(1-this.player, [0,0,0,0], false, false);
+                    this.emit_dice(this.player, [d0,0,0,d1], true, true);
+                    return [d0, 0, 0, d1];
+                } else if ( d0 < d1 ) {
+                    this.board.emit_turn(1 - this.player);
+                    this.emit_dice(this.player, [0,0,0,0], false, false);
+                    this.emit_dice(1-this.player, [d0,0,0,d1], true, true);
+                    return [0, 0, 0, 0];
+                }
+            }
+        } else if ( value1 != value2 ) {
             this.dice[d1].set(value1);
             this.dice[d2].set(value2);
         } else {
@@ -2340,21 +2372,28 @@ class DiceArea extends BoardArea {
                 this.dice[d].set(value1);
             }
         }
-
+        
         const modified = this.check_disable();
         console.log(`DiceArea.roll()> ${this.get()}`);
-
+        
         const dice_values = this.get();
-
-        /**
-         * emit
-         */
-        emit_msg("dice", { player: this.player,
-                           dice: this.get(),
-                           roll: true }, true);
-
+        
+        this.emit_dice(this.player, dice_values, true, true);
+        
         return dice_values;
     } // DiceArea.roll()
+
+    /**
+     * @param {number} player
+     * @param {number[]} dice
+     * @param {boolean} roll
+     * @param {boolean} add_hist
+     */
+    emit_dice(player, dice, roll=false, add_hist=false) {
+        emit_msg("dice", { player: player,
+                           dice: dice,
+                           roll: roll }, add_hist);
+    }
 
     /**
      * @param {boolean} emit
@@ -2379,7 +2418,7 @@ class DiceArea extends BoardArea {
      * called from Board.on_mouse_down()
      */
     on_mouse_down(x, y) {
-        console.log(`DiceArea.on_mouse_down>this.player=${this.player},active=${this.active}`);
+        console.log(`DiceArea.on_mouse_down>this.player=${this.player},active=${this.active},turn=${this.board.turn}`);
 
         if ( ! this.board.cube.accepted ) {
             console.log(`DiceArea.on_mouse_down> cube is not accepted .. return`);
@@ -2390,34 +2429,28 @@ class DiceArea extends BoardArea {
             return;
         }
 
-        if ( this.another_dicearea().active ) {
-            return;
-        }
-
         if ( this.board.closeout(1 - this.player) ) {
             console.log(`DiceArea.on_mouse_down> closed out`);
-            this.board.emit_turn(1 - this.player);
+            this.board.emit_turn(1-this.player);
             this.board.emit_banner(this.player, "Pass");
+            /*
             emit_msg("dice", { player: (1 - this.player),
                                dice: [0, 0, 0, 0],
                                roll: false }, true);
+            */
             return;
         }
 
-        console.log(`DiceArea.on_mouse_down>turn=${this.board.turn}`);
-        if ( this.player != this.board.turn ) {
-            if ( this.board.turn < 2 ) {
-                return;
-            }
-            this.board.emit_turn(this.player);
+        if ( this.player != this.board.turn && this.board.turn < 2 ) {
+            return;
         }
 
         this.board.emit_banner(0, "");
         this.board.emit_banner(1, "");
+
         this.roll();
-        let dice_value = this.get();
-        console.log(`DiceArea.on_mouse_down> player=${this.player},dice_value=${JSON.stringify(dice_value)}`);
-        
+        const dice_val0 = this.get();
+        console.log(`DiceArea.on_mouse_down>player=${this.player},dice_val0=${JSON.stringify(dice_val0)}`);
     } // DiceArea.on_mouse_down()
 } // DiceArea
 
@@ -2439,10 +2472,10 @@ const new_game = () => {
     emit_msg("new", {}, false);
 };
 
-const backward_hist = () => {
+const backward_hist = (n=1) => {
     nav.checked=false;
-    console.log("backward_hist()");
-    emit_msg("back", {}, false);
+    console.log(`backward_hist(n=${n})`);
+    emit_msg("back", {n: n}, false);
 };
 
 const back2 = () => {
@@ -2457,10 +2490,10 @@ const back_all = () => {
     emit_msg("back_all", {}, false);
 };
 
-const forward_hist = () => {
+const forward_hist = (n=1) => {
     nav.checked=false;
-    console.log("forward_hist()");
-    emit_msg("fwd", {}, false);
+    console.log(`forward_hist(n=${n})`);
+    emit_msg("fwd", {n: n}, false);
 };
 
 const fwd2 = () => {
@@ -2471,7 +2504,7 @@ const fwd2 = () => {
 
 const fwd_all = () => {
     nav.checked=false;
-    console.log("back_all()");
+    console.log("fwd_all()");
     emit_msg("fwd_all", {}, false);
 };
     

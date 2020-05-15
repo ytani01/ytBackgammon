@@ -303,8 +303,8 @@ class ytBackgammonServer:
         self._log.info('msg=%s', msg)
 
         if msg['type'] == 'back':
-            # data: {}
-            self.backward_hist()
+            # data: {n: n}
+            self.backward_hist(msg['data']['n'])
             return
 
         if msg['type'] == 'back2':
@@ -318,8 +318,8 @@ class ytBackgammonServer:
             return
 
         if msg['type'] == 'fwd':
-            # data: {}
-            self.forward_hist()
+            # data: {n: n}
+            self.forward_hist(msg['data']['n'])
             return
 
         if msg['type'] == 'fwd2':
