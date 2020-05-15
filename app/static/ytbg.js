@@ -26,7 +26,8 @@
  *        |    |    +- Cube
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
- *        |    |         +- OnBoardText
+ *        |    |         +- RollButton
+ *        |    |         +- PlayerName
  *        |    |         +- BannerText
  *        |    |         +- Dice
  *        |    |         +- Checker
@@ -34,11 +35,10 @@
  *        |         
  *        +- BoardArea .. on board
  *             +- BoardPoint
- *             +- DiceArea
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.59";
+const VERSION = "0.60";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -294,6 +294,14 @@ class ImageItem extends BackgammonArea {
     } // ImageItem.move()
 
     /**
+     * @param {number} z
+     */
+    set_z(z) {
+        this.z = z;
+        this.el.style.zIndex = this.z;
+    }
+
+    /**
      * @param {number} deg
      */
     rotate(deg, center=false, sec=0) {
@@ -495,9 +503,10 @@ class FwdAllButton extends EmitButton {
 } // class FwdAllButton
 
 /**
- *                    x0
- *                    |
- *                    |
+ *                      bx[1]                                    bx[5]
+ *                    x0|bx[2]             bx[3]                 |bx[6]
+ *                    | ||                 |   bx[4]             ||   bx[7]
+ *                    | vv                 |   |                 ||   |
  *            y ->+---|-------------------------------------------------
  *                |   v   13 14 15 16 17 18     19 20 21 22 23 24       |
  *        by[0] --->+-+-----------------------------------------------  |
@@ -529,6 +538,7 @@ class Cube extends BoardItem {
         this.move_sec = 0.3;
         
         this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
+        this.x1 = (this.board.bx[2] + this.board.bx[3]) / 2;
         this.y0 = this.board.h / 2;
         this.y2 = [this.board.by[1] - this.h / 2,
                    this.board.by[0] + this.h / 2];
@@ -542,13 +552,36 @@ class Cube extends BoardItem {
         this.move(this.x0, this.board.h / 2, true);
     }
 
+    emit(val, player=undefined, accepted) {
+        console.log("Cube.emit("
+                    + `val=${val},`
+                    + `player=${player},`
+                    + `accepted=${accepted}`
+                    + ")");
+
+        if ( player < 0 ) {
+            player = undefined;
+        }
+
+        let side = player;
+        if ( side === undefined ) {
+            side = -1;
+        }
+        emit_msg("cube", { side: side, value: val, accepted: accepted }, true);
+    }
+
     /**
-     * 
+     * @param {number} val
+     * @param {number} player
+     * @param {boolean} accepted
      */
-    set(val, player=undefined, accepted=false, emit=true) {
-        console.log("Cube.set(val=" + val
-                    + ", player=" + player
-                    + ", accepted=" + accepted + ")");
+    set(val, player=undefined, accepted=false) {
+        console.log("Cube.set("
+                    + `val=${val},`
+                    + `player=${player},`
+                    + `accepted=${accepted}`
+                    + ")");
+        
         this.value = val;
         this.player = player;
         this.accepted = accepted;
@@ -574,20 +607,8 @@ class Cube extends BoardItem {
             this.move(this.x0, this.y2[this.player], true, this.move_sec);
         } else {
             this.player = player;
-            this.move(this.x0, this.y1[this.player], true, this.move_sec);
-        }
-
-        if ( emit ) {
-            let side = this.player;
-            if ( side === undefined ) {
-                side = -1;
-            }
-
-            emit_msg("cube",
-                     { side: side,
-                       value: this.value,
-                       accepted: this.accepted },
-                     true);
+            this.set_z(100);
+            this.move(this.x1, this.y1[this.player], true, this.move_sec);
         }
     } // Cube.set()
 
@@ -595,7 +616,8 @@ class Cube extends BoardItem {
      * 
      */
     double(player=undefined) {
-        console.log("Cube.double(player=" + player + ")");
+        console.log(`Cube.double(player=${player})`);
+
         if ( player === undefined ) {
             if ( this.player !== undefined ) {
                 player = 1 - this.player;
@@ -605,51 +627,50 @@ class Cube extends BoardItem {
         }
         console.log("Cube.double> player=" + player);
 
-        this.value *= 2;
-        /*
-        if ( this.value > 64 ) {
-            this.value = 64;
+        let val = this.value * 2;
+        if ( val > 64 ) {
+            val = 64;
         }
-        */
 
-        this.accepted = false;
-        this.set(this.value, player, false);
+        const accepted = false;
+
+        this.emit(val, player, accepted);
     } // Cube.double()
 
     /**
      *
      */
-    double_accept() {
-        console.log("Cube.double_accept()");
+    accept_double() {
+        console.log("Cube.accept_double()");
 
-        this.set(this.value, this.player, true);
-    } // Cube.double_accept()
+        this.emit(this.value, this.player, true);
+    } // Cube.accept_double()
 
     /**
      *
      */
-    double_cancel() {
-        console.log("Cube.double_cancel()");
+    cancel_double() {
+        console.log("Cube.cancel_double()");
         
-        let value = this.value / 2;
+        let val = this.value / 2;
         let player = 1 - this.player;
-        if ( value == 1 ) {
+        if ( val == 1 ) {
             player = undefined;
         }
-        this.set(value, player, true);
-    } // Cube.double_cancel()
+        this.emit(val, player, true);
+    } // Cube.cancel_double()
 
     /**
      * @param {MouseEvent} e
      */
     on_mouse_down(e) {
         const [x, y] = this.get_xy(e);
-        console.log("Cube.on_mouse_down> this.player=" + this.player
-                   + ", this.board.player=" + this.board.player);
+        console.log(`Cube.on_mouse_down>this.player=${this.player},`
+                    + `this.board.player=${this.board.player}`);
 
         if ( this.player !== undefined && this.player != this.board.player ) {
             if ( ! this.accepted ) {
-                this.double_cancel();
+                this.cancel_double();
             }
             return false;
         }
@@ -657,7 +678,7 @@ class Cube extends BoardItem {
         if ( this.player === undefined || this.accepted == true ) {
             this.double(this.board.player);
         } else {
-            this.double_accept();
+            this.accept_double();
         }
         return false;
     } // Cube.on_mouse_down
@@ -676,7 +697,290 @@ class PlayerItem extends BoardItem {
 /**
  *
  */
-class OnBoardText extends PlayerItem {
+class RollButton extends PlayerItem {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+
+        this.el.style.opacity = 0.8;
+        this.move(this.x, this.y, true);
+
+        this.active = false;
+
+        const dice_prefix = "dice" + this.player;
+
+        this.dice = [];
+        for (let i=0; i < 4; i++) {
+            let x1 = this.w / 8 * ( i * 2 + 1 );
+            x1 += this.x - this.w / 2;
+            let y1 = this.h / 4 * ((i * 2 + 1) % 4);
+            y1 += this.y - this.h / 2;
+            this.dice.push(new Dice(dice_prefix + i,
+                                    this.board, this.player,
+                                    x1, y1,
+                                    dice_prefix));
+        } // for(i)
+
+        this.off();
+    } // RollButton.constructor()
+
+    on() {
+        const dice = this.get();
+        console.log(`RollButton.on>dice=${JSON.stringify(dice)}`);
+
+        if ( this.board.turn != this.player && this.board.turn < 2 ) {
+            super.off();
+            return;
+        }
+        
+        for (let i=0; i < 4; i++) {
+            if ( this.dice[i].value != 0 ) {
+                super.off();
+                return;
+            }
+        } // for(i)
+
+        if ( this.board.banner[this.player].get() != "" ) {
+            return;
+        }
+        
+        super.on();
+    } // RollButton.on()
+
+    /**
+     *
+     */
+    another() {
+        return this.board.roll_button[1 - this.player];
+    }
+
+    /**
+     * Set dice values
+     * @param {number[][]} dice_value
+     * @param {boolean} [emit=true] - emit flag
+     * @param {boolean} [roll_flag=false] 
+     */
+    set(dice_value, emit=true, roll_flag=false) {
+        console.log(`RollButton[${this.player}].set(dive_value=${JSON.stringify(dice_value)},emit=${emit},roll_flag=${roll_flag})`);
+        
+        this.clear();
+        
+        for (let i=0; i < 4; i++) {
+            if ( dice_value[i] < 1 ) {
+                continue;
+            }
+            this.dice[i].set(dice_value[i], roll_flag);
+            this.active = true;
+        } // for(i)
+
+        if ( emit ) {
+            this.emit_dice(dice_value, roll_flag, true);
+        }
+
+
+    } // RollButton.set()
+
+    /**
+     * Get dice values list
+     * @return {number[]} - dice values
+     */
+    get() {
+        let values = [];
+        for (let i=0; i < this.dice.length; i++) {
+            values.push(this.dice[i].value);
+        }
+        console.log(`RollButton.get> values=${JSON.stringify(values)}`);
+        return values;
+    } // RollButton.get()
+
+    /**
+     * 使えるダイスを取得
+     * @return {number[]}
+     */
+    get_active_dice() {
+        let active_dice = [];
+        
+        for (let d of this.dice) {
+            let val = d.value;
+            if ( val >= 1 && val <=6 ) {
+                active_dice.push(val);
+            }
+        }
+        console.log(`RollButton.get_active_dice> active_dice=${JSON.stringify(active_dice)}`);
+        return active_dice;
+    } // RollButton.get_active_dice()
+    
+    /**
+     * 使えないダイスを確認してdisable()する
+     * @return {boolean} - modified
+     */
+    check_disable() {
+        console.log(`RollButton.check_disable()`);
+        let modified = false;
+        
+        let bar_p = 26;
+        if ( this.player == 1 ) {
+            bar_p = 27;
+        }
+        if ( this.board.point[bar_p].checkers.length > 0 ) {
+            // ヒットされている場合は、復活できるか確認
+            for (let d=0; d < 4; d++) {
+                this.dice[d].disable();
+            }
+            modified = true;
+            for (let d=0; d < 4; d++) {
+                const dice_value = this.dice[d].value % 10;
+                if ( dice_value < 1 ) {
+                    continue;
+                }
+                let dst_p = dice_value;
+                if ( this.player == 0 ) {
+                    dst_p = 25 - dice_value;
+                }
+                let checkers = this.board.point[dst_p].checkers;
+                if (checkers.length <= 1 || checkers[0].player == this.player) {
+                    modified = false;
+                }
+            } // for(d)
+            if ( ! modified ) {
+                for (let d=0; d < 4; d++) {
+                    this.dice[d].enable();
+                } // for(d)
+            }
+            return modified;
+        }
+
+        // 全てのチェッカーで、移動できるかのチェック
+        // XXX T.B.D. XXX
+
+        return modified;
+    } // RollButton.check_disable()
+
+    /**
+     * Roll dices
+     * @return {number[]} - dice values
+     */
+    roll() {
+        this.clear();
+        console.log(`RollButton.roll()> ${this.get()}`);
+
+        let d1 = Math.floor(Math.random()  * 4);
+        let d2 = d1;
+        while ( d1 == d2 ) {
+            d2 = Math.floor(Math.random()  * 4);
+        }
+        console.log(`RollButton.roll> [d1, d2]=[${d1}, ${d2}]`);
+
+        this.active = true;
+
+        const value1 = Math.floor(Math.random() * 6) + 1;
+        const value2 = Math.floor(Math.random() * 6) + 1;
+
+        // Dice histogram
+        this.board.dice_histogram[this.player][value1 - 1]++;
+        this.board.dice_histogram[this.player][value2 - 1]++;
+        console.log(`RollButton.roll>dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
+        let histogram_str = "| ";
+        for (let p=0; p < 2; p++) {
+            let sum = 0;
+            for (let i=0; i < 6; i++) {
+                sum += this.board.dice_histogram[p][i];
+            } // for (i)
+            for (let i=0; i < 6; i++) {
+                let a = 0;
+                if ( sum > 0 ) {
+                    a = Math.floor(this.board.dice_histogram[p][i] / sum * 100);
+                }
+                histogram_str += a + " ";
+            } // for (i)
+            histogram_str += "| ";
+        } // for(p)
+        console.log(`histogram_str=${histogram_str}`);
+        document.getElementById("dice-histogram").innerHTML = histogram_str;
+
+        if ( this.board.turn >= 2 ) {
+            this.dice[d1].set(value1);
+        } else if ( value1 != value2 ) {
+            this.dice[d1].set(value1);
+            this.dice[d2].set(value2);
+        } else {
+            for ( let d = 0; d < 4; d++ ) {
+                this.dice[d].set(value1);
+            }
+        }
+        
+        const modified = this.check_disable();
+        console.log(`RollButton.roll()> ${this.get()}`);
+        
+        const dice_values = this.get();
+        
+        this.emit_dice(dice_values, true, true);
+        
+        return dice_values;
+    } // RollButton.roll()
+
+    /**
+     * @param {number[]} dice
+     * @param {boolean} roll
+     * @param {boolean} add_hist
+     */
+    emit_dice(dice, roll=false, add_hist=false) {
+        emit_msg("dice", { player: this.player,
+                           dice: dice,
+                           roll: roll }, add_hist);
+    } // RollButton.emit_dice
+
+    /**
+     * @param {boolean} emit
+     * @param {boolean} add_hist
+     */
+    clear(emit=false, add_hist=false) {
+        console.log(`RollButton.clear(emit=${emit})`);
+
+        this.active = false;
+        for ( let d=0; d < 4; d++ ) {
+            this.dice[d].clear();
+        }
+
+        if ( emit ) {
+            emit_msg("dice", { player: this.player,
+                               dice: [0, 0, 0, 0],
+                               roll: false }, add_hist);
+        }
+        return [];
+    } // RollButton.clear()
+
+    /**
+     *
+     */
+    on_mouse_down(e) {
+        const [x, y] = this.get_xy(e);
+
+        this.off();
+
+        /*
+        if ( this.board.closeout(1 - this.player) ) {
+            console.log(`RollButton.on_mouse_down> closed out`);
+            this.board.emit_turn(1-this.player);
+            this.baord.banner[this.player].set("Pass");
+            return;
+        }
+        */
+
+        this.board.banner[0].set("");
+        this.board.banner[1].set("");
+
+        this.roll();
+        const dice_val0 = this.get();
+        console.log("RollButton.on_mouse_down>"
+                    + `player=${this.player},`
+                    + `dice_val0=${JSON.stringify(dice_val0)}`);
+    }
+} // class RollButton
+
+/**
+ *
+ */
+class PlayerName extends PlayerItem {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
 
@@ -686,16 +990,21 @@ class OnBoardText extends PlayerItem {
         this.default_text = `Player ${player + 1}`;
     }
 
-    get_text() {
+    get() {
         return this.el.innerHTML;
-    } // OnBoardText.get_text()
+    } // PlayerName.get()
     
-    set_text(txt) {
+    emit(name, add_hist=true) {
+        emit_msg("set_playername", { player: parseInt(this.player),
+                                     name: name }, add_hist);
+    } // PlayerName.emit()
+
+    set(name) {
         this.el.innerHTML = this.default_text;
-        if ( txt.length > 0 ) {
-            this.el.innerHTML = txt;
+        if ( name.length > 0 ) {
+            this.el.innerHTML = name;
         }
-    } // OnBoardText.set_text()
+    } // PlayerName.set()
 
     on() {
         this.el.style.borderColor = "rgba(0, 128, 255, 0.8)";
@@ -708,18 +1017,20 @@ class OnBoardText extends PlayerItem {
     }
 
     off() {
-        this.el.style.borderColor = "rgba(128, 128, 128, 0.5)";
-        this.el.style.color = "rgba(128, 128, 128, 0.5)";
+        this.el.style.borderColor = "rgba(64, 64, 64, 0.4)";
+        this.el.style.color = "rgba(64, 64, 64, 0.4)";
     }
-} // class OnBoardText
+} // class PlayerName
 
 /**
  *
  */
-class BannerText extends OnBoardText {
+class BannerText extends PlayerName {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
         console.log(`BannerText(id=${id},player=${player},x=${x},y=${y})`);
+
+        this.TEXT_PASS = "Pass";
 
         this.el.style.fontFamily = "sans-serif";
         this.el.style.fontStyle = "italic";
@@ -731,24 +1042,50 @@ class BannerText extends OnBoardText {
         this.el.style.backgroundColor = "lightsteelblue";
 
         this.default_text = "";
-        this.set_text("");
-    }
+        this.set("");
+    } // BannerText.constructor()
 
     /**
      * @param {string} txt
      */
-    set_text(txt) {
-        super.set_text(txt);
+    emit(txt, add_hist=false) {
+        emit_msg("set_banner", { player: this.player, text: txt }, add_hist);
+    } // BannerText.emit()
+
+    /**
+     * @param {string} txt
+     */
+    set(txt) {
+        super.set(txt);
         if ( txt.length == 0 ) {
             this.off();
+        } else {
+            this.on();
+            this.board.roll_button[this.player].off();
         }
-    } // BannerText.set_text()
+    } // BannerText.set()
+
+    /**
+     *
+     */
+    pass(add_hist=false) {
+        this.emit(this.TEXT_PASS, add_hist);
+    }
 
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
         console.log(`BannerText.on_mouse_down>(x,y)=(${x},${y})`);
-        
-        this.board.emit_banner(this.player, "", true);
+
+        const txt = this.get();
+
+        if ( txt == this.TEXT_PASS ) {
+            this.emit("", false);
+            this.board.emit_turn(1-this.player ,true);
+            return false;
+        }
+
+        this.board.banner[this.player].set("", true);
+
         return false;
     } // BannerText.on_mouse_down()
 } // class BannerText
@@ -851,26 +1188,49 @@ class Dice extends PlayerItem {
         let [x, y] = this.get_xy(e);
         console.log(`Dice.on_mouse_down> x=${x},y=${y}`);
 
-        const da = this.board.dice_area[this.player];
-        const da1 = this.board.dice_area[1-this.player];
+        const rb = this.board.roll_button[this.player];
+        const rb1 = this.board.roll_button[1-this.player];
 
         if ( this.board.turn >= 2 ) {
-            if ( this.board.dice_area[1-this.player].active ) {
-                da1.clear(true);
+            console.log(`Dice.on_mouse_down>turn=${this.board.turn}`);
+            // Opening roll
+            if ( ! rb1.active ) {
+                return false;
             }
-            da.clear(true);
+
+            // 双方が振った後、数値が大きい方が先手
+            const d0 = rb.get_active_dice()[0];
+            const d1 = rb1.get_active_dice()[0];
+
+            if ( d0 > d1 ) {
+                rb1.clear(true, false);
+                rb.emit_dice([d0, 0, 0, d1], false);
+                this.board.emit_turn(this.player, true);
+                return false;
+            }
+            if ( d0 < d1 ) {
+                rb.clear(true, false);
+                rb1.emit_dice([d0, 0, 0, d1], false);
+                this.board.emit_turn(1-this.player, true);
+                return false;
+            }
+
+            // 同じ目だった場合は、もう一度
+            rb.clear(true, false);
+            rb1.clear(true, false);
+            this.board.emit_turn(2, true);
             return false;
         }
 
-        this.board.set_turn(1 - this.player);
+        // this.board.set_turn(1 - this.player);
         this.board.emit_turn(1 - this.player, false);
 
         if ( this.board.closeout(this.player) ) {
             console.log(`Dice.on_mouse_down>close out!`);
-            this.board.txt[1 - this.player].red();
-            this.board.emit_banner(1 - this.player, "Close out");
+            this.board.playername[1 - this.player].red();
+            this.board.banner[1-this.player].pass();
         }
-        da.clear(true);
+        rb.clear(true, true);
         console.log(`Dice.on_mouse_down:return false;`);
         return false;
     } // Dice.on_mouse_down()
@@ -894,14 +1254,6 @@ class Checker extends PlayerItem {
         this.el.style.cursor = "pointer";
 
         this.cur_point = undefined;
-    }
-
-    /**
-     * @param {number} z
-     */
-    set_z(z) {
-        this.z = z;
-        this.el.style.zIndex = this.z;
     }
 
     /**
@@ -1110,7 +1462,7 @@ class Checker extends PlayerItem {
 
         ch.move(x, y, true);
 
-        let da = this.board.dice_area[ch.player];
+        let rb = this.board.roll_button[ch.player];
         let dice_value = [];
 
         let dst_p = ch.board.chpos2point(ch);
@@ -1201,7 +1553,7 @@ class Checker extends PlayerItem {
 
             // 移動OK. 以降、移動後の処理
 
-            da = this.board.dice_area[ch.player];
+            rb = this.board.roll_button[ch.player];
 
             if ( hit_ch !== undefined ) {
                 // hit
@@ -1224,7 +1576,7 @@ class Checker extends PlayerItem {
         if ( ! board.free_move ) {
             // 使ったダイスを使用済みする
             //for (let i=0; i < 4; i++) {
-            for (let d of da.dice) {
+            for (let d of rb.dice) {
                 if ( d.value == dice_value ) {
                     d.disable();
                     break;
@@ -1237,7 +1589,7 @@ class Checker extends PlayerItem {
                 console.log(`Checker.on_mouse_up> T.B.D.`);
                 let ch2 = this.board.point[bar_p].checkers[0];
                 if ( this.board.get_dst_points(ch2.player, bar_p).length == 0 ) {
-                    for (let d of da.dice) {
+                    for (let d of rb.dice) {
                         d.disable();
                     }
                 }
@@ -1245,9 +1597,9 @@ class Checker extends PlayerItem {
         } // if ( ! board.free_move )
         
         // emit dice values to server
-        // const dice_values = this.board.dice_area[this.player].get();
+        // const dice_values = this.board.roll_button[this.player].get();
         emit_msg("dice", { player: this.player,
-                           dice: da.get(),
+                           dice: rb.get(),
                            roll: false}, true);
 
         ch.board.moving_checker = undefined;
@@ -1280,14 +1632,14 @@ class Checker extends PlayerItem {
  *         | v     13 14 15 16 17 18v   v19 20 21 22 23 24vv   v |
  * by[0] --->+----------------------+---+-----------------++---+ |
  *         | |   ||p0          p1   |   |p1             p0||   | |
- *         | |   ||p0          p1   |   |p1 tx     dx   p0||   | |
- *         | |   ||p0          p1   |27 |p1 |      |      ||25 | |
- *         | |   ||p0               |   |p1 |      v      ||   | |
- *         | |   ||p0               |   |p1 v      +------+<---------dy
- *         | |   ||         ty ------------>+------| Dice ||   | |
- *         | |   ||                 |---|   |      | Area ||---| |
- *         | |   ||                 |   |    ------|      ||   | |
- *         | |   ||p1               |   |p0         ------||   | |
+ *         | |   ||p0          p1   |   |p1 tx          p0||   | |
+ *         | |   ||p0          p1   |27 |p1 |             ||25 | |
+ *         | |   ||p0               |   |p1 |             ||   | |
+ *         | |   ||p0               |   |p1 v             ||   | |
+ *         | |   ||         ty ------------>+------       ||   | |
+ *         | |   ||                 |---|   |      |      ||---| |
+ *         | |   ||                 |   |    ------       ||   | |
+ *         | |   ||p1               |   |p0               ||   | |
  *         | |   ||p1               |   |p0               ||   | |
  *         | |   ||p1          p0   |26 |p0               || 0 | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
@@ -1338,8 +1690,7 @@ class Board extends ImageItem {
         this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
         this.by = [20, 509];
         [this.tx, this.ty] = [this.bx[4]+5, 246];
-        [this.tx2, this.ty2] = [this.bx[4]+20, this.by[0]+205];
-        [this.dx, this.dy] = [620, 245];
+        [this.tx2, this.ty2] = [this.bx[4]+150, this.by[0]+205];
 
         this.gameinfo = undefined;
 
@@ -1355,22 +1706,6 @@ class Board extends ImageItem {
 
         // Buttons
         const bx0 = this.x + this.w + 30;
-        /*
-        this.button_back_all = new BackAllButton(
-            "button-back_all", this, bx0, 20);
-
-        this.button_back2 = new Back2Button(
-            "button-back2", this, bx0,
-            this.button_back_all.y + this.button_back_all.h);
-
-        this.button_fwd_all = new FwdAllButton(
-            "button-fwd_all", this, bx0,
-            this.button_back2.y + this.button_back2.h);
-
-        this.button_fwd2 = new Fwd2Button(
-            "button-fwd2", this, bx0,
-            this.button_fwd_all.y + this.button_fwd_all.h);
-        */
         this.button_back = new BackButton("button-back", this, bx0, this.h);
         this.button_back.move(bx0, this.y + this.h - this.button_back.h - 50);
 
@@ -1389,17 +1724,17 @@ class Board extends ImageItem {
             this.button_back.x + this.button_back.w + 100) + "px";
         body_el.style.height = (this.y + this.h + 10) + "px";
 
-        // OnBoardText
-        this.txt = [];
-        this.txt.push(new OnBoardText(
+        // PlayerName
+        this.playername = [];
+        this.playername.push(new PlayerName(
             "p0text", this, 0, this.tx, this.ty));
-        this.txt.push(new OnBoardText(
+        this.playername.push(new PlayerName(
             "p1text", this, 1, this.w - this.tx, this.h - this.ty));
-        this.txt[1].rotate(180);
+        this.playername[1].rotate(180);
 
         for (let p=0; p < 2; p++) {
-            this.txt[p].set_text("");
-            this.txt[p].on();
+            this.playername[p].set("");
+            this.playername[p].on();
         }
 
         // BannerText
@@ -1411,7 +1746,7 @@ class Board extends ImageItem {
         this.banner[1].rotate(180);
         /*
         for (let p=0; p < 2; p++) {
-            this.banner[p].set_text("");
+            this.banner[p].set("");
         }
         */
 
@@ -1489,17 +1824,21 @@ class Board extends ImageItem {
             }
         } // for
 
-        // DiceArea
-        let da_w = this.bx[5] - this.dx;
-        let da_h = this.h - this.dy * 2;
+        // RollButton
+        const x1 = 190;
+
+        this.roll_button = [];
+        this.roll_button.push(new RollButton(
+            "rollbutton0", this, 0,
+            this.bx[4] + x1,
+            this.h / 2));
+        this.roll_button.push(new RollButton(
+            "rollbutton1", this, 1,
+            this.bx[3] - x1,
+            this.h / 2));
+
         this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
         console.log(`Board.constructor>dice_histogram=${JSON.stringify(this.dice_histogram)}`);
-
-        this.dice_area = [];
-        this.dice_area.push(new DiceArea(this, this.dx, this.dy,
-                                         da_w, da_h, 0));
-        this.dice_area.push(new DiceArea(this, this.bx[2], this.dy,
-                                         da_w, da_h, 1));
 
         //this.rotate(360, true, 0.5);
         if ( this.player == 1 ) {
@@ -1599,6 +1938,7 @@ class Board extends ImageItem {
      */
     emit_turn(turn, add_hist=false) {
         console.log(`Boad.emit_turn(turn=${turn},add_hist=${add_hist})`);
+        // this.turn = turn;
         emit_msg("set_turn", { turn: turn }, add_hist);
     } // Board.emit_turn()
 
@@ -1610,24 +1950,36 @@ class Board extends ImageItem {
      *   >=  2 : all on
      */
     set_turn(turn) {
-        console.log(`Board.set_turn(turn=${turn})`);
+        const prev_turn = this.turn;
+        console.log(`Board.set_turn(turn=${turn})>prev_turn=${prev_turn}`);
+
         this.turn = turn;
         
-        this.txt[0].off();
-        this.txt[1].off();
+        this.roll_button[0].off();
+        this.roll_button[1].off();
+
+        this.playername[0].off();
+        this.playername[1].off();
 
         if ( turn < 0 ) {
             return;
         }
 
         if ( turn >= 2 ) {
-            this.txt[0].on();
-            this.txt[1].on();
+            this.roll_button[0].on();
+            this.roll_button[1].on();
+
+            this.playername[0].on();
+            this.playername[1].on();
             return;
         }
             
         // turn == 0 or 1
-        this.txt[turn].on();
+        if ( this.turn != prev_turn ) {
+            let playpromise = board.sound_turn_change.play();
+        }
+        this.roll_button[turn].on();
+        this.playername[turn].on();
     } // Board.set_turn()
 
     /**
@@ -1664,28 +2016,28 @@ class Board extends ImageItem {
     finish_game(player, emit=false) {
         console.log(`Board.finish_game(player=${player},emit=${emit})`);
         // ダイスを全て使用済みにする
-        const da = this.dice_area[player];
+        const rb = this.roll_button[player];
         for (let i=0; i < 4; i++) {
-            if ( da.dice[i].value > 0 ) {
-                da.dice[i].disable();
+            if ( rb.dice[i].value > 0 ) {
+                rb.dice[i].disable();
             }
         } // for(i)
         
         this.emit_turn(-1);
         if ( emit ) {
             emit_msg("dice", { player: player,
-                               dice:   da.get(),
+                               dice:   rb.get(),
                                roll:   false }, false);
         }
 
-        this.emit_banner(player, "Win !");
+        this.banner[player].emit("Win !");
     }
     
     /**
      * @param {number} player
      */
     pass(player) {
-        this.emit_banner(player, "Pass");
+        this.banner[player].set("Pass");
     } // Board.pass()
     
     /**
@@ -1736,7 +2088,7 @@ class Board extends ImageItem {
      * @return {number[]}
      */
     get_active_dice(player) {
-        return this.dice_area[player].get_active_dice();
+        return this.roll_button[player].get_active_dice();
     } // Board.get_active_dice
 
     /**
@@ -1822,8 +2174,8 @@ class Board extends ImageItem {
                     accepted: this.cube.accepted
                 },
                 dice: [
-                    this.dice_area[0].get(),
-                    this.dice_area[1].get()
+                    this.roll_button[0].get(),
+                    this.roll_button[1].get()
                 ],
                 point: point
             }
@@ -1908,15 +2260,11 @@ class Board extends ImageItem {
             } // for (p)
         } // for(i)
 
-        // turn
-        console.log(`Board.load_gameinfo> set turn`);
-        this.set_turn(gameinfo.turn);
-
         // dice
         let d = gameinfo.board.dice;
         console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
-        this.dice_area[0].set(d[0], false);
-        this.dice_area[1].set(d[1], false);
+        this.roll_button[0].set(d[0], false);
+        this.roll_button[1].set(d[1], false);
 
         // cube
         let c = gameinfo.board.cube;
@@ -1924,14 +2272,20 @@ class Board extends ImageItem {
         this.cube.set(c.value, c.side, c.accepted, false);
 
         // banner
-        console.log(`Board.load_gameinfo> banner=${JSON.stringify(gameinfo.board.banner)}`);
-        this.set_banner(0, gameinfo.board.banner[0]);
-        this.set_banner(1, gameinfo.board.banner[1]);
+        console.log(`Board.load_gameinfo>banner=${JSON.stringify(gameinfo.board.banner)}`);
+        this.banner[0].set(gameinfo.board.banner[0]);
+        this.banner[1].set(gameinfo.board.banner[1]);
 
         // player name
-        this.set_playername(0, gameinfo.text[0]);
-        this.set_playername(1, gameinfo.text[1]);
-    } // Board.load_gameinfo()
+        console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.text)}`);
+        this.playername[0].set(gameinfo.text[0]);
+        this.playername[1].set(gameinfo.text[1]);
+
+        // turn
+        console.log(`Board.load_gameinfo> set turn`);
+        this.set_turn(gameinfo.turn);
+
+} // Board.load_gameinfo()
 
     /**
      *
@@ -1950,24 +2304,18 @@ class Board extends ImageItem {
 
     /**
      * @param {MouseEvent} e
-     */
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
         console.log(`Board.on_mouse_down> (x,y)=(${x},${y})`);
 
-        /*
-        for (let p=0; p < 2; p++) {
-            this.emit_banner(p, "");
-        }
-        */
-
         // dice area
         for (let p=0; p < 2; p++) {
-            if ( this.dice_area[p].in_this(x, y) ) {
-                this.dice_area[p].on_mouse_down(x, y);
+            if ( this.roll_button[p].in_this(x, y) ) {
+                this.roll_button[p].on_mouse_down(x, y);
             }
         } // for(p)
     } // Board.on_mouse_down()
+     */
 
     /**
      * @param {MouseEvent} e
@@ -2024,8 +2372,8 @@ class Board extends ImageItem {
 
         /*
         if ( p <= 25 ) { // ヒットされた移動の場合、ダイスチェックは不要
-            if ( this.dice_area[ch.player].check_disable() ) {
-                const dice_values = this.dice_area[ch.player].get();
+            if ( this.roll_button[ch.player].check_disable() ) {
+                const dice_values = this.roll_button[ch.player].get();
                 if ( emit ) {
                     emit_msg("dice", { turn:   this.turn,
                                        player: ch.player,
@@ -2046,67 +2394,6 @@ class Board extends ImageItem {
                                       idx: idx }, add_hist);
         }
     } // Board.put_checker()
-
-    /**
-     * @param {number} player
-     * @param {string} txt
-     * @param {boolean} add_history
-     */
-    emit_banner(player, txt, add_hist=false) {
-        console.log(`Board.emit_banner(player=${player},txt=${txt},add_hist=${add_hist})`);
-        emit_msg("set_banner", { player: player,
-                                 text: txt }, add_hist);
-    } // Board.emit_banner()
-    
-    /**
-     * @param {number} player
-     * @param {string} txt
-     */
-    set_banner(player, txt) {
-        console.log(`Board.set_banner(player=${player},txt=${txt})`);
-        this.banner[player].set_text(txt);
-        this.gameinfo['board']['banner'][player] = txt;
-
-        if ( txt.length > 0 ) {
-            this.banner[player].on();
-        } else {
-            this.banner[player].off();
-        }
-    } // Board.set_banner()
-
-    /**
-     * 
-     */
-    emit_playername(add_hist=true) {
-        const el = document.getElementById("player-name");
-        const name = el.value;
-        const cur_name = this.txt[this.player].get_text();
-        const def_name = this.txt[this.player].default_text;
-        console.log(`Board.emit_playername(): this.player=${this.player},cur_name=${cur_name},name=${name}`);
-
-        el.value = "";
-
-        if ( name == cur_name ) {
-            return;
-        }
-        if ( name == "" && cur_name == def_name ) {
-            return;
-        }
-        emit_msg("set_playername", { player: parseInt(this.player),
-                                     name: name }, add_hist);
-    } // Board.emit_playername()
-
-    /**
-     * 
-     */
-    set_playername(player, name) {
-        console.log(`Board.set_playername(player=${player},name=${name})`);
-        if ( name == "" ) {
-            name = `Player ${player+1}`;
-            console.log(`Board.set_playername>name=${name}`);
-        }
-        this.txt[player].set_text(name);
-    }
 
 } // class Board
 
@@ -2165,296 +2452,6 @@ class BoardPoint extends BoardArea {
 } // class BoardPoint
 
 /**
- *
- */
-class DiceArea extends BoardArea {
-    constructor(board, x, y, w, h, player) {
-        super(board, x, y, w, h);
-        this.player = player;
-
-        this.active = false;
-
-        let prefix = "dice" + this.player;
-
-        this.dice = [];
-        for (let i=0; i < 4; i++) {
-            const x1 = this.w / 20 * (i * 4 + 1);
-            let x2 = this.x + x1;
-            if ( this.player == 1 ) {
-                x2 = this.x + this.w - x1;
-            }
-            this.dice.push(new Dice(prefix + i,
-                                    this.board, this.player,
-                                    x2,
-                                    this.y + this.h / 4 * ((i * 2 + 1) % 4),
-                                    prefix));
-        } // for(i)
-    }
-
-    /**
-     *
-     */
-    another_dicearea() {
-        return this.board.dice_area[1 - this.player];
-    }
-
-    /**
-     * Set dice values
-     * @param {number[][]} dice_value
-     * @param {boolean} [emit=true] - emit flag
-     * @param {boolean} [roll_flag=false] 
-     */
-    set(dice_value, emit=true, roll_flag=false) {
-        console.log(`DiceArea[${this.player}].set(dive_value=${JSON.stringify(dice_value)},emit=${emit},roll_flag=${roll_flag})`);
-        
-        this.clear();
-        
-        for (let i=0; i < 4; i++) {
-            if ( dice_value[i] < 1 ) {
-                continue;
-            }
-            this.dice[i].set(dice_value[i], roll_flag);
-            this.active = true;
-        } // for(i)
-
-        if ( emit ) {
-            this.emit_dice(this.player, dice_value, roll_flag, true);
-        }
-
-
-    } // DiceArea.set()
-
-    /**
-     * Get dice values list
-     * @return {number[]} - dice values
-     */
-    get() {
-        let values = [];
-        for (let i=0; i < this.dice.length; i++) {
-            values.push(this.dice[i].value);
-        }
-        console.log(`DiceArea.get> values=${JSON.stringify(values)}`);
-        return values;
-    } // DiceArea.get()
-
-    /**
-     * 使えるダイスを取得
-     * @return {number[]}
-     */
-    get_active_dice() {
-        let active_dice = [];
-        
-        for (let d of this.dice) {
-            let val = d.value;
-            if ( val >= 1 && val <=6 ) {
-                active_dice.push(val);
-            }
-        }
-        console.log(`DiceArea.get_active_dice> active_dice=${JSON.stringify(active_dice)}`);
-        return active_dice;
-    } // DiceArea.get_active_dice()
-    
-    /**
-     * 使えないダイスを確認してdisable()する
-     * @return {boolean} - modified
-     */
-    check_disable() {
-        console.log(`DiceArea.check_disable()`);
-        let modified = false;
-        
-        let bar_p = 26;
-        if ( this.player == 1 ) {
-            bar_p = 27;
-        }
-        if ( this.board.point[bar_p].checkers.length > 0 ) {
-            // ヒットされている場合は、復活できるか確認
-            for (let d=0; d < 4; d++) {
-                this.dice[d].disable();
-            }
-            modified = true;
-            for (let d=0; d < 4; d++) {
-                const dice_value = this.dice[d].value % 10;
-                if ( dice_value < 1 ) {
-                    continue;
-                }
-                let dst_p = dice_value;
-                if ( this.player == 0 ) {
-                    dst_p = 25 - dice_value;
-                }
-                let checkers = this.board.point[dst_p].checkers;
-                if (checkers.length <= 1 || checkers[0].player == this.player) {
-                    modified = false;
-                }
-            } // for(d)
-            if ( ! modified ) {
-                for (let d=0; d < 4; d++) {
-                    this.dice[d].enable();
-                } // for(d)
-            }
-            return modified;
-        }
-
-        // 全てのチェッカーで、移動できるかのチェック
-        // XXX T.B.D. XXX
-
-        return modified;
-    } // DiceArea.check_disable()
-
-    /**
-     * Roll dices
-     * @return {number[]} - dice values
-     */
-    roll() {
-        this.clear();
-        console.log(`DiceArea.roll()> ${this.get()}`);
-
-        let d1 = Math.floor(Math.random()  * 4);
-        let d2 = d1;
-        while ( d1 == d2 ) {
-            d2 = Math.floor(Math.random()  * 4);
-        }
-        console.log(`DiceArea.roll> [d1, d2]=[${d1}, ${d2}]`);
-
-        this.active = true;
-
-        const value1 = Math.floor(Math.random() * 6) + 1;
-        const value2 = Math.floor(Math.random() * 6) + 1;
-
-        // Dice histogram
-        this.board.dice_histogram[this.player][value1 - 1]++;
-        this.board.dice_histogram[this.player][value2 - 1]++;
-        console.log(`DiceArea.roll>dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
-        let histogram_str = "| ";
-        for (let p=0; p < 2; p++) {
-            let sum = 0;
-            for (let i=0; i < 6; i++) {
-                sum += this.board.dice_histogram[p][i];
-            } // for (i)
-            for (let i=0; i < 6; i++) {
-                let a = 0;
-                if ( sum > 0 ) {
-                    a = Math.floor(this.board.dice_histogram[p][i] / sum * 100);
-                }
-                histogram_str += a + " ";
-            } // for (i)
-            histogram_str += "| ";
-        } // for(p)
-        console.log(`histogram_str=${histogram_str}`);
-        document.getElementById("dice-histogram").innerHTML = histogram_str;
-
-        const another_da = this.another_dicearea();
-
-        // ぞろ目判定
-        if ( this.board.turn >= 2 ) {
-            this.dice[d1].set(value1);
-
-            if ( another_da.active ) {
-                const d0 = this.get_active_dice()[0];
-                const d1 = another_da.get_active_dice()[0];
-                console.log(`DiceArea.roll>da0=${d0},another_da=${d1}`);
-                if ( d0 > d1 ) {
-                    this.board.emit_turn(this.player);
-                    this.emit_dice(1-this.player, [0,0,0,0], false, false);
-                    this.emit_dice(this.player, [d0,0,0,d1], true, true);
-                    return [d0, 0, 0, d1];
-                } else if ( d0 < d1 ) {
-                    this.board.emit_turn(1 - this.player);
-                    this.emit_dice(this.player, [0,0,0,0], false, false);
-                    this.emit_dice(1-this.player, [d0,0,0,d1], true, true);
-                    return [0, 0, 0, 0];
-                }
-            }
-        } else if ( value1 != value2 ) {
-            this.dice[d1].set(value1);
-            this.dice[d2].set(value2);
-        } else {
-            for ( let d = 0; d < 4; d++ ) {
-                this.dice[d].set(value1);
-            }
-        }
-        
-        const modified = this.check_disable();
-        console.log(`DiceArea.roll()> ${this.get()}`);
-        
-        const dice_values = this.get();
-        
-        this.emit_dice(this.player, dice_values, true, true);
-        
-        return dice_values;
-    } // DiceArea.roll()
-
-    /**
-     * @param {number} player
-     * @param {number[]} dice
-     * @param {boolean} roll
-     * @param {boolean} add_hist
-     */
-    emit_dice(player, dice, roll=false, add_hist=false) {
-        emit_msg("dice", { player: player,
-                           dice: dice,
-                           roll: roll }, add_hist);
-    }
-
-    /**
-     * @param {boolean} emit
-     */
-    clear(emit=false) {
-        console.log(`DiceArea.clear(emit=${emit})`);
-
-        this.active = false;
-        for ( let d=0; d < 4; d++ ) {
-            this.dice[d].clear();
-        }
-
-        if ( emit ) {
-            emit_msg("dice", { player: this.player,
-                               dice: [0, 0, 0, 0],
-                               roll: false }, true);
-        }
-        return [];
-    } // DiceArea.clear()
-
-    /**
-     * called from Board.on_mouse_down()
-     */
-    on_mouse_down(x, y) {
-        console.log(`DiceArea.on_mouse_down>this.player=${this.player},active=${this.active},turn=${this.board.turn}`);
-
-        if ( ! this.board.cube.accepted ) {
-            console.log(`DiceArea.on_mouse_down> cube is not accepted .. return`);
-            return;
-        }
-
-        if ( this.active ) {
-            return;
-        }
-
-        if ( this.board.closeout(1 - this.player) ) {
-            console.log(`DiceArea.on_mouse_down> closed out`);
-            this.board.emit_turn(1-this.player);
-            this.board.emit_banner(this.player, "Pass");
-            /*
-            emit_msg("dice", { player: (1 - this.player),
-                               dice: [0, 0, 0, 0],
-                               roll: false }, true);
-            */
-            return;
-        }
-
-        if ( this.player != this.board.turn && this.board.turn < 2 ) {
-            return;
-        }
-
-        this.board.emit_banner(0, "");
-        this.board.emit_banner(1, "");
-
-        this.roll();
-        const dice_val0 = this.get();
-        console.log(`DiceArea.on_mouse_down>player=${this.player},dice_val0=${JSON.stringify(dice_val0)}`);
-    } // DiceArea.on_mouse_down()
-} // DiceArea
-
-/**
  * @param {string} type
  * @param {Object} data
  * @param {boolean} [history=false]
@@ -2467,8 +2464,8 @@ const emit_msg = (type, data, history=false) => {
 const new_game = () => {
     nav.checked=false;
     console.log("new_game()");
-    board.set_banner(0, "");
-    board.set_banner(1, "");
+    board.banner[0].set("");
+    board.banner[1].set("");
     emit_msg("new", {}, false);
 };
 
@@ -2528,7 +2525,20 @@ const clear_filename = () => {
 };
 
 const emit_playername = () => {
-    board.emit_playername();
+    const el = document.getElementById("player-name");
+    const name = el.value;
+
+    const txt = board.playername[board.player];
+    const cur_name = txt.get();
+    const def_name = txt.default_text;
+
+    console.log(`emit_player>player=${board.player},`
+                + `cur_name=${cur_name},`
+                + `name=${name}`
+                + ")");
+    
+    //board.emit_playername();
+    txt.emit(name, true);
 };
 
 const apply_sound_switch = () => {
@@ -2588,10 +2598,7 @@ window.onload = () => {
 
         if ( msg.type == "cube" ) {
             console.log(`ws.on(json)cube>`);
-            board.cube.set(msg.data.value,
-                           msg.data.side,
-                           msg.data.accepted,
-                           false);
+            board.cube.set(msg.data.value, msg.data.side, msg.data.accepted);
             return;
         } // "cube"
 
@@ -2601,14 +2608,14 @@ window.onload = () => {
                 return;
             }
             if (JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
-                let playpromise = board.sound_turn_change.play();
+                // let playpromise = board.sound_turn_change.play();
             }
 
-            board.dice_area[msg.data.player].set(msg.data.dice,
+            board.roll_button[msg.data.player].set(msg.data.dice,
                                                  false, msg.data.roll);
             if ( board.turn < 0 ) {
-                board.txt[0].off();
-                board.txt[1].off();
+                board.playername[0].off();
+                board.playername[1].off();
             }
             return;
         } // "dice"
@@ -2622,13 +2629,13 @@ window.onload = () => {
         if ( msg.type == "set_banner" ) {
             console.log(`ws.on(json)set_banner> player=${msg.data.player},text=${msg.data.text}`);
 
-            board.set_banner(msg.data.player, msg.data.text, false);
+            board.banner[msg.data.player].set(msg.data.text);
             return;
         } // set_banner
 
         if ( msg.type == "set_playername" ) {
             console.log(`ws.on(json)set_playername>player=${msg.data.player},name=${msg.data.name}`);
-            board.set_playername(msg.data.player, msg.data.name);
+            board.playername[msg.data.player].set(msg.data.name);
             return;
         }
         

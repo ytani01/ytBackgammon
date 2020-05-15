@@ -81,13 +81,15 @@
       &nbsp;
       Name:
       <input id="player-name" type="text" onChange="emit_playername();">
-      <input type="button" value="Clear" onClick="emit_playername();">
+      <!-- <input type="button" value="Clear" onClick="emit_playername();"> -->
       &nbsp;
-      Sound <input id="sound-switch" type="checkbox"
-                   onChange="apply_sound_switch();">
+      Sound
+      <input id="sound-switch" type="checkbox"
+             onChange="apply_sound_switch();">
       &nbsp;
-      Free <input id="free-move" type="checkbox"
-                  onChange="apply_free_move();">
+      Free
+      <input id="free-move" type="checkbox"
+             onChange="apply_free_move();">
       &nbsp;
       <span id="dice-histogram" style="font-size:small"></span>
     </header>
@@ -130,6 +132,9 @@
         <div id="p114"><image src="/static/images/checker1.png"></div>
 
         <div id="cube"><image src="/static/images/cube01.png"></div>
+
+        <div id="rollbutton0"><image src="/static/images/roll0.png"></div>
+        <div id="rollbutton1"><image src="/static/images/roll1.png"></div>
 
         <div id="dice00"><image src="/static/images/dice01.png"></div>
         <div id="dice01"><image src="/static/images/dice01.png"></div>
