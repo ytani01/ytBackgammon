@@ -30,7 +30,12 @@
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
  *        |    |         |
- *        |    |         +- RollButton
+ *        |    |         +- BannerButton
+ *        |    |         |    |
+ *        |    |         |    +- RollButton
+ *        |    |         |    +- PassButton
+ *        |    |         |    +- WinButton
+ *        |    |         |
  *        |    |         +- PlayerName
  *        |    |         +- BannerText
  *        |    |         +- Dice
@@ -44,7 +49,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.61";
+const VERSION = "0.62";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -261,6 +266,7 @@ class ImageItem extends BackgammonArea {
         this.el.style.width = `${this.w}px`;
         this.el.style.height = `${this.h}px`;
   
+        this.active = true;
         this.el.hidden = false;
         this.el.draggable = false;
 
@@ -278,10 +284,12 @@ class ImageItem extends BackgammonArea {
     } // ImageItem.constructor()
 
     on() {
+        this.active = true;
         this.el.hidden = false;
     } // ImageItem.on()
 
     off() {
+        this.active = false;
         this.el.hidden = true;
     } // ImageItem.off()
 
@@ -708,14 +716,41 @@ class PlayerItem extends BoardItem {
 /**
  *
  */
-class RollButton extends PlayerItem {
+class BannerButton extends PlayerItem {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
 
         this.el.style.opacity = 0.8;
-        this.move(this.x, this.y, true);
+        this.move(this.x, this.y);
 
-        this.active = false;
+        this.off();
+    } // BannerButton.constructor()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    move(x, y) {
+        super.move(x, y, true);
+    } // BannerButton.move()
+
+    /**
+     * 
+     */
+    on() {
+        this.set_z(5);
+        super.on();
+    }
+} // class BannerButton
+
+/**
+ *
+ */
+class RollButton extends BannerButton {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+
+        this.dice_active = false;
 
         const dice_prefix = "dice" + this.player;
 
@@ -750,9 +785,11 @@ class RollButton extends PlayerItem {
             }
         } // for(i)
 
+        /*
         if ( this.board.banner[this.player].get() != "" ) {
             return;
         }
+        */
         
         super.on();
     } // RollButton.on()
@@ -780,8 +817,14 @@ class RollButton extends PlayerItem {
                 continue;
             }
             this.dice[i].set(dice_value[i], roll_flag);
-            this.active = true;
+            this.dice_active = true;
         } // for(i)
+
+        if ( ! this.dice_active ) {
+            if ( this.board.closeout(1 - this.player) ) {
+                this.board.pass_button[1 - this.player].on();
+            }
+        }
     } // RollButton.set()
 
     /**
@@ -875,7 +918,7 @@ class RollButton extends PlayerItem {
         }
         console.log(`RollButton.roll> [d1, d2]=[${d1}, ${d2}]`);
 
-        this.active = true;
+        this.dice_active = true;
 
         const value1 = Math.floor(Math.random() * 6) + 1;
         const value2 = Math.floor(Math.random() * 6) + 1;
@@ -943,7 +986,7 @@ class RollButton extends PlayerItem {
     clear(emit=false, add_hist=false) {
         console.log(`RollButton.clear(emit=${emit})`);
 
-        this.active = false;
+        this.dice_active = false;
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].clear();
         }
@@ -957,7 +1000,7 @@ class RollButton extends PlayerItem {
     } // RollButton.clear()
 
     /**
-     *
+     * @param {MouseEvent} e
      */
     on_mouse_down(e) {
         const [x, y] = this.get_xy(e);
@@ -970,8 +1013,48 @@ class RollButton extends PlayerItem {
         this.board.banner[1].set("");
 
         this.roll();
-    }
+    } // RollButton.on_mouse_down()
 } // class RollButton
+
+/**
+ *
+ */
+class PassButton extends BannerButton {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+    } // PassButton.constructor()
+
+    /**
+     * @param {MouseEvent} e
+     */
+    on_mouse_down(e) {
+        const [x, y] = this.get_xy(e);
+        console.log("PassButton.on_mouse_down>"
+                    + `player=${this.player}`);
+
+        this.off();
+        this.board.emit_turn(1 - this.player);
+    } // PassButton.on_mouse_down()
+} // class PassButton
+
+/**
+ *
+ */
+class WinButton extends BannerButton {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+    } // WinButton.constructor()
+
+    /**
+     * @param {MouseEvent} e
+     */
+    on_mouse_down(e) {
+        const [x, y] = this.get_xy(e);
+        console.log("WinButton.on_mouse_down>"
+                    + `player=${this.player}`);
+
+    } // WinButton.on_mouse_down()
+} // class WinButton
 
 /**
  *
@@ -1204,9 +1287,18 @@ class Dice extends PlayerItem {
         }
     } // Dice.set()
 
+    /**
+     * @param {MouseEvent} e
+     */
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
         console.log(`Dice.on_mouse_down> x=${x},y=${y}`);
+
+        if ( this.board.turn < 0 ) {
+            console.log(
+                `Dice.on_mouse_down>turn=${this.board.turn} .. ignored`);
+            return;
+        }
 
         const rb = this.board.roll_button[this.player];
         const rb1 = this.board.roll_button[1-this.player];
@@ -1214,7 +1306,7 @@ class Dice extends PlayerItem {
         if ( this.board.turn >= 2 ) {
             console.log(`Dice.on_mouse_down>turn=${this.board.turn}`);
             // Opening roll
-            if ( ! rb1.active ) {
+            if ( ! rb1.dice_active ) {
                 return false;
             }
 
@@ -1242,15 +1334,15 @@ class Dice extends PlayerItem {
             return false;
         }
 
-        // this.board.set_turn(1 - this.player);
-        this.board.emit_turn(1 - this.player, false);
-
+        /*
         if ( this.board.closeout(this.player) ) {
             console.log(`Dice.on_mouse_down>close out!`);
             this.board.playername[1 - this.player].red();
             this.board.banner[1-this.player].pass();
         }
-        rb.clear(true, true);
+        */
+        rb.clear(true, false);
+        this.board.emit_turn(1 - this.player, true);
         console.log(`Dice.on_mouse_down:return false;`);
         return false;
     } // Dice.on_mouse_down()
@@ -1716,11 +1808,6 @@ class Board extends ImageItem {
 
         // Title
         const name_el = document.getElementById("name");
-        /*
-        name_el.style.width = this.w + "px";
-        name_el.style.left = this.x + "px";
-        name_el.style.top = this.y + this.h + "px";
-        */
         const ver_el = document.getElementById("version");
         ver_el.innerHTML = `<strong>Client</strong> Ver. ${VERSION}`;
 
@@ -1764,11 +1851,6 @@ class Board extends ImageItem {
         this.banner.push(new BannerText(
             "p1banner", this, 1, this.w - this.tx2, this.h - this.ty2));
         this.banner[1].rotate(180);
-        /*
-        for (let p=0; p < 2; p++) {
-            this.banner[p].set("");
-        }
-        */
 
         // Checkers
         this.checker = [Array(15), Array(15)];
@@ -1776,8 +1858,8 @@ class Board extends ImageItem {
             for (let i=0; i < 15; i++) {
                 let c_id = "p" + player + ("0" + i).slice(-2);
                 this.checker[player][i] = new Checker(c_id, this, player);
-            }
-        }
+            } // for(i)
+        } // for(player)
 
         this.moving_checker = undefined;
 
@@ -1795,40 +1877,46 @@ class Board extends ImageItem {
             if ( p == 0 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, -1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                                               p, -1, cn));
             }
             if ( p >= 1 && p <= 6 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 6 - p;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, -1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                                               p, -1, cn));
             }
             if ( p >= 7 && p <= 12 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let xn = 12 - p;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, -1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                                               p, -1, cn));
             }
             if ( p >= 13 && p <= 18 ) {
                 let x0 = this.bx[2];
                 let y0 = this.by[0];
                 let xn = p - 13;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, 1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                                               p, 1, cn));
             }
             if ( p >= 19 && p <= 24 ) {
                 let x0 = this.bx[4];
                 let y0 = this.by[0];
                 let xn = p - 19;
                 let x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph, p, 1, cn));
+                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                                               p, 1, cn));
             }
             if ( p == 25 ) {
                 let x0 = this.bx[6];
                 let y0 = this.by[0];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph, p, 1, cn));
+                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                                               p, 1, cn));
             }
             if ( p == 26 ) {
                 let x0 = this.bx[3];
@@ -1851,18 +1939,28 @@ class Board extends ImageItem {
 
         this.roll_button = [];
         this.roll_button.push(new RollButton(
-            "rollbutton0", this, 0,
-            this.bx[4] + x1,
-            this.h / 2));
+            "rollbutton0", this, 0, this.bx[4] + x1, this.h / 2));
         this.roll_button.push(new RollButton(
-            "rollbutton1", this, 1,
-            this.bx[3] - x1,
-            this.h / 2));
+            "rollbutton1", this, 1, this.bx[3] - x1, this.h / 2));
 
+        // PassButton
+        this.pass_button = [];
+        this.pass_button.push(new PassButton(
+            "passbutton0", this, 0, this.bx[4] + x1, this.h / 2 + 150));
+        this.pass_button.push(new PassButton(
+            "passbutton1", this, 1, this.bx[3] - x1, this.h / 2 - 150));
+
+        // WinButton
+        this.win_button = [];
+        this.win_button.push(new WinButton(
+            "winbutton0", this, 0, this.bx[4] + x1, this.h / 2 + 150));
+        this.win_button.push(new WinButton(
+            "winbutton1", this, 1, this.bx[3] - x1, this.h / 2 - 150));
+
+        // Dice histogram
         this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
         console.log(`Board.constructor>dice_histogram=${JSON.stringify(this.dice_histogram)}`);
 
-        //this.rotate(360, true, 0.5);
         if ( this.player == 1 ) {
             this.player = 0;
             this.inverse(0);
@@ -1983,7 +2081,21 @@ class Board extends ImageItem {
         this.playername[0].off();
         this.playername[1].off();
 
+        for (let p=0; p < 2; p++) {
+            this.roll_button[p].off();
+            this.pass_button[p].off();
+            this.win_button[p].off();
+            this.playername[p].off();
+        } // for(p)
+
         if ( turn < 0 ) {
+            for (let p=0; p < 2; p++) {
+                if ( this.game_is_finished(p) ) {
+                    console.log(`Board.set_turn>plyaer${p} win!`);
+                    this.win_button[p].on();
+                    return;
+                }
+            } // for(p)
             return;
         }
 
@@ -1997,10 +2109,15 @@ class Board extends ImageItem {
         }
             
         // turn == 0 or 1
-        if ( this.turn != prev_turn ) {
+        if ( turn != prev_turn ) {
             let playpromise = board.sound_turn_change.play();
         }
-        this.roll_button[turn].update();
+
+        if ( this.closeout(1 - this.turn) ) {
+            this.pass_button[turn].on();
+        } else {
+            this.roll_button[turn].update();
+        }
         this.playername[turn].on();
     } // Board.set_turn()
 
@@ -2037,6 +2154,7 @@ class Board extends ImageItem {
      */
     finish_game(player, emit=false) {
         console.log(`Board.finish_game(player=${player},emit=${emit})`);
+
         // ダイスを全て使用済みにする
         const rb = this.roll_button[player];
         for (let i=0; i < 4; i++) {
@@ -2045,7 +2163,10 @@ class Board extends ImageItem {
             }
         } // for(i)
         
-        this.emit_turn(-1);
+        if ( emit ) {
+            this.emit_turn(-1, false);
+        }
+        /*
         if ( emit ) {
             emit_msg("dice", { player: player,
                                dice:   rb.get(),
@@ -2053,7 +2174,8 @@ class Board extends ImageItem {
         }
 
         this.banner[player].emit("Win !");
-    }
+        */
+    } // Board.finish_game()
     
     /**
      * @param {number} player
@@ -2392,12 +2514,12 @@ class Board extends ImageItem {
         */
         
         if ( emit ) {
+            emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
+                                      p:  p,
+                                      idx: idx }, false);
             if ( this.game_is_finished(ch.player) ) {
                 this.finish_game(ch.player, true);
             }
-            emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
-                                      p:  p,
-                                      idx: idx }, add_hist);
         }
     } // Board.put_checker()
 
@@ -2564,14 +2686,14 @@ window.onload = () => {
     let url = "http://" + document.domain + ":" + location.port + "/";
     ws = io.connect(url);
 
-    console.log(`onload> location.pathname=${location.pathname}`);
+    console.log(`onload>location.pathname=${location.pathname}`);
 
     //setTimeout("location.reload()",5000);
 
     const nav_el = document.getElementById("nav-drawer");
     board = new Board("board",
                       nav_el.offsetWidth  + 20,
-                      nav_el.offsetHeight + 20,
+                      nav_el.offsetHeight + 30,
                       ws);
 
     ws.on("connect", function() {
@@ -2586,13 +2708,14 @@ window.onload = () => {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
         if ( msg.type == "gameinfo" ) {
-            console.log(`ws.on(json)gameinfo>`);
+            console.log(`ws.on(json)>msg.type=gameinfo`);
             board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
             return;
         } // "gameinfo"
 
         if ( msg.type == "put_checker" ) {
-            console.log(`ws.on(json)put_checker> board.turn=${board.turn}`);
+            console.log(
+                `ws.on(json)>msg.type=put_checker,board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
             }
@@ -2604,13 +2727,13 @@ window.onload = () => {
         } // "put_checker"
 
         if ( msg.type == "cube" ) {
-            console.log(`ws.on(json)cube>`);
+            console.log(`ws.on(json)>msg.type=cube`);
             board.cube.set(msg.data.value, msg.data.side, msg.data.accepted);
             return;
         } // "cube"
 
         if ( msg.type == "dice" ) {
-            console.log(`ws.on(json)dice> board.turn=${board.turn}`);
+            console.log(`ws.on(json)>msg.type=dice,board.turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
             }
@@ -2628,25 +2751,25 @@ window.onload = () => {
         } // "dice"
 
         if ( msg.type == "set_turn" ) {
-            console.log(`ws.on(json)set_turn> turn=${msg.data.turn}`);
+            console.log(`ws.on(json)>msg.type=set_turn,turn=${msg.data.turn}`);
             board.set_turn(msg.data.turn);
             return;
         } // set_turn
 
         if ( msg.type == "set_banner" ) {
-            console.log(`ws.on(json)set_banner> player=${msg.data.player},text=${msg.data.text}`);
+            console.log(`ws.on(json)>msg.type=set_banner,player=${msg.data.player},text=${msg.data.text}`);
 
             board.banner[msg.data.player].set(msg.data.text);
             return;
         } // set_banner
 
         if ( msg.type == "set_playername" ) {
-            console.log(`ws.on(json)set_playername>player=${msg.data.player},name=${msg.data.name}`);
+            console.log(`ws.on(json)>msg.type=set_playername,player=${msg.data.player},name=${msg.data.name}`);
             board.playername[msg.data.player].set(msg.data.name);
             return;
         }
         
-        console.log("ws.on(json)???");
+        console.log("ws.on(json)>msg.type=???");
     });
 
 }; // window.onload
