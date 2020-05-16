@@ -1170,7 +1170,7 @@ class Dice extends PlayerItem {
      * @param {number} sec
      */
     move1(deg, sec) {
-        this.set_z(1);
+        this.set_z(0);
         super.move(this.x1, this.y1, true, sec);
         this.rotate(deg, true, sec);
     }
