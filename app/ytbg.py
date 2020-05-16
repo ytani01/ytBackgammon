@@ -17,7 +17,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.56'
+VERSION = '0.57'
 
 _log = get_logger(__name__, True)
 

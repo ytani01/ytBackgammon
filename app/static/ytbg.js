@@ -37,7 +37,6 @@
  *        |    |         |    +- WinButton
  *        |    |         |
  *        |    |         +- PlayerName
- *        |    |         +- BannerText
  *        |    |         +- Dice
  *        |    |         +- Checker
  *        |    +- Board
@@ -49,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.62";
+const VERSION = "0.63";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -121,7 +120,8 @@ class CookieBase {
  */
 class SoundBase {
     constructor(board, soundfile) {
-        console.log(`SoundBase(board.svr_id=${board.svr_id},soundfile=${soundfile}`);
+        console.log("SoundBase("
+                    + `board.svr_id=${board.svr_id},soundfile=${soundfile}`);
         this.board = board;
         this.soundfile = soundfile;
         this.audio = new Audio(this.soundfile);
@@ -785,12 +785,6 @@ class RollButton extends BannerButton {
             }
         } // for(i)
 
-        /*
-        if ( this.board.banner[this.player].get() != "" ) {
-            return;
-        }
-        */
-        
         super.on();
     } // RollButton.on()
 
@@ -853,7 +847,8 @@ class RollButton extends BannerButton {
                 active_dice.push(val);
             }
         }
-        console.log(`RollButton.get_active_dice> active_dice=${JSON.stringify(active_dice)}`);
+        console.log("RollButton.get_active_dice>"
+                    +`active_dice=${JSON.stringify(active_dice)}`);
         return active_dice;
     } // RollButton.get_active_dice()
     
@@ -885,7 +880,8 @@ class RollButton extends BannerButton {
                     dst_p = 25 - dice_value;
                 }
                 let checkers = this.board.point[dst_p].checkers;
-                if (checkers.length <= 1 || checkers[0].player == this.player) {
+                if ( checkers.length <= 1
+                     || checkers[0].player == this.player ) {
                     modified = false;
                 }
             } // for(d)
@@ -926,7 +922,8 @@ class RollButton extends BannerButton {
         // Dice histogram
         this.board.dice_histogram[this.player][value1 - 1]++;
         this.board.dice_histogram[this.player][value2 - 1]++;
-        console.log(`RollButton.roll>dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
+        console.log("RollButton.roll>"
+                    + `dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
         let histogram_str = "| ";
         for (let p=0; p < 2; p++) {
             let sum = 0;
@@ -961,7 +958,8 @@ class RollButton extends BannerButton {
         const modified = this.check_disable();
         const dice_values = this.get();
         this.clear();
-        console.log(`RollButton.roll()>dice_value=${JSON.stringify(dice_values)}`);
+        console.log("RollButton.roll()>"
+                    + `dice_value=${JSON.stringify(dice_values)}`);
         
         this.emit_dice(dice_values, true, true);
         
@@ -1009,9 +1007,6 @@ class RollButton extends BannerButton {
 
         this.off();
 
-        this.board.banner[0].set("");
-        this.board.banner[1].set("");
-
         this.roll();
     } // RollButton.on_mouse_down()
 } // class RollButton
@@ -1022,6 +1017,7 @@ class RollButton extends BannerButton {
 class PassButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
+        this.el.style.opacity = 0.9;
     } // PassButton.constructor()
 
     /**
@@ -1043,6 +1039,7 @@ class PassButton extends BannerButton {
 class WinButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
+        this.el.style.opacity = 0.9;
     } // WinButton.constructor()
 
     /**
@@ -1104,74 +1101,6 @@ class PlayerName extends PlayerItem {
 /**
  *
  */
-class BannerText extends PlayerName {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
-        console.log(`BannerText(id=${id},player=${player},x=${x},y=${y})`);
-
-        this.TEXT_PASS = "Pass";
-
-        this.el.style.fontFamily = "sans-serif";
-        this.el.style.fontStyle = "italic";
-        this.el.style.fontSize = "50px";
-        this.el.style.fontWeight = "900";
-
-        this.el.style.opacity = 0.8;
-        this.el.style.color = "red";
-        this.el.style.backgroundColor = "lightsteelblue";
-
-        this.default_text = "";
-        this.set("");
-    } // BannerText.constructor()
-
-    /**
-     * @param {string} txt
-     */
-    emit(txt, add_hist=false) {
-        emit_msg("set_banner", { player: this.player, text: txt }, add_hist);
-    } // BannerText.emit()
-
-    /**
-     * @param {string} txt
-     */
-    set(txt) {
-        super.set(txt);
-        if ( txt.length == 0 ) {
-            this.off();
-        } else {
-            this.on();
-            this.board.roll_button[this.player].off();
-        }
-    } // BannerText.set()
-
-    /**
-     *
-     */
-    pass(add_hist=false) {
-        this.emit(this.TEXT_PASS, add_hist);
-    }
-
-    on_mouse_down(e) {
-        let [x, y] = this.get_xy(e);
-        console.log(`BannerText.on_mouse_down>(x,y)=(${x},${y})`);
-
-        const txt = this.get();
-
-        if ( txt == this.TEXT_PASS ) {
-            this.emit("", false);
-            this.board.emit_turn(1-this.player ,true);
-            return false;
-        }
-
-        this.board.banner[this.player].set("", true);
-
-        return false;
-    } // BannerText.on_mouse_down()
-} // class BannerText
-
-/**
- *
- */
 class Dice extends PlayerItem {
     constructor(id, board, player, x1, y1, file_prefix) {
         super(id, board, player, x1, y1);
@@ -1206,7 +1135,7 @@ class Dice extends PlayerItem {
         this.el.style.cursor = "pointer";
 
         this.move0();
-    }
+    } // Dice.constructor()
 
     /**
      *
@@ -1214,7 +1143,7 @@ class Dice extends PlayerItem {
     enable() {
         this.value = this.value % 10;
         this.image_el.style.opacity = 1.0;
-    }
+    } // Dice.enable()
 
     /**
      *
@@ -1222,7 +1151,7 @@ class Dice extends PlayerItem {
     disable() {
         this.value = this.value % 10 + 10;
         this.image_el.style.opacity = 0.5;
-    }
+    } // Dice.disable()
 
     /**
      *
@@ -1230,14 +1159,14 @@ class Dice extends PlayerItem {
     get_filename(val) {
         val %= 10;
         return this.image_dir + this.file_prefix + val + this.file_suffix;
-    }
+    } // Dice.get_filename()
 
     /**
      * 
      */
     clear() {
         this.set(0);
-    }
+    } // Dice.clear()
 
     /**
      * 
@@ -1246,7 +1175,7 @@ class Dice extends PlayerItem {
         this.set_z(-1);
         super.move(this.x0, this.y0, true, 0);
         this.rotate(0, true, 0);
-    }
+    } // Dice.move0()
 
     /**
      * @param {number} deg
@@ -1256,7 +1185,7 @@ class Dice extends PlayerItem {
         this.set_z(0);
         super.move(this.x1, this.y1, true, sec);
         this.rotate(deg, true, sec);
-    }
+    } // Dice.move1()
 
     /**
      * @param {number} val - dice number, 11-16 .. disable
@@ -1297,7 +1226,7 @@ class Dice extends PlayerItem {
         if ( this.board.turn < 0 ) {
             console.log(
                 `Dice.on_mouse_down>turn=${this.board.turn} .. ignored`);
-            return;
+            return false;
         }
 
         const rb = this.board.roll_button[this.player];
@@ -1334,13 +1263,6 @@ class Dice extends PlayerItem {
             return false;
         }
 
-        /*
-        if ( this.board.closeout(this.player) ) {
-            console.log(`Dice.on_mouse_down>close out!`);
-            this.board.playername[1 - this.player].red();
-            this.board.banner[1-this.player].pass();
-        }
-        */
         rb.clear(true, false);
         this.board.emit_turn(1 - this.player, true);
         console.log(`Dice.on_mouse_down:return false;`);
@@ -1366,7 +1288,7 @@ class Checker extends PlayerItem {
         this.el.style.cursor = "pointer";
 
         this.cur_point = undefined;
-    }
+    } // Checker.constructor()
 
     /**
      * @return {number} z座標
@@ -1390,7 +1312,7 @@ class Checker extends PlayerItem {
         } // for (p)
 
         this.set_z(z);
-    }
+    } // Checker.calc_z()
 
     /**
      * calcurate distance
@@ -1432,7 +1354,7 @@ class Checker extends PlayerItem {
         } else {
             return (this.cur_point >= 19 && this.cur_point <= 25);
         }
-    }
+    } // Checker.is_inner()
 
     /**
      * 移動に使用するダイスの目を取得する
@@ -1461,7 +1383,7 @@ class Checker extends PlayerItem {
             from_p = 25 - from_p;
             to_p = 25 - to_p;
         }
-        console.log(`dice_check> ${from_p} ==> ${to_p}`);
+        console.log(`Checker.dice_check> ${from_p} ==> ${to_p}`);
         
         let diff_p = from_p - to_p;
 
@@ -1478,9 +1400,9 @@ class Checker extends PlayerItem {
             }
         }
 
-        console.log(`dice_check> dice_val=${dice_val}`);
+        console.log(`Checker.dice_check> dice_val=${dice_val}`);
         return dice_val;
-    }
+    } // Checker.dice_check()
 
     /**
      * 元の位置に戻して、移動をキャンセルする
@@ -1582,18 +1504,21 @@ class Checker extends PlayerItem {
 
         if ( ! board.free_move ) {
             const active_dice = this.board.get_active_dice(ch.player);
-            console.log(`Checker.on_mouse_up> active_dice=${JSON.stringify(active_dice)}`);
+            console.log("Checker.on_mouse_up>"
+                        + `active_dice=${JSON.stringify(active_dice)}`);
 
             if ( dst_p == ch.cur_point ) {
                 //
                 // XXX T.B.D. ワンタッチでのムーブ??
                 //
-                const available_p = this.board.get_dst_points(ch.player, ch.cur_point);
+                const available_p = this.board.get_dst_points(ch.player,
+                                                              ch.cur_point);
                 if ( available_p.length == 0 ) {
                     this.cancel_move(ch);
                     return;
                 }
-                console.log(`Checker.on_mouse_up>available_p=${JSON.stringify(available_p)}`);
+                console.log("Checker.on_mouse_up>"
+                            + `available_p=${JSON.stringify(available_p)}`);
                 if ( ch.player == 0 ) {
                     dst_p = Math.min(...available_p);
                 } else {
@@ -1687,15 +1612,17 @@ class Checker extends PlayerItem {
 
         if ( ! board.free_move ) {
             // 使ったダイスを使用済みする
-            //for (let i=0; i < 4; i++) {
             for (let d of rb.dice) {
                 if ( d.value == dice_value ) {
                     d.disable();
                     break;
                 }
-            } // for(i)
+            } // for(d)
 
-            // まだ、バーポイントに残っている場合、もう一つのダイスが使えるか確認
+            /**
+             * まだ、バーポイントに残っている場合、
+             * もう一つのダイスが使えるか確認
+             */
             let bar_p = this.bar_point(ch.player);
             if ( this.board.point[bar_p].checkers.length > 0 ) {
                 console.log(`Checker.on_mouse_up> T.B.D.`);
@@ -1708,11 +1635,9 @@ class Checker extends PlayerItem {
             }
         } // if ( ! board.free_move )
         
-        // emit dice values to server
-        // const dice_values = this.board.roll_button[this.player].get();
         emit_msg("dice", { player: this.player,
                            dice: rb.get(),
-                           roll: false}, true);
+                           roll: false }, true);
 
         ch.board.moving_checker = undefined;
 
@@ -1844,14 +1769,6 @@ class Board extends ImageItem {
             this.playername[p].on();
         }
 
-        // BannerText
-        this.banner = [];
-        this.banner.push(new BannerText(
-            "p0banner", this, 0, this.tx2, this.ty2));
-        this.banner.push(new BannerText(
-            "p1banner", this, 1, this.w - this.tx2, this.h - this.ty2));
-        this.banner[1].rotate(180);
-
         // Checkers
         this.checker = [Array(15), Array(15)];
         for (let player=0; player < 2; player++) {
@@ -1935,7 +1852,7 @@ class Board extends ImageItem {
         } // for
 
         // RollButton
-        const x1 = 190;
+        const x1 = 150;
 
         this.roll_button = [];
         this.roll_button.push(new RollButton(
@@ -1943,23 +1860,26 @@ class Board extends ImageItem {
         this.roll_button.push(new RollButton(
             "rollbutton1", this, 1, this.bx[3] - x1, this.h / 2));
 
+        const dy1 = 130;
+
         // PassButton
         this.pass_button = [];
         this.pass_button.push(new PassButton(
-            "passbutton0", this, 0, this.bx[4] + x1, this.h / 2 + 150));
+            "passbutton0", this, 0, this.bx[4] + x1, this.h / 2 + dy1));
         this.pass_button.push(new PassButton(
-            "passbutton1", this, 1, this.bx[3] - x1, this.h / 2 - 150));
+            "passbutton1", this, 1, this.bx[3] - x1, this.h / 2 - dy1));
 
         // WinButton
         this.win_button = [];
         this.win_button.push(new WinButton(
-            "winbutton0", this, 0, this.bx[4] + x1, this.h / 2 + 150));
+            "winbutton0", this, 0, this.bx[4] + x1, this.h / 2 + dy1));
         this.win_button.push(new WinButton(
-            "winbutton1", this, 1, this.bx[3] - x1, this.h / 2 - 150));
+            "winbutton1", this, 1, this.bx[3] - x1, this.h / 2 - dy1));
 
         // Dice histogram
         this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
-        console.log(`Board.constructor>dice_histogram=${JSON.stringify(this.dice_histogram)}`);
+        console.log("Board.constructor>"
+                    + `dice_histogram=${JSON.stringify(this.dice_histogram)}`);
 
         if ( this.player == 1 ) {
             this.player = 0;
@@ -1971,7 +1891,8 @@ class Board extends ImageItem {
      * @return {boolean} sound
      */
     load_sound_switch() {
-        console.log(`Board.load_sound_switch>cookie_sound=${this.cookie_sound}`);
+        console.log("Board.load_sound_switch>"
+                    + `cookie_sound=${this.cookie_sound}`);
 
         const s = this.cookie.get(this.cookie_sound);
         console.log(`Board.load_sound_switch>s=${s}`);
@@ -1990,7 +1911,8 @@ class Board extends ImageItem {
      * @return {boolean} sound
      */
     apply_sound_switch() {
-        console.log(`Board.apply_sound_switch>cookie_sound=${this.cookie_sound}`);
+        console.log("Board.apply_sound_switch>"
+                    + `cookie_sound=${this.cookie_sound}`);
 
         this.sound = document.getElementById("sound-switch").checked;
         console.log(`Board.apply_sound_switch>sound=${this.sound}`);
@@ -2141,7 +2063,8 @@ class Board extends ImageItem {
      */
     game_is_finished(player) {
         const pip_count = this.pip_count(player);
-        console.log(`Board.game_is_finished(player=${player})>pip_count=${pip_count}`);
+        console.log(`Board.game_is_finished(player=${player})>`
+                    + `pip_count=${pip_count}`);
 
         if ( pip_count == 0 ) {
             return true;
@@ -2166,23 +2089,7 @@ class Board extends ImageItem {
         if ( emit ) {
             this.emit_turn(-1, false);
         }
-        /*
-        if ( emit ) {
-            emit_msg("dice", { player: player,
-                               dice:   rb.get(),
-                               roll:   false }, false);
-        }
-
-        this.banner[player].emit("Win !");
-        */
     } // Board.finish_game()
-    
-    /**
-     * @param {number} player
-     */
-    pass(player) {
-        this.banner[player].set("Pass");
-    } // Board.pass()
     
     /**
      * @param {number} player
@@ -2254,7 +2161,8 @@ class Board extends ImageItem {
         if ( dice_vals.length == 4 ) {
             dice_vals = [dice_vals[0]];
         }
-        console.log(`Board.get_dst_points>dice_vals=${JSON.stringify(dice_vals)}`);
+        console.log("Board.get_dst_points>"
+                    + `dice_vals=${JSON.stringify(dice_vals)}`);
         for (let dice_val of dice_vals) {
             const dst_p1 = this.calc_dst_point(player, src_p, dice_val);
             console.log(`Board.get_dst_points> dst_p1=${dst_p1}`);
@@ -2326,7 +2234,7 @@ class Board extends ImageItem {
         };
         
         return gameinfo;
-    }
+    } // Board.gen_gameinfo()
 
     /**
      * write game information to file
@@ -2342,8 +2250,7 @@ class Board extends ImageItem {
         document.getElementById("write_gameinfo").download = GAMEINFO_FILE;
         document.getElementById("write_gameinfo").href
             = window.URL.createObjectURL(blob_gameinfo);
-        
-    }
+    } // Board.write_gameinfo()
 
     /**
      *
@@ -2360,7 +2267,7 @@ class Board extends ImageItem {
             emit_msg("set_gameinfo", gameinfo);
         };
         reader.readAsText(file);
-    }
+    } // Board.read_gameinfo()
 
     /**
      * load all game information
@@ -2415,11 +2322,6 @@ class Board extends ImageItem {
         console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
         this.cube.set(c.value, c.side, c.accepted, false);
 
-        // banner
-        console.log(`Board.load_gameinfo>banner=${JSON.stringify(gameinfo.board.banner)}`);
-        this.banner[0].set(gameinfo.board.banner[0]);
-        this.banner[1].set(gameinfo.board.banner[1]);
-
         // player name
         console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.text)}`);
         this.playername[0].set(gameinfo.text[0]);
@@ -2432,7 +2334,7 @@ class Board extends ImageItem {
     } // Board.load_gameinfo()
 
     /**
-     *
+     * @param {number} sec
      */
     inverse(sec) {
         console.log(`Board.inverse(sec=${sec})`);
@@ -2444,7 +2346,7 @@ class Board extends ImageItem {
         } else {
             this.rotate(180, true, sec);
         }
-    }
+    } // Board.inverse()
 
     /**
      * @param {MouseEvent} e
@@ -2592,8 +2494,6 @@ const emit_msg = (type, data, history=false) => {
 const new_game = () => {
     nav.checked=false;
     console.log("new_game()");
-    board.banner[0].set("");
-    board.banner[1].set("");
     emit_msg("new", {}, false);
 };
 
@@ -2755,13 +2655,6 @@ window.onload = () => {
             board.set_turn(msg.data.turn);
             return;
         } // set_turn
-
-        if ( msg.type == "set_banner" ) {
-            console.log(`ws.on(json)>msg.type=set_banner,player=${msg.data.player},text=${msg.data.text}`);
-
-            board.banner[msg.data.player].set(msg.data.text);
-            return;
-        } // set_banner
 
         if ( msg.type == "set_playername" ) {
             console.log(`ws.on(json)>msg.type=set_playername,player=${msg.data.player},name=${msg.data.name}`);
