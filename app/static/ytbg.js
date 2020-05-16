@@ -1098,14 +1098,14 @@ class Dice extends PlayerItem {
         [this.x1, this.y1] = [x1, y1];
 
         if ( this.player == 0 ) {
-            this.x0 = this.board.w + this.w / 2;
+            this.x0 = this.board.w - this.w / 2;
             this.y0 = this.board.h - this.h / 2;
         } else {
-            this.x0 = -this.w / 2;
+            this.x0 = this.w / 2;
             this.y0 = this.h / 2;
         }
 
-        this.rad = 0;
+        this.deg = 0;
 
         /**
          * ダイスの値
@@ -1122,7 +1122,7 @@ class Dice extends PlayerItem {
         this.el.style.backgroundColor = "#000";
         this.el.style.cursor = "pointer";
 
-        this.move(this.x0, this.y0, true);
+        this.move0();
     }
 
     /**
@@ -1157,6 +1157,25 @@ class Dice extends PlayerItem {
     }
 
     /**
+     * 
+     */
+    move0() {
+        this.set_z(-1);
+        super.move(this.x0, this.y0, true, 0);
+        this.rotate(0, true, 0);
+    }
+
+    /**
+     * @param {number} deg
+     * @param {number} sec
+     */
+    move1(deg, sec) {
+        this.set_z(1);
+        super.move(this.x1, this.y1, true, sec);
+        this.rotate(deg, true, sec);
+    }
+
+    /**
      * @param {number} val - dice number, 11-16 .. disable
      * @param {boolean} [roll_flag=false]
      */
@@ -1167,8 +1186,7 @@ class Dice extends PlayerItem {
         this.enable();
 
         if (val % 10 < 1) {
-            this.move(this.x0, this.y0, true);
-            this.rotate(0, true, 0);
+            this.move0();
             return;
         }
 
@@ -1179,13 +1197,10 @@ class Dice extends PlayerItem {
         this.el.firstChild.src = this.get_filename(val % 10);
 
         if ( roll_flag ) {
-            //this.move(this.x0, this.y0, true, 0);
-            this.move(this.x1, this.y1, true, .5);
-            this.rad = Math.floor(Math.random() * 720 - 360);
-            this.rotate(this.rad, true, .5);
+            this.deg = Math.floor(Math.random() * 720 - 360);
+            this.move1(this.deg, 0.5);
         } else {
-            this.move(this.x1, this.y1, true, 0);
-            this.rotate(this.rad, true, 0);
+            this.move1(this.deg, 0);
         }
     } // Dice.set()
 
