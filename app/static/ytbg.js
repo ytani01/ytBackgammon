@@ -917,6 +917,7 @@ class RollButton extends PlayerItem {
         
         const modified = this.check_disable();
         const dice_values = this.get();
+        this.clear();
         console.log(`RollButton.roll()>dice_value=${JSON.stringify(dice_values)}`);
         
         this.emit_dice(dice_values, true, true);
@@ -1089,15 +1090,23 @@ class BannerText extends PlayerName {
  *
  */
 class Dice extends PlayerItem {
-    constructor(id, board, player, x, y, file_prefix) {
-        super(id, board, player, x, y);
-        console.log(`Dice> (x,y)=(${x},${y})`);
+    constructor(id, board, player, x1, y1, file_prefix) {
+        super(id, board, player, x1, y1);
+        console.log(`Dice> (x1,y1)=(${x1},${y1})`);
         this.file_prefix = file_prefix;
 
-        [this.x1, this.y1] = [this.x, this.y];
-        console.log(`Dice> x1=${this.x1}, y1=${this.y1}`);
-        [this.x0, this.y0] = [0, 0];
-        
+        [this.x1, this.y1] = [x1, y1];
+
+        if ( this.player == 0 ) {
+            this.x0 = this.board.w + this.w / 2;
+            this.y0 = this.board.h - this.h / 2;
+        } else {
+            this.x0 = -this.w / 2;
+            this.y0 = this.h / 2;
+        }
+
+        this.rad = 0;
+
         /**
          * ダイスの値
          * @type {number}
@@ -1109,7 +1118,7 @@ class Dice extends PlayerItem {
 
         this.image_el = this.el.firstElementChild;
 
-        this.el.hidden = true;
+        // this.el.hidden = true;
         this.el.style.backgroundColor = "#000";
         this.el.style.cursor = "pointer";
 
@@ -1159,7 +1168,7 @@ class Dice extends PlayerItem {
 
         if (val % 10 < 1) {
             this.move(this.x0, this.y0, true);
-            this.el.hidden = true;
+            this.rotate(0, true, 0);
             return;
         }
 
@@ -1168,14 +1177,15 @@ class Dice extends PlayerItem {
         }
 
         this.el.firstChild.src = this.get_filename(val % 10);
-        this.el.hidden = false;
 
         if ( roll_flag ) {
             //this.move(this.x0, this.y0, true, 0);
-            this.move(this.x1, this.y1, true, 1);
-            this.rotate(Math.floor(Math.random() * 720 - 360), true, .5);
+            this.move(this.x1, this.y1, true, .5);
+            this.rad = Math.floor(Math.random() * 720 - 360);
+            this.rotate(this.rad, true, .5);
         } else {
-            this.move(this.x1, this.y1, true, 1);
+            this.move(this.x1, this.y1, true, 0);
+            this.rotate(this.rad, true, 0);
         }
     } // Dice.set()
 
@@ -2546,7 +2556,7 @@ window.onload = () => {
     const nav_el = document.getElementById("nav-drawer");
     board = new Board("board",
                       nav_el.offsetWidth  + 20,
-                      nav_el.offsetHeight + 10,
+                      nav_el.offsetHeight + 20,
                       ws);
 
     ws.on("connect", function() {
