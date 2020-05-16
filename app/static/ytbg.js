@@ -44,7 +44,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.60";
+const VERSION = "0.61";
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -734,7 +734,7 @@ class RollButton extends PlayerItem {
         this.off();
     } // RollButton.constructor()
 
-    on() {
+    update() {
         const dice = this.get();
         console.log(`RollButton.on>dice=${JSON.stringify(dice)}`);
 
@@ -767,13 +767,13 @@ class RollButton extends PlayerItem {
     /**
      * Set dice values
      * @param {number[][]} dice_value
-     * @param {boolean} [emit=true] - emit flag
      * @param {boolean} [roll_flag=false] 
      */
-    set(dice_value, emit=true, roll_flag=false) {
-        console.log(`RollButton[${this.player}].set(dive_value=${JSON.stringify(dice_value)},emit=${emit},roll_flag=${roll_flag})`);
+    set(dice_value, roll_flag=false) {
+        console.log(`RollButton[${this.player}].set(dive_value=${JSON.stringify(dice_value)},roll_flag=${roll_flag})`);
         
         this.clear();
+        this.off();
         
         for (let i=0; i < 4; i++) {
             if ( dice_value[i] < 1 ) {
@@ -782,12 +782,6 @@ class RollButton extends PlayerItem {
             this.dice[i].set(dice_value[i], roll_flag);
             this.active = true;
         } // for(i)
-
-        if ( emit ) {
-            this.emit_dice(dice_value, roll_flag, true);
-        }
-
-
     } // RollButton.set()
 
     /**
@@ -871,8 +865,8 @@ class RollButton extends PlayerItem {
      * @return {number[]} - dice values
      */
     roll() {
+        console.log(`RollButton.roll()`);
         this.clear();
-        console.log(`RollButton.roll()> ${this.get()}`);
 
         let d1 = Math.floor(Math.random()  * 4);
         let d2 = d1;
@@ -908,6 +902,8 @@ class RollButton extends PlayerItem {
         console.log(`histogram_str=${histogram_str}`);
         document.getElementById("dice-histogram").innerHTML = histogram_str;
 
+        let dice = [0, 0, 0, 0];
+
         if ( this.board.turn >= 2 ) {
             this.dice[d1].set(value1);
         } else if ( value1 != value2 ) {
@@ -920,9 +916,8 @@ class RollButton extends PlayerItem {
         }
         
         const modified = this.check_disable();
-        console.log(`RollButton.roll()> ${this.get()}`);
-        
         const dice_values = this.get();
+        console.log(`RollButton.roll()>dice_value=${JSON.stringify(dice_values)}`);
         
         this.emit_dice(dice_values, true, true);
         
@@ -965,26 +960,15 @@ class RollButton extends PlayerItem {
      */
     on_mouse_down(e) {
         const [x, y] = this.get_xy(e);
+        console.log("RollButton.on_mouse_down>"
+                    + `player=${this.player}`);
 
         this.off();
-
-        /*
-        if ( this.board.closeout(1 - this.player) ) {
-            console.log(`RollButton.on_mouse_down> closed out`);
-            this.board.emit_turn(1-this.player);
-            this.baord.banner[this.player].set("Pass");
-            return;
-        }
-        */
 
         this.board.banner[0].set("");
         this.board.banner[1].set("");
 
         this.roll();
-        const dice_val0 = this.get();
-        console.log("RollButton.on_mouse_down>"
-                    + `player=${this.player},`
-                    + `dice_val0=${JSON.stringify(dice_val0)}`);
     }
 } // class RollButton
 
@@ -1174,7 +1158,7 @@ class Dice extends PlayerItem {
         this.enable();
 
         if (val % 10 < 1) {
-            this.move(this.x0, this.y0, 1);
+            this.move(this.x0, this.y0, true);
             this.el.hidden = true;
             return;
         }
@@ -1188,10 +1172,10 @@ class Dice extends PlayerItem {
 
         if ( roll_flag ) {
             //this.move(this.x0, this.y0, true, 0);
-            this.rotate(Math.floor(Math.random() * 720 - 360), true, .5);
             this.move(this.x1, this.y1, true, 1);
+            this.rotate(Math.floor(Math.random() * 720 - 360), true, .5);
         } else {
-            this.move(this.x1, this.y1, true, 0);
+            this.move(this.x1, this.y1, true, 1);
         }
     } // Dice.set()
 
@@ -1979,8 +1963,8 @@ class Board extends ImageItem {
         }
 
         if ( turn >= 2 ) {
-            this.roll_button[0].on();
-            this.roll_button[1].on();
+            this.roll_button[0].update();
+            this.roll_button[1].update();
 
             this.playername[0].on();
             this.playername[1].on();
@@ -1991,7 +1975,7 @@ class Board extends ImageItem {
         if ( this.turn != prev_turn ) {
             let playpromise = board.sound_turn_change.play();
         }
-        this.roll_button[turn].on();
+        this.roll_button[turn].update();
         this.playername[turn].on();
     } // Board.set_turn()
 
@@ -2610,7 +2594,7 @@ window.onload = () => {
             }
 
             board.roll_button[msg.data.player].set(msg.data.dice,
-                                                 false, msg.data.roll);
+                                                   msg.data.roll);
             if ( board.turn < 0 ) {
                 board.playername[0].off();
                 board.playername[1].off();
