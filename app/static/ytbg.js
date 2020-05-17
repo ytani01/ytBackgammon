@@ -48,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.64";
+const VERSION = "0.65";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1513,32 +1513,39 @@ class Checker extends PlayerItem {
                     + `this.id=${this.id},(x,y)=${x},${y})`);
         
         if ( ! board.free_move ) {
-            
-        // check active dices
-        const active_dice = this.board.get_active_dice(this.player);
-        console.log(`Checker.on_mouse_down_xy>active_dice=${active_dice}`);
-        if ( active_dice.length == 0 ) {
-            return;
-        }
-
-        // ヒットされている場合は、バーのポイントしか動かせない
-        let bar_p = 26;
-        if ( this.player == 1 ) {
-            bar_p = 27;
-        }
-        if ( this.board.point[bar_p].checkers.length > 0 ) {
-            if ( this.cur_point != bar_p ) {
+            // check turn
+            if ( this.board.turn >= 2 || this.board.turn < 0 ) {
                 return;
             }
-        }
 
-        // 移動可能か確認
-        const dst_p = this.board.get_dst_points(this.player, this.cur_point);
-        console.log(`dst_p=${JSON.stringify(dst_p)}`);
-        if ( dst_p.length == 0 ) {
-            return;
-        }
+            if ( this.board.turn != this.player ) {
+                return;
+            }
 
+            // check active dices
+            const active_dice = this.board.get_active_dice(this.player);
+            console.log(`Checker.on_mouse_down_xy>active_dice=${active_dice}`);
+            if ( active_dice.length == 0 ) {
+                return;
+            }
+
+            // ヒットされている場合は、バーのポイントしか動かせない
+            let bar_p = 26;
+            if ( this.player == 1 ) {
+                bar_p = 27;
+            }
+            if ( this.board.point[bar_p].checkers.length > 0 ) {
+                if ( this.cur_point != bar_p ) {
+                    return;
+                }
+            }
+
+            // 移動可能か確認
+            const dst_p = this.board.get_dst_points(this.player, this.cur_point);
+            console.log(`dst_p=${JSON.stringify(dst_p)}`);
+            if ( dst_p.length == 0 ) {
+                return;
+            }
         } // if (!free_move)
 
         // クリックされたポイントの先端のチェッカーに持ち換える
