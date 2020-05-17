@@ -48,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.65";
+const VERSION = "0.66";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1087,7 +1087,47 @@ class RollButton extends BannerButton {
         this.off();
 
         this.roll();
+
+        if ( this.another().dice_active ) {
+            console.log(`settimeout`);
+            const co = this.check_opening.bind(this);
+            setTimeout(co, 1500);
+        }
     } // RollButton.on_mouse_down_xy()
+
+    check_opening() {
+        console.log(`RollButton.check_opening>`
+                    + `turn=${this.board.turn}`);
+        
+        const rb0 = this.board.roll_button[0];
+        const rb1 = this.board.roll_button[1];
+
+        if ( this.board.trun < 2 || ! rb0.dice_active || ! rb1.dice_active ) {
+            console.log("return undefined");
+            return undefined;
+        }
+
+        const d0 = rb0.get_active_dice()[0];
+        const d1 = rb1.get_active_dice()[0];
+        console.log(`d0=${d0},d1=${d1}`);
+
+        if ( d0 > d1 ) {
+            rb1.clear(true, false);
+            rb0.emit_dice([d1, 0, 0, d0], false);
+            this.board.emit_turn(0, true);
+            return 0;
+        }
+        if ( d0 < d1 ) {
+            rb0.clear(true, false);
+            rb1.emit_dice([d0, 0, 0, d1], false);
+            this.board.emit_turn(1, true);
+            return 1;
+        }
+        rb0.clear(true, false);
+        rb1.clear(true, false);
+        this.board.emit_turn(2, true);
+        return 2;
+    }
 } // class RollButton
 
 /**
