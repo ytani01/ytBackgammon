@@ -48,7 +48,8 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.63";
+const VERSION = "0.64";
+
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -387,10 +388,35 @@ class ImageItem extends BackgammonArea {
     } // ImageItem.get_xy()
 
     /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_down_xy(x, y) {
+        // to be overridden
+    } // ImageItem.on_mouse_down_xy()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_up_xy(x, y) {
+        // to be overridden
+    } // ImageItem.on_mouse_down_xy()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_move_xy(x, y) {
+        // to be overridden
+    } // ImageItem.on_mouse_down_xy()
+
+    /**
      * @param {MouseEvent} e
      */
     on_mouse_down(e) {
         let [x, y] = this.get_xy(e);
+        this.on_mouse_down_xy(x, y);
     } // ImageItem.on_mouse_down()
 
     /**
@@ -398,6 +424,7 @@ class ImageItem extends BackgammonArea {
      */
     on_mouse_up(e) {
         let [x, y] = this.get_xy(e);
+        this.on_mouse_up_xy(x, y);
     } // ImageItem.on_mouse_up()
 
     /**
@@ -405,6 +432,7 @@ class ImageItem extends BackgammonArea {
      */
     on_mouse_move(e) {
         let [x, y] = this.get_xy(e);
+        this.on_mouse_move_xy(x, y);
     } // ImageItem.on_mouse_move()
 
     /**
@@ -720,7 +748,7 @@ class BannerButton extends PlayerItem {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
 
-        this.el.style.opacity = 0.8;
+        this.el.style.opacity = 0.9;
         this.move(this.x, this.y);
 
         this.off();
@@ -924,20 +952,25 @@ class RollButton extends BannerButton {
         this.board.dice_histogram[this.player][value2 - 1]++;
         console.log("RollButton.roll>"
                     + `dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
-        let histogram_str = "| ";
+        let histogram_str = "";
         for (let p=0; p < 2; p++) {
+            /*
             let sum = 0;
             for (let i=0; i < 6; i++) {
                 sum += this.board.dice_histogram[p][i];
             } // for (i)
+            */
             for (let i=0; i < 6; i++) {
                 let a = 0;
+                /*
                 if ( sum > 0 ) {
                     a = Math.floor(this.board.dice_histogram[p][i] / sum * 100);
                 }
+                */
+                a = this.board.dice_histogram[p][i];
                 histogram_str += a + " ";
             } // for (i)
-            histogram_str += "| ";
+            histogram_str += "<br />";
         } // for(p)
         console.log(`histogram_str=${histogram_str}`);
         document.getElementById("dice-histogram").innerHTML = histogram_str;
@@ -1017,7 +1050,6 @@ class RollButton extends BannerButton {
 class PassButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
-        this.el.style.opacity = 0.9;
     } // PassButton.constructor()
 
     /**
@@ -1029,7 +1061,7 @@ class PassButton extends BannerButton {
                     + `player=${this.player}`);
 
         this.off();
-        this.board.emit_turn(1 - this.player);
+        this.board.emit_turn(1 - this.player, true);
     } // PassButton.on_mouse_down()
 } // class PassButton
 
@@ -1039,7 +1071,6 @@ class PassButton extends BannerButton {
 class WinButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
-        this.el.style.opacity = 0.9;
     } // WinButton.constructor()
 
     /**
@@ -1083,18 +1114,18 @@ class PlayerName extends PlayerItem {
     } // PlayerName.set()
 
     on() {
-        this.el.style.borderColor = "rgba(0, 128, 255, 0.8)";
-        this.el.style.color = "rgba(0, 128, 255, 0.8)";
+        // this.el.style.borderColor = "rgba(255, 255, 255, 0.8)";
+        this.el.style.color = "rgba(255, 255, 128, 0.8)";
     }
 
     red() {
-        this.el.style.borderColor = "rgba(255, 0, 0, 0.8)";
+        // this.el.style.borderColor = "rgba(255, 0, 0, 0.8)";
         this.el.style.color = "rgba(255, 0, 0, 0.8)";
     }
 
     off() {
-        this.el.style.borderColor = "rgba(64, 64, 64, 0.4)";
-        this.el.style.color = "rgba(64, 64, 64, 0.4)";
+        // this.el.style.borderColor = "rgba(0, 0, 0, 0.8)";
+        this.el.style.color = "rgba(0, 0, 0, 0.8)";
     }
 } // class PlayerName
 
@@ -1109,12 +1140,14 @@ class Dice extends PlayerItem {
 
         [this.x1, this.y1] = [x1, y1];
 
+        const offset0 = 5;
+        
         if ( this.player == 0 ) {
-            this.x0 = this.board.w - this.w / 2;
-            this.y0 = this.board.h - this.h / 2;
+            this.x0 = this.board.w - this.w / 2 - offset0;
+            this.y0 = this.board.h - this.h / 2 - offset0;
         } else {
-            this.x0 = this.w / 2;
-            this.y0 = this.h / 2;
+            this.x0 = this.w / 2 + offset0;
+            this.y0 = this.h / 2 + offset0;
         }
 
         this.deg = 0;
@@ -1431,10 +1464,10 @@ class Checker extends PlayerItem {
     } // Checker.get_available_points()
 
     /**
-     *
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_down(e) {
-        let [x, y] = this.get_xy(e);
+    on_mouse_down_xy(x, y) {
         console.log(`Checker.on_mouse_down> this.id=${this.id},(x,y)=${x},${y})`);
         
         if ( ! board.free_move ) {
@@ -1478,13 +1511,13 @@ class Checker extends PlayerItem {
 
         ch.move(x, y, true);
         ch.set_z(1000);
-    } // Checker.on_mosue_down()
+    } // Checker.on_mouse_down_xy()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_up(e) {
-        let [x, y] = this.get_xy(e);
+    on_mouse_up_xy(x, y) {
         console.log(`Checker.on_mouse_up> this.id=${this.id},x=${x},y=${y}`);
 
         const ch = this.board.moving_checker;
@@ -1644,11 +1677,10 @@ class Checker extends PlayerItem {
     } // Checker.on_mouse_up()
 
     /**
-     *
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_move(e) {
-        let [x, y] = this.get_xy(e);
-
+    on_mouse_move_xy(x, y) {
         let ch = this.board.moving_checker;
         if ( ch === undefined ) {
             return;
@@ -1659,7 +1691,6 @@ class Checker extends PlayerItem {
 } // class Checker
 
 /**
- *
  *           bx[0]                  bx[3]                 bx[5]
  *           |   bx[1]              |   bx[4]             |bx[6]
  *         x |   |bx[2]             |   |                 ||   bx[7]
@@ -1702,6 +1733,9 @@ class Board extends ImageItem {
 
         this.free_move = false;
         
+        this.bx = [27, 81, 108, 432, 495, 819, 846];
+        this.by = [30, 520];
+
         // server ID
         this.svr_id = document.getElementById("server-id").innerHTML;
         console.log(`Board> svr_id=${this.svr_id}`);
@@ -1723,11 +1757,6 @@ class Board extends ImageItem {
         }
 
         this.turn = -1;
-
-        this.bx = [27, 81, 108, 432, 540, 864, 891, 945];
-        this.by = [20, 509];
-        [this.tx, this.ty] = [this.bx[4]+5, 246];
-        [this.tx2, this.ty2] = [this.bx[4]+150, this.by[0]+205];
 
         this.gameinfo = undefined;
 
@@ -1753,15 +1782,15 @@ class Board extends ImageItem {
         // <body>
         let body_el = document.body;
         body_el.style.width = (
-            this.button_back.x + this.button_back.w + 100) + "px";
+            this.button_back.x + this.button_back.w + 50) + "px";
         body_el.style.height = (this.y + this.h + 10) + "px";
 
         // PlayerName
         this.playername = [];
         this.playername.push(new PlayerName(
-            "p0text", this, 0, this.tx, this.ty));
+            "p0text", this, 0, this.bx[4], this.by[1] + 4));
         this.playername.push(new PlayerName(
-            "p1text", this, 1, this.w - this.tx, this.h - this.ty));
+            "p1text", this, 1, this.bx[3], this.by[0] - 4));
         this.playername[1].rotate(180);
 
         for (let p=0; p < 2; p++) {

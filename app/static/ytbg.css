@@ -3,8 +3,11 @@
 }
 
 body {
-/*    background-image: url("http://www.ytani.net:5001/static/images/bg.png");*/
-    background-color: #DDD;
+    background-image: url("/static/images/bg.png");
+    /*
+    background-color: rgba(255, 255, 255, 0.1);
+    background-blend-mode: lighten;
+    */
 }
 
 div, span {
@@ -14,9 +17,11 @@ div, span {
 }
 
 .onboardtext {
+    /*
     border: 4px solid;
     border-color: rgba(255,255,255,1);
     padding: 3px;
+    */
     color: rgba(255,255,255,1);
     font-weight: bold;
 }
@@ -109,7 +114,7 @@ header {
   top: 0;
   left: 0;
   z-index: 9999;/*最前面に*/
-  width: 90%;/*右側に隙間を作る（閉じるカバーを表示）*/
+  width: 90%; /*右側に隙間を作る（閉じるカバーを表示）*/
   max-width: 220px;/*最大幅（調整してください）*/
   height: 100%;
   background: #fff;/*背景色*/
