@@ -148,14 +148,19 @@ header {
     padding-inline-start: 15px;
     text-align: left;
     background-color: #DDD;
+
+    border-top: 1px solid;
+    border-bottom: 1px solid;
 }
 
 #nav li {
 /*    width: 140px; */
-    font-size: 24px;
+    font-size: 22px;
     font-weight: bold;
-    margin-top: 5px;
-    margin-bottom: 15px;
+    margin-top: -1px;
+    margin-bottom: -1px;
+    border-top: 1px solid;
+    border-bottom: 1px solid;
 }
 
 #nav li a {
