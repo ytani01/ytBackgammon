@@ -21,7 +21,7 @@
       const head_el = document.getElementsByTagName("head")[0];
 
       const js_url = "/static/ytbg.js?ts=" + ts;
-      // const js_url = "/static/ytbg.js"; // for debug
+      //const js_url = "/static/ytbg.js"; // for debug
       const script_el = document.createElement("script");
       console.log(`js_url=${js_url}`);
       script_el.setAttribute("type", "text/javascript");
@@ -52,13 +52,13 @@
           </ul>
           <ul id="nav">
             <li><a href="#" onClick="backward_hist();">1つ戻す</a>
-            <li><a href="#" onClick="back2();">戻す</a>
-            <li><a href="#" onClick="back_all();">戻す(高速)</a>
+            <li><a href="#" onClick="back2();">連続で戻す</a>
+            <li><a href="#" onClick="back_all();">連続で戻す(高速)</a>
           </ul>
           <ul id="nav">
             <li><a href="#" onClick="forward_hist();">1つ進める</a>
-            <li><a href="#" onClick="fwd2();">進める</a>
-            <li><a href="#" onClick="fwd_all();">進める(高速)</a>
+            <li><a href="#" onClick="fwd2();">連続で進める</a>
+            <li><a href="#" onClick="fwd_all();">連続で進める(高速)</a>
           </ul>
           <ul id="nav">
             <li><a id="write_gameinfo" href="#"
@@ -140,15 +140,17 @@
                                      width="100px"
                                      style="transform:rotate(160deg);"></div>
 
-        <div id="passbutton0"><image src="/static/images/pass0.png"
+        <div id="passbutton0"><image src="/static/images/pass.png"
                                      width="180px"></div>
-        <div id="passbutton1"><image src="/static/images/pass1.png"
-                                     width="180px"></div>
+        <div id="passbutton1"><image src="/static/images/pass.png"
+                                     width="180px"
+                                     style="transform:rotate(180deg);"></div>
 
-        <div id="winbutton0"><image src="/static/images/win0.png"
+        <div id="winbutton0"><image src="/static/images/win.png"
                                     width="180px"></div>
-        <div id="winbutton1"><image src="/static/images/win1.png"
-                                    width="180px"></div>
+        <div id="winbutton1"><image src="/static/images/win.png"
+                                    width="180px"
+                                    style="transform:rotate(180deg);"></div>
 
         <div id="dice00"><image src="/static/images/dice01.png"></div>
         <div id="dice01"><image src="/static/images/dice01.png"></div>
@@ -167,13 +169,16 @@
            class="fas fa-bars"></i>
       </div>
       -->
-      <div id="button-inverse"><image src="/static/images/button-inverse.png"></div>
-      <div id="button-fwd"><image src="/static/images/button-fwd.png"></div>
+      <div id="button-inverse"><image src="/static/images/button-inverse.png"
+                                      width="70px"></div>
+      <div id="button-fwd"><image src="/static/images/button-fwd.png"
+                                  width="70px"></div>
       <!--
       <div id="button-fwd2"><image src="/static/images/button-fwd2.png"></div>
       <div id="button-fwd_all"><image src="/static/images/button-fwd3.png"></div>
       -->
-      <div id="button-back"><image src="/static/images/button-bak.png"></div>
+      <div id="button-back"><image src="/static/images/button-bak.png"
+                                   width="70px"></div>
       <!--
       <div id="button-back2"><image src="/static/images/button-bak2.png"></div>
       <div id="button-back_all"><image src="/static/images/button-bak3.png"></div>

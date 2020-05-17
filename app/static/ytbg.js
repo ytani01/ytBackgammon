@@ -470,12 +470,11 @@ class BoardButton extends BoardItem {
 class InverseButton extends BoardButton {
     constructor(id, board, x, y) {
         super(id, board, x, y);
-    }
+    } // InverseButton.constructor()
 
-    on_mouse_down(e) {
-        const [x, y] = this.get_xy(e);
+    on_mouse_down_xy(x, y) {
         this.board.inverse(0.5);
-    }
+    } // InverseButton.on_mouse_down_xy()
 } // class InverseButton
 
 /**
@@ -487,12 +486,11 @@ class EmitButton extends BoardButton {
 
         this.type = type;
         this.data = data;
-    }
+    } // EmitButton.constructor()
 
-    on_mouse_down(e) {
-        const [x, y] = this.get_xy(e);
+    on_mouse_down_xy(x, y) {
         emit_msg(this.type, this.data);
-    }
+    } // EmitButton.on_mouse_down_xy()
 } // class EmitButton
 
 /**
@@ -501,7 +499,7 @@ class EmitButton extends BoardButton {
 class BackButton extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "back", {n: 1}, x, y);
-    }
+    } // BackButton.constructor()
 } // class BackButton
 
 /**
@@ -510,7 +508,7 @@ class BackButton extends EmitButton {
 class Back2Button extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "back2", {}, x, y);
-    }
+    } // Back2Button.constructor()
 } // class Back2Button
 
 /**
@@ -519,7 +517,7 @@ class Back2Button extends EmitButton {
 class BackAllButton extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "back_all", {}, x, y);
-    }
+    } // BackAllButton.constructor()
 } // class BackAllButton
 
 /**
@@ -528,7 +526,7 @@ class BackAllButton extends EmitButton {
 class FwdButton extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "fwd", {n: 1}, x, y);
-    }
+    } // FwdButton.constructor()
 } // class FwdButton
 
 /**
@@ -537,7 +535,7 @@ class FwdButton extends EmitButton {
 class Fwd2Button extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "fwd2", x, y);
-    }
+    } // Fwd2Button.constructor()
 } // class FwdButton
 
 /**
@@ -546,7 +544,7 @@ class Fwd2Button extends EmitButton {
 class FwdAllButton extends EmitButton {
     constructor(id, board, x, y) {
         super(id, board, "fwd_all", x, y);
-    }
+    } // FwdAllButton.constructor()
 } // class FwdAllButton
 
 /**
@@ -558,14 +556,14 @@ class FwdAllButton extends EmitButton {
  *                |   v   13 14 15 16 17 18     19 20 21 22 23 24       |
  *        by[0] --->+-+-----------------------------------------------  |
  *                | |   ||p0          p1   |   |p1             p0||   | |
- * y2[1] ------------>+ ||p0          p1   |   |p1 tx     dx   p0||   | |
- *                | |   ||p0          p1   |27 |p1 |      |      ||25 | |
- * y1[1] ------------>+ ||p0               |   |p1 |      v      ||   | |
- *                | |   ||p0               |   |p1 v      +------+<-------dy
- *                | |   ||         ty ------------>+------| Dice ||   | |
- * y0 --------------->+ ||                 |---|   |Text  | Area ||---| |
- *                | |   ||                 |   |    ------|      ||   | |
- *                | |   ||p1               |   |p0         ------||   | |
+ * y2[1] ------------>+ ||p0          p1   |   |p1             p0||   | |
+ *                | |   ||p0          p1   |27 |p1               ||25 | |
+ * y1[1] ------------>+ ||p0               |   |p1               ||   | |
+ *                | |   ||p0               |   |p1               ||   | |
+ *                | |   ||                 |   |                 ||   | |
+ * y0 --------------->+ ||                 |---|                 ||---| |
+ *                | |   ||                 |   |                 ||   | |
+ *                | |   ||p1               |   |p0               ||   | |
  * y1[0] ------------>+ ||p1               |   |p0               ||   | |
  *                | |   ||p1          p0   |26 |p0               || 0 | |
  * y2[0] ------------>+ ||p1          p0   |   |p0             p1||   | |
@@ -597,7 +595,7 @@ class Cube extends BoardItem {
         this.el.style.cursor = "pointer";
 
         this.move(this.x0, this.board.h / 2, true);
-    }
+    } // Cube.constructor()
 
     emit(val, player=undefined, accepted) {
         console.log("Cube.emit("
@@ -615,7 +613,7 @@ class Cube extends BoardItem {
             side = -1;
         }
         emit_msg("cube", { side: side, value: val, accepted: accepted }, true);
-    }
+    } // Cube.emit()
 
     /**
      * @param {number} val
@@ -708,12 +706,22 @@ class Cube extends BoardItem {
     } // Cube.cancel_double()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_down(e) {
-        const [x, y] = this.get_xy(e);
-        console.log(`Cube.on_mouse_down>this.player=${this.player},`
+    on_mouse_down_xy(x, y) {
+        console.log(`Cube.on_mouse_down_xy>this.player=${this.player},`
                     + `this.board.player=${this.board.player}`);
+
+        if ( this.board.turn >= 2 || this.board.turn < 0 ) {
+            return false;
+        }
+
+        for (let rb of this.board.roll_button) {
+            if ( rb.dice_active ) {
+                return false;
+            }
+        }
 
         if ( this.player !== undefined && this.player != this.board.player ) {
             if ( ! this.accepted ) {
@@ -728,7 +736,7 @@ class Cube extends BoardItem {
             this.accept_double();
         }
         return false;
-    } // Cube.on_mouse_down
+    } // Cube.on_mouse_down_xy()
 } // class Cube
 
 /**
@@ -738,7 +746,7 @@ class PlayerItem extends BoardItem {
     constructor(id, board, player, x, y) {
         super(id, board, x, y);
         this.player = player;
-    }
+    } // PlayerItem.constructor()
 } // class PlayerItem
 
 /**
@@ -751,7 +759,7 @@ class BannerButton extends PlayerItem {
         this.el.style.opacity = 0.9;
         this.move(this.x, this.y);
 
-        this.off();
+        //this.off();
     } // BannerButton.constructor()
 
     /**
@@ -766,8 +774,13 @@ class BannerButton extends PlayerItem {
      * 
      */
     on() {
-        this.set_z(5);
         super.on();
+        this.set_z(5);
+    } // BannerButton.on()
+
+    off() {
+        super.off();
+        this.set_z(-2);
     }
 } // class BannerButton
 
@@ -777,6 +790,21 @@ class BannerButton extends PlayerItem {
 class RollButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
+        console.log(`RollButton(id=${id},player=${this.player},x=${this.x},y=${this.y})`);
+
+
+        [this.x1, this.y1] = [this.x, this.y];
+        console.log(`(x1,y1)=(${this.x1},${this.y1})`);
+
+        if ( this.player == 0 ) {
+            this.x0 = this.board.w - this.w;
+            this.y0 = this.board.h - this.h;
+        } else {
+            this.x0 = this.w;
+            this.y0 = this.h;
+        }
+        console.log(`(x0,y0)=(${this.x0},${this.y0})`);
+        
 
         this.dice_active = false;
 
@@ -784,36 +812,51 @@ class RollButton extends BannerButton {
 
         this.dice = [];
         for (let i=0; i < 4; i++) {
-            let x1 = this.w / 8 * ( i * 2 + 1 );
-            x1 += this.x - this.w / 2;
-            let y1 = this.h / 4 * ((i * 2 + 1) % 4);
-            y1 += this.y - this.h / 2;
+            let x2 = this.w / 8 * ( i * 2 + 1 );
+            x2 += this.x - this.w / 2;
+            let y2 = this.h / 4 * ((i * 2 + 1) % 4);
+            y2 += this.y - this.h / 2;
             this.dice.push(new Dice(dice_prefix + i,
                                     this.board, this.player,
-                                    x1, y1,
+                                    x2, y2,
                                     dice_prefix));
         } // for(i)
 
         this.off();
     } // RollButton.constructor()
 
+    on() {
+        this.active = true;
+        this.set_z(5);
+        this.move(this.x1, this.y1);
+    } // RollButton.on()
+
+    off() {
+        if ( ! this.active ) {
+            return;
+        }
+        this.active = false;
+        this.move(this.x0, this.y0);
+        this.set_z(-1);
+    } // RollButton.off()
+
     update() {
         const dice = this.get();
-        console.log(`RollButton.on>dice=${JSON.stringify(dice)}`);
+        console.log(`RollButton.update>dice=${JSON.stringify(dice)}`);
 
         if ( this.board.turn != this.player && this.board.turn < 2 ) {
-            super.off();
+            this.off();
             return;
         }
         
         for (let i=0; i < 4; i++) {
             if ( this.dice[i].value != 0 ) {
-                super.off();
+                this.off();
                 return;
             }
         } // for(i)
 
-        super.on();
+        this.on();
     } // RollButton.on()
 
     /**
@@ -821,7 +864,7 @@ class RollButton extends BannerButton {
      */
     another() {
         return this.board.roll_button[1 - this.player];
-    }
+    } // RollButton.another()
 
     /**
      * Set dice values
@@ -1031,17 +1074,20 @@ class RollButton extends BannerButton {
     } // RollButton.clear()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_down(e) {
-        const [x, y] = this.get_xy(e);
-        console.log("RollButton.on_mouse_down>"
-                    + `player=${this.player}`);
+    on_mouse_down_xy(x, y) {
+        console.log(`RollButton.on_mouse_down_xy>player=${this.player}`);
+
+        if ( ! this.board.cube.accepted ) {
+            return;
+        }
 
         this.off();
 
         this.roll();
-    } // RollButton.on_mouse_down()
+    } // RollButton.on_mouse_down_xy()
 } // class RollButton
 
 /**
@@ -1053,16 +1099,15 @@ class PassButton extends BannerButton {
     } // PassButton.constructor()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_down(e) {
-        const [x, y] = this.get_xy(e);
-        console.log("PassButton.on_mouse_down>"
-                    + `player=${this.player}`);
+    on_mouse_down(x, y) {
+        console.log(`PassButton.on_mouse_down_xy>player=${this.player}`);
 
         this.off();
         this.board.emit_turn(1 - this.player, true);
-    } // PassButton.on_mouse_down()
+    } // PassButton.on_mouse_down_xy()
 } // class PassButton
 
 /**
@@ -1074,14 +1119,12 @@ class WinButton extends BannerButton {
     } // WinButton.constructor()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_down(e) {
-        const [x, y] = this.get_xy(e);
-        console.log("WinButton.on_mouse_down>"
-                    + `player=${this.player}`);
-
-    } // WinButton.on_mouse_down()
+    on_mouse_down_xy(x, y) {
+        console.log(`WinButton.on_mouse_down>player=${this.player}`);
+    } // WinButton.on_mouse_down_xy()
 } // class WinButton
 
 /**
@@ -1095,7 +1138,7 @@ class PlayerName extends PlayerItem {
         this.el.style.removeProperty("height");
 
         this.default_text = `Player ${player + 1}`;
-    }
+    } // PlayerName.constructor()
 
     get() {
         return this.el.innerHTML;
@@ -1116,17 +1159,17 @@ class PlayerName extends PlayerItem {
     on() {
         // this.el.style.borderColor = "rgba(255, 255, 255, 0.8)";
         this.el.style.color = "rgba(255, 255, 128, 0.8)";
-    }
-
-    red() {
-        // this.el.style.borderColor = "rgba(255, 0, 0, 0.8)";
-        this.el.style.color = "rgba(255, 0, 0, 0.8)";
-    }
+    } // PlayerName.on()
 
     off() {
         // this.el.style.borderColor = "rgba(0, 0, 0, 0.8)";
         this.el.style.color = "rgba(0, 0, 0, 0.8)";
-    }
+    } // PlayerName.off()
+
+    red() {
+        // this.el.style.borderColor = "rgba(255, 0, 0, 0.8)";
+        this.el.style.color = "rgba(255, 0, 0, 0.8)";
+    } // PlayerName.red()
 } // class PlayerName
 
 /**
@@ -1252,13 +1295,12 @@ class Dice extends PlayerItem {
     /**
      * @param {MouseEvent} e
      */
-    on_mouse_down(e) {
-        let [x, y] = this.get_xy(e);
-        console.log(`Dice.on_mouse_down> x=${x},y=${y}`);
+    on_mouse_down_xy(x, y) {
+        console.log(`Dice.on_mouse_down_xy>x=${x},y=${y}`);
 
         if ( this.board.turn < 0 ) {
             console.log(
-                `Dice.on_mouse_down>turn=${this.board.turn} .. ignored`);
+                `Dice.on_mouse_down_xy>turn=${this.board.turn} .. ignored`);
             return false;
         }
 
@@ -1266,7 +1308,7 @@ class Dice extends PlayerItem {
         const rb1 = this.board.roll_button[1-this.player];
 
         if ( this.board.turn >= 2 ) {
-            console.log(`Dice.on_mouse_down>turn=${this.board.turn}`);
+            console.log(`Dice.on_mouse_down_xy>turn=${this.board.turn}`);
             // Opening roll
             if ( ! rb1.dice_active ) {
                 return false;
@@ -1298,9 +1340,8 @@ class Dice extends PlayerItem {
 
         rb.clear(true, false);
         this.board.emit_turn(1 - this.player, true);
-        console.log(`Dice.on_mouse_down:return false;`);
         return false;
-    } // Dice.on_mouse_down()
+    } // Dice.on_mouse_down_xy()
 } // class Dice
 
 /**
@@ -1468,13 +1509,14 @@ class Checker extends PlayerItem {
      * @param {number} y
      */
     on_mouse_down_xy(x, y) {
-        console.log(`Checker.on_mouse_down> this.id=${this.id},(x,y)=${x},${y})`);
+        console.log("Checker.on_mouse_down_xy>"
+                    + `this.id=${this.id},(x,y)=${x},${y})`);
         
         if ( ! board.free_move ) {
             
         // check active dices
         const active_dice = this.board.get_active_dice(this.player);
-        console.log(`Checker.on_mouse_down> active_dice=${active_dice}`);
+        console.log(`Checker.on_mouse_down_xy>active_dice=${active_dice}`);
         if ( active_dice.length == 0 ) {
             return;
         }
@@ -1503,7 +1545,7 @@ class Checker extends PlayerItem {
         let ch = this;
         if ( ch.cur_point !== undefined ) {
             ch = this.board.point[ch.cur_point].checkers.slice(-1)[0];
-            console.log(`Checker.on_mouse_down> ch.id=${ch.id}`);
+            console.log(`Checker.on_mouse_down_xy>ch.id=${ch.id}`);
         }
         this.board.moving_checker = ch;
 
@@ -1518,14 +1560,15 @@ class Checker extends PlayerItem {
      * @param {number} y
      */
     on_mouse_up_xy(x, y) {
-        console.log(`Checker.on_mouse_up> this.id=${this.id},x=${x},y=${y}`);
+        console.log("Checker.on_mouse_up_xy>"
+                    + `this.id=${this.id},(x,y)=(${x},${y})`);
 
         const ch = this.board.moving_checker;
         if ( ch === undefined ) {
             return;
         }
 
-        console.log(`Checker.on_mouse_up> ch.id=${ch.id}`);
+        console.log(`Checker.on_mouse_up_xy>ch.id=${ch.id}`);
 
         ch.move(x, y, true);
 
@@ -1533,11 +1576,11 @@ class Checker extends PlayerItem {
         let dice_value = [];
 
         let dst_p = ch.board.chpos2point(ch);
-        console.log(`Checker.on_mouse_up> dst_p=${dst_p}`);
+        console.log(`Checker.on_mouse_up_xy>dst_p=${dst_p}`);
 
         if ( ! board.free_move ) {
             const active_dice = this.board.get_active_dice(ch.player);
-            console.log("Checker.on_mouse_up>"
+            console.log("Checker.on_mouse_up_xy>"
                         + `active_dice=${JSON.stringify(active_dice)}`);
 
             if ( dst_p == ch.cur_point ) {
@@ -1550,7 +1593,7 @@ class Checker extends PlayerItem {
                     this.cancel_move(ch);
                     return;
                 }
-                console.log("Checker.on_mouse_up>"
+                console.log("Checker.on_mouse_up_xy>"
                             + `available_p=${JSON.stringify(available_p)}`);
                 if ( ch.player == 0 ) {
                     dst_p = Math.min(...available_p);
@@ -1612,11 +1655,11 @@ class Checker extends PlayerItem {
                  */
                 can_move = true;
                 hit_ch = checkers[0];
-                console.log(`Checker.on_mouse_up()> hit_ch.id=${hit_ch.id}`);
+                console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
             }
             
             if ( ! can_move ) {
-                console.log(`Checker.on_mouse_up()> cancel`);
+                console.log(`Checker.on_mouse_up_xy>cancel`);
                 this.cancel_move(ch);
                 return;
             }
@@ -1627,7 +1670,7 @@ class Checker extends PlayerItem {
 
             if ( hit_ch !== undefined ) {
                 // hit
-                console.log(`Checker.on_mouse_up> hit_ch.id=${hit_ch.id}`);
+                console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
 
                 let bar_p = 26;
                 if ( hit_ch.player == 1 ) {
@@ -1658,7 +1701,6 @@ class Checker extends PlayerItem {
              */
             let bar_p = this.bar_point(ch.player);
             if ( this.board.point[bar_p].checkers.length > 0 ) {
-                console.log(`Checker.on_mouse_up> T.B.D.`);
                 let ch2 = this.board.point[bar_p].checkers[0];
                 if ( this.board.get_dst_points(ch2.player, bar_p).length == 0 ) {
                     for (let d of rb.dice) {
@@ -1674,7 +1716,7 @@ class Checker extends PlayerItem {
 
         ch.board.moving_checker = undefined;
 
-    } // Checker.on_mouse_up()
+    } // Checker.on_mouse_up_xy()
 
     /**
      * @param {number} x
@@ -1685,9 +1727,8 @@ class Checker extends PlayerItem {
         if ( ch === undefined ) {
             return;
         }
-        
         ch.move(x, y, true);
-    }
+    } // Checker.on_mouse_move_xy()
 } // class Checker
 
 /**
@@ -1881,29 +1922,31 @@ class Board extends ImageItem {
         } // for
 
         // RollButton
-        const x1 = 150;
+        console.log("AAA");
+
+        const bx1 = 150;
 
         this.roll_button = [];
         this.roll_button.push(new RollButton(
-            "rollbutton0", this, 0, this.bx[4] + x1, this.h / 2));
+            "rollbutton0", this, 0, this.bx[4] + bx1, this.h / 2));
         this.roll_button.push(new RollButton(
-            "rollbutton1", this, 1, this.bx[3] - x1, this.h / 2));
+            "rollbutton1", this, 1, this.bx[3] - bx1, this.h / 2));
 
         const dy1 = 130;
 
         // PassButton
         this.pass_button = [];
         this.pass_button.push(new PassButton(
-            "passbutton0", this, 0, this.bx[4] + x1, this.h / 2 + dy1));
+            "passbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1));
         this.pass_button.push(new PassButton(
-            "passbutton1", this, 1, this.bx[3] - x1, this.h / 2 - dy1));
+            "passbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1));
 
         // WinButton
         this.win_button = [];
         this.win_button.push(new WinButton(
-            "winbutton0", this, 0, this.bx[4] + x1, this.h / 2 + dy1));
+            "winbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1));
         this.win_button.push(new WinButton(
-            "winbutton1", this, 1, this.bx[3] - x1, this.h / 2 - dy1));
+            "winbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1));
 
         // Dice histogram
         this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
@@ -2378,17 +2421,16 @@ class Board extends ImageItem {
     } // Board.inverse()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
-    on_mouse_move(e) {
-        let [x, y] = this.get_xy(e);
-
+    on_mouse_move_xy(x, y) {
         if ( this.moving_checker === undefined ) {
             return;
         }
 
         this.moving_checker.move(x, y, true);
-    } // Board.on_mouse_move()
+    } // Board.on_mouse_move_xy()
 
     /**
      * checker position(x, y) to  piont index
@@ -2453,7 +2495,6 @@ class Board extends ImageItem {
             }
         }
     } // Board.put_checker()
-
 } // class Board
 
 /**
@@ -2463,7 +2504,7 @@ class BoardArea extends BackgammonArea {
     constructor(board, x, y, w, h) {
         super(x, y, w, h);
         this.board = board;
-    }
+    } // BoardArea.constructor()
 } // class BoardArea
 
 /**
