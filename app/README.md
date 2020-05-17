@@ -41,6 +41,17 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ![](docs/ytbackgammon1-1.png)
 
+* 両プレーヤーが、「Roll」と書かれたダイスカップをクリックすると、
+それぞれ、一つずつダイスを振ります。
+
+![](docs/ytbackgammon1-2.png)
+
+* どちらかのダイスをクリックすると、大きな目を出した方(先行)が2つダイスを振ったような表示に切り替ります。
+
+![](docs/ytbackgammon1-3.png)
+
+* この図の場合は、赤が先行でプレーを開始します。
+
 ## Implementation
 
 * Server: Python3, flask, flask_socketio (on FreeBSD and Linux)
