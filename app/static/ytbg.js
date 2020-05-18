@@ -48,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.68";
+const VERSION = "0.69";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -56,9 +56,11 @@ let ws = undefined;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
+/*
 sound1 = "/static/sounds/computerbeep_12.mp3";
 sound2 = "/static/sounds/computerbeep_43.mp3";
 sound3 = "/static/sounds/computerbeep_58.mp3";
+*/
 
 sound_roll = "/static/sounds/roll1.mp3";
 sound_put = "/static/sounds/put1.mp3";
@@ -135,8 +137,8 @@ class SoundBase {
     } // SoundBase.constructor()
 
     play() {
-        console.log(`SoundBase.play>soundfile=${this.soundfile}`);
-        console.log(`SoundBase.play>sound=${this.board.sound}`);
+        // console.log(`SoundBase.play>soundfile=${this.soundfile}`);
+        // console.log(`SoundBase.play>sound=${this.board.sound}`);
         if ( this.board.sound ) {
             return this.audio.play();
         } else {
@@ -784,10 +786,13 @@ class BannerButton extends PlayerItem {
         this.set_z(5);
     } // BannerButton.on()
 
+    /**
+     * 
+     */
     off() {
         super.off();
         this.set_z(-2);
-    }
+    } // BannerButton.off()
 } // class BannerButton
 
 /**
@@ -855,8 +860,8 @@ class RollButton extends BannerButton {
             return;
         }
         
-        for (let i=0; i < 4; i++) {
-            if ( this.dice[i].value != 0 ) {
+        for (let d of this.dice) {
+            if ( d.value != 0 ) {
                 this.off();
                 return;
             }
@@ -1700,13 +1705,13 @@ class Checker extends PlayerItem {
                     bar_p = 27;
                 }
 
-                ch.board.put_checker(hit_ch, bar_p, 0.3, true, false);
+                ch.board.emit_put_checker(hit_ch, bar_p, false);
                 hit_ch.calc_z();
             }
         } // if (!free_move)
 
         // move_checker
-        ch.board.put_checker(ch, dst_p, 0.3, true, false);
+        ch.board.emit_put_checker(ch, dst_p, false);
         ch.calc_z();
 
         if ( ! board.free_move ) {
@@ -2318,6 +2323,7 @@ class Board extends ImageItem {
             turn: this.turn,
             text: [ "", "" ],
             board: {
+                playername: this.gameinfo.board.playername,
                 cube: {
                     side: cube_side,
                     value: this.cube.value,
@@ -2402,7 +2408,7 @@ class Board extends ImageItem {
                 for (let c=0; c < 15; c++) {
                     const ch = this.checker[p][c];
                     if ( ch_point[p][c][1] == i ) {
-                        this.put_checker(ch, ch_point[p][c][0], sec, false, false);
+                        this.put_checker(ch, ch_point[p][c][0], sec);
                         ch.el.hidden = false;
                     }
                 } // for (c)
@@ -2421,9 +2427,9 @@ class Board extends ImageItem {
         this.cube.set(c.value, c.side, c.accepted, false);
 
         // player name
-        console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.text)}`);
-        this.playername[0].set(gameinfo.text[0]);
-        this.playername[1].set(gameinfo.text[1]);
+        console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.board.playername)}`);
+        this.playername[0].set(gameinfo.board.playername[0]);
+        this.playername[1].set(gameinfo.board.playername[1]);
 
         // turn
         console.log(`Board.load_gameinfo> set turn`);
@@ -2471,28 +2477,35 @@ class Board extends ImageItem {
             }
         }
         return undefined;
-    }
+    } // Board.chpos2point()
+
+    /**
+     * @param {Checker} ch
+     * @param {number} p - point index
+     * @param {boolean} [add_hist=true]
+     */
+    emit_put_checker(ch, p, add_hist) {
+        const idx = this.point[p].checkers.length;
+        console.log("Board.emit_put_checker("
+                    + `cd.id=${ch.id},`
+                    + `p=${p},`
+                    + `add_hist=${add_hist})`);
+
+        emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
+                                  p:  p,
+                                  idx: idx }, add_hist);
+    } // Board.emit_put_checker()
 
     /**
      * @param {Checker} ch - Checker
      * @param {number} p - point index
-     * @param {number} sec
-     * @param {boolean} [emit=true] - emit flag
-     * @param {boolean} [add_hist=true] - add history flag
+     * @param {number} [sec=0]
      */
-    put_checker(ch, p, sec=0, emit=true, add_hist=true) {
-        console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec},emit=${emit},add_hist=${add_hist})`);
+    put_checker(ch, p, sec=0) {
+        console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
 
         const prev_p = ch.cur_point;
-        const idx = this.point[p].checkers.length;
-        console.log(`Board.put_checker>prev_p=${prev_p},idx=${idx}`);
-
-        if ( emit ) {
-            emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
-                                      p:  p,
-                                      idx: idx }, add_hist);
-            return;
-        }
+        console.log(`Board.put_checker>prev_p=${prev_p})`);
 
         if (prev_p !== undefined ) {
             // chがあったポイントからチェッカーを削除
@@ -2505,7 +2518,8 @@ class Board extends ImageItem {
         }
 
         // 移動先ポイントに chを加える
-        this.point[p].add(ch, sec);
+        const idx = this.point[p].add(ch, sec);
+        console.log(`Board.put_checker>idx=${idx})`);
         ch.cur_point = p;
 
         /*
@@ -2723,15 +2737,14 @@ window.onload = () => {
         } // "gameinfo"
 
         if ( msg.type == "put_checker" ) {
-            console.log(
-                `ws.on(json)>msg.type=put_checker,board.turn=${board.turn}`);
+            console.log(`ws.on(json)>msg.type=put_checker,turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 return;
             }
             const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
             console.log(`ws.on(json)put_checker)> ch_id=${ch_id}`);
             let ch = board.search_checker(ch_id);
-            board.put_checker(ch, msg.data.p, 0.2, false);
+            board.put_checker(ch, msg.data.p, 0.2);
             return;
         } // "put_checker"
 

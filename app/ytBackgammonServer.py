@@ -58,12 +58,12 @@ class ytBackgammonServer:
         """
         self._log.debug('')
 
-        player0_name = self._bg._gameinfo['text'][0]
-        player1_name = self._bg._gameinfo['text'][1]
+        player0_name = self._bg._gameinfo['board']['playername'][0]
+        player1_name = self._bg._gameinfo['board']['playername'][1]
 
         self._bg.init_gameinfo()
-        self._bg._gameinfo['text'][0] = player0_name
-        self._bg._gameinfo['text'][1] = player1_name
+        self._bg._gameinfo['board']['playername'][0] = player0_name
+        self._bg._gameinfo['board']['playername'][1] = player1_name
         
         self.add_history(self._bg._gameinfo)
 
@@ -194,8 +194,11 @@ class ytBackgammonServer:
         j_str += '      "match_score": %d,\n' % h['match_score']
         j_str += '      "score": %s,\n' % h['score']
         j_str += '      "turn": %d,\n' % h['turn']
-        j_str += '      "text": %s,\n' % json.dumps(h['text'])
         j_str += '      "board": {\n'
+        j_str += '        "playername": [\n'
+        j_str += '          %s,\n' % json.dumps(h['board']['playername'][0])
+        j_str += '          %s\n' % json.dumps(h['board']['playername'][1])
+        j_str += '        ],\n'
         j_str += '        "cube": { "side": %d, ' % h['board']['cube']['side']
         j_str += '"value": %d, ' % h['board']['cube']['value']
         j_str += '"accepted": %s },\n' % json.dumps(
@@ -204,10 +207,6 @@ class ytBackgammonServer:
         j_str += '        "checker": [\n'
         j_str += '          %s,\n' % h['board']['checker'][0]
         j_str += '          %s \n' % h['board']['checker'][1]
-        j_str += '        ],\n'
-        j_str += '        "banner": [\n'
-        j_str += '           "%s",\n' % h['board']['banner'][0]
-        j_str += '           "%s"\n' % h['board']['banner'][1]
         j_str += '        ]\n'
         j_str += '      }\n'
         j_str += '    },\n'
@@ -366,10 +365,6 @@ class ytBackgammonServer:
         if msg['type'] == 'set_turn':
             # data: {'turn': int}
             self._bg.set_turn(msg['data'])
-
-        if msg['type'] == 'set_banner':
-            # data: {'player': int, 'text': str}
-            self._bg.set_banner(msg['data'])
 
         if msg['type'] == 'set_playername':
             # data: {'player': int, 'name': str}

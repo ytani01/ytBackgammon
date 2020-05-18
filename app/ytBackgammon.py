@@ -35,13 +35,13 @@ class ytBackgammon:
             'match_score': 0,
             'score': [0, 0],
             'turn': 2,  # <=-1:all off, 0:player0, 1:player1, >=2:all on
-            'text': [
-                '',
-                ''
-            ],
             'board': {
+                'playername': [
+                    '',
+                    ''
+                ],
                 'cube': {
-                    'side': -1,
+                    'side': -1,  # -1: center, 0|1: player
                     'value': 1,
                     'accepted': True
                 },
@@ -49,6 +49,7 @@ class ytBackgammon:
                     [0, 0, 0, 0],
                     [0, 0, 0, 0]
                 ],
+                'roll': False,
                 'checker': [
                     [ [ 6, 0], [ 6, 1], [ 6, 2], [ 6, 3], [ 6, 4],
                       [ 8, 0], [ 8, 1], [ 8, 2],
@@ -59,7 +60,6 @@ class ytBackgammon:
                       [12, 0], [12, 1], [12, 2], [12, 3], [12, 4],
                       [ 1, 0], [ 1, 1] ]
                 ],
-                'banner': ["", ""]
             }
         }
         self._log.debug('_gameinfo=%s', self._gameinfo)
@@ -111,17 +111,10 @@ class ytBackgammon:
         self._log.debug('data=%s', data)
         self._gameinfo['turn'] = data['turn']
 
-    def set_banner(self, data):
-        """
-        data = {'player': int, 'text': str}
-        """
-        self._log.debug('data=%s', data)
-        self._gameinfo['board']['banner'][data['player']] = data['text']
-
     def set_playername(self, data):
         """
         data = {'player': int, 'name': str}
         """
         self._log.debug('data=%s', data)
-        self._gameinfo['text'][data['player']] = data['name']
+        self._gameinfo['board']['playername'][data['player']] = data['name']
 ###
