@@ -48,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.66";
+const VERSION = "0.68";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -59,6 +59,12 @@ const nav = document.getElementById("nav-input");
 sound1 = "/static/sounds/computerbeep_12.mp3";
 sound2 = "/static/sounds/computerbeep_43.mp3";
 sound3 = "/static/sounds/computerbeep_58.mp3";
+
+sound_roll = "/static/sounds/roll1.mp3";
+sound_put = "/static/sounds/put1.mp3";
+sound_hit = "/static/sounds/hit1.mp3";
+sound_turn_change = "/static/sounds/turn_change1.mp3";
+
 
 /**
  *
@@ -877,6 +883,10 @@ class RollButton extends BannerButton {
         this.clear();
         this.off();
         
+        if ( roll_flag ) {
+            this.board.sound_roll.play();
+        }
+
         for (let i=0; i < 4; i++) {
             if ( dice_value[i] < 1 ) {
                 continue;
@@ -1598,7 +1608,7 @@ class Checker extends PlayerItem {
 
             if ( dst_p == ch.cur_point ) {
                 //
-                // XXX T.B.D. ワンタッチでのムーブ??
+                // ワンタッチでのムーブ??
                 //
                 const available_p = this.board.get_dst_points(ch.player,
                                                               ch.cur_point);
@@ -1711,7 +1721,6 @@ class Checker extends PlayerItem {
             /**
              * まだ、バーポイントに残っている場合、
              * もう一つのダイスが使えるか確認
-             */
             let bar_p = this.bar_point(ch.player);
             if ( this.board.point[bar_p].checkers.length > 0 ) {
                 let ch2 = this.board.point[bar_p].checkers[0];
@@ -1721,6 +1730,7 @@ class Checker extends PlayerItem {
                     }
                 }
             }
+             */
         } // if ( ! board.free_move )
         
         emit_msg("dice", { player: this.player,
@@ -1803,7 +1813,10 @@ class Board extends ImageItem {
         this.el_sound = document.getElementById("sound-switch");
         this.sound = false;
         this.load_sound_switch();
-        this.sound_turn_change = new SoundBase(this, sound2);
+        this.sound_turn_change = new SoundBase(this, sound_turn_change);
+        this.sound_roll = new SoundBase(this, sound_roll);
+        this.sound_put = new SoundBase(this, sound_put);
+        this.sound_hit = new SoundBase(this, sound_hit);
 
         // Player name
         if ( this.load_player() === undefined ) {
@@ -2470,18 +2483,29 @@ class Board extends ImageItem {
     put_checker(ch, p, sec=0, emit=true, add_hist=true) {
         console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec},emit=${emit},add_hist=${add_hist})`);
 
-        if (ch.cur_point !== undefined ) {
+        const prev_p = ch.cur_point;
+        const idx = this.point[p].checkers.length;
+        console.log(`Board.put_checker>prev_p=${prev_p},idx=${idx}`);
+
+        if ( emit ) {
+            emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
+                                      p:  p,
+                                      idx: idx }, add_hist);
+            return;
+        }
+
+        if (prev_p !== undefined ) {
             // chがあったポイントからチェッカーを削除
             //
             // 前提: chは、ポイントの先端のチェッカー
             //
-            const checkers = this.point[ch.cur_point].checkers;
+            const checkers = this.point[prev_p].checkers;
             const ch_i = checkers.indexOf(ch);
             checkers.splice(ch_i, 1);
         }
 
         // 移動先ポイントに chを加える
-        const idx = this.point[p].add(ch, sec);
+        this.point[p].add(ch, sec);
         ch.cur_point = p;
 
         /*
@@ -2499,13 +2523,15 @@ class Board extends ImageItem {
 
         */
         
-        if ( emit ) {
-            emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
-                                      p:  p,
-                                      idx: idx }, false);
-            if ( this.game_is_finished(ch.player) ) {
+        console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
+        if ( p >= 26 && prev_p < 26 ) {
+            this.sound_hit.play();
+        } else {
+            this.sound_put.play();
+        }
+
+        if ( this.game_is_finished(ch.player) ) {
                 this.finish_game(ch.player, true);
-            }
         }
     } // Board.put_checker()
 } // class Board
