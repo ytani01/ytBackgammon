@@ -311,7 +311,7 @@ class ImageItem extends BackgammonArea {
     move(x, y, center=false, sec=0) {
         [this.x, this.y] = [x, y];
 
-        this.el.style.transitionTimingTunction = "liner";
+        this.el.style.transitionTimingFunction = "liner";
         this.el.style.transitionDuration = sec + "s";
         this.el.style.left = this.x + "px";
         this.el.style.top = this.y + "px";
@@ -880,6 +880,7 @@ class RollButton extends BannerButton {
             }
         } // for(i)
 
+        this.board.pass_button[1 - this.player].off();
         this.on();
     } // RollButton.on()
 
@@ -2504,6 +2505,8 @@ class Board extends ImageItem {
             console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
             this.set_turn(gameinfo.turn, this.resign);
         }
+
+        
     } // Board.load_gameinfo()
 
     /**
@@ -2615,6 +2618,12 @@ class Board extends ImageItem {
 
         if ( this.game_is_finished(ch.player) ) {
             this.finish_game(ch.player);
+        }
+
+        if ( this.closeout(1 - this.turn) ) {
+            this.pass_button[this.turn].on();
+            this.roll_button[this.turn].off();
+            this.roll_button[1 - this.turn].off();
         }
     } // Board.put_checker()
 
