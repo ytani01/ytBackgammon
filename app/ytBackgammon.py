@@ -35,6 +35,7 @@ class ytBackgammon:
             'match_score': 0,
             'score': [0, 0],
             'turn': 2,  # <=-1:all off, 0:player0, 1:player1, >=2:all on
+            'resign': -1,  # < 0: none, 0|1: player
             'board': {
                 'playername': [
                     '',
@@ -106,10 +107,11 @@ class ytBackgammon:
 
     def set_turn(self, data):
         """
-        data = {'turn': int}
+        data = {'turn': int, resign: int}
         """
         self._log.debug('data=%s', data)
         self._gameinfo['turn'] = data['turn']
+        self._gameinfo['resign'] = data['resign']
 
     def set_playername(self, data):
         """
@@ -117,4 +119,16 @@ class ytBackgammon:
         """
         self._log.debug('data=%s', data)
         self._gameinfo['board']['playername'][data['player']] = data['name']
+
+    def resign(self, data):
+        """
+        resign game
+
+        Parameters
+        ----------
+        data: {'player': int}
+        """
+        self._log.debug('data=%s', data)
+        self._gameinfo['resign'] = data['player']
+        self._log.debug('gameinfo.resign=%s', self._gameinfo['resign'])
 ###

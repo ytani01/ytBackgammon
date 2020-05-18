@@ -194,6 +194,7 @@ class ytBackgammonServer:
         j_str += '      "match_score": %d,\n' % h['match_score']
         j_str += '      "score": %s,\n' % h['score']
         j_str += '      "turn": %d,\n' % h['turn']
+        j_str += '      "resign": %s,\n' % h['resign']
         j_str += '      "board": {\n'
         j_str += '        "playername": [\n'
         j_str += '          %s,\n' % json.dumps(h['board']['playername'][0])
@@ -363,21 +364,26 @@ class ytBackgammonServer:
             self._bg.dice(msg['data'])
 
         if msg['type'] == 'set_turn':
-            # data: {'turn': int}
+            # data: {'turn': int, resign: int}
             self._bg.set_turn(msg['data'])
 
         if msg['type'] == 'set_playername':
             # data: {'player': int, 'name': str}
             self._bg.set_playername(msg['data'])
-        #
-        # append history or not
-        #
+
+        if msg['type'] == 'resign':
+            # data: {'player': int}
+            self._bg.resign(msg['data'])
+
+        """
+        append history or not
+        """
         if msg['history']:
             self.add_history(self._bg._gameinfo)
 
-        #
-        # broadcast
-        #
+        """
+        broadcast
+        """
         emit('json', msg, broadcast=True)
 
     def app_top(self):
