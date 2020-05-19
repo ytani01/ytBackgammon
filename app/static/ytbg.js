@@ -48,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.71";
+const VERSION = "0.72";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -60,7 +60,6 @@ sound_roll = "/static/sounds/roll1.mp3";
 sound_put = "/static/sounds/put1.mp3";
 sound_hit = "/static/sounds/hit1.mp3";
 sound_turn_change = "/static/sounds/turn_change1.mp3";
-
 
 /**
  *
@@ -159,6 +158,9 @@ class BackgammonBase {
 
     /**
      * ポイントとダイスの目から行き先のポイントを計算
+     *
+     * 注1：実際に移動できるかどうかは判断しない。
+     *
      * @param {number} player
      * @param {number} src_p
      * @param {number} dice_val
@@ -172,17 +174,21 @@ class BackgammonBase {
                 src_p = 25;
             }
             dst_p = src_p - dice_val;
+            /*
             if ( dst_p < 0 ) {
                 dst_p = 0;
             }
+            */
         } else { // player1
             if ( src_p == 27 ) {
                 src_p = 0;
             }
             dst_p = src_p + dice_val;
+            /*
             if ( dst_p > 25 ) {
                 dst_p = 25;
             }
+            */
         }
         return dst_p;
     } // BackgammonBase.calc_dst_point()
@@ -956,12 +962,21 @@ class RollButton extends BannerButton {
         console.log(`RollButton.check_disable()`);
         let modified = false;
         
-        let bar_p = 26;
-        if ( this.player == 1 ) {
-            bar_p = 27;
-        }
+        const bar_p = this.bar_point(this.player);
+
+        const active_d = this.get_active_dice();
+        
         if ( this.board.point[bar_p].checkers.length > 0 ) {
             // ヒットされている場合は、復活できるか確認
+            const dst_p = this.board.get_dst_points(this.player, bar_p, active_d);
+            console.log(`RollButton.check_disable>dst_p=${dst_p}`);
+            if ( dst_p.length == 0 ) {
+                for (let d=0; d < 4; d++) {
+                    this.dice[d].disable();
+                }
+                modified = true;
+            }
+            /*
             for (let d=0; d < 4; d++) {
                 this.dice[d].disable();
             }
@@ -986,6 +1001,7 @@ class RollButton extends BannerButton {
                     this.dice[d].enable();
                 } // for(d)
             }
+            */
             return modified;
         }
 
@@ -1022,19 +1038,8 @@ class RollButton extends BannerButton {
                     + `dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
         let histogram_str = "";
         for (let p=0; p < 2; p++) {
-            /*
-            let sum = 0;
-            for (let i=0; i < 6; i++) {
-                sum += this.board.dice_histogram[p][i];
-            } // for (i)
-            */
             for (let i=0; i < 6; i++) {
                 let a = 0;
-                /*
-                if ( sum > 0 ) {
-                    a = Math.floor(this.board.dice_histogram[p][i] / sum * 100);
-                }
-                */
                 a = this.board.dice_histogram[p][i];
                 histogram_str += a + " ";
             } // for (i)
@@ -1532,9 +1537,11 @@ class Checker extends PlayerItem {
             }
         }
 
-        if ( dice_vals.length == 0 && this.board.all_inner(this.player) ) {
+        if ( dice_vals.length == 0 && to_p == 0 ) {
             // bearing off
-            // XXX T.B.D. XXX
+            // 移動可能かどうかは、事前に確認済と仮定
+            // 該当するダイスが無い場合は、大きい方を使用する。
+            dice_vals = [ Math.max(...active_dice) ];
         }
 
         console.log(`Checker.dice_check> dice_vals=${JSON.stringify(dice_vals)}`);
@@ -1635,7 +1642,6 @@ class Checker extends PlayerItem {
     on_mouse_up_xy(x, y) {
         console.log("Checker.on_mouse_up_xy>"
                     + `this.id=${this.id},(x,y)=(${x},${y})`);
-
         const ch = this.board.moving_checker;
         if ( ch === undefined ) {
             return;
@@ -1650,7 +1656,7 @@ class Checker extends PlayerItem {
         let dst_p = ch.board.chpos2point(ch);
         console.log(`Checker.on_mouse_up_xy>dst_p=${dst_p}`);
 
-        const active_dice = this.board.get_active_dice(ch.player);
+        let active_dice = this.board.get_active_dice(ch.player);
         console.log("Checker.on_mouse_up_xy>"
                     + `active_dice=${JSON.stringify(active_dice)}`);
 
@@ -1662,9 +1668,9 @@ class Checker extends PlayerItem {
         console.log("Checker.on_mouse_up_xy>"
                     + `active_dice=${JSON.stringify(active_dice)}`);
 
-        const available_p = this.board.get_dst_points(ch.player,
-                                                      ch.cur_point,
-                                                      active_dice);
+        let available_p = this.board.get_dst_points(ch.player,
+                                                    ch.cur_point,
+                                                    active_dice);
         console.log("Checker.on_mouse_up_xy>"
                     + `available_p=${JSON.stringify(available_p)}`);
 
@@ -1723,7 +1729,8 @@ class Checker extends PlayerItem {
         if ( ! board.free_move ) {
             // 使ったダイスの取得
             dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
-            console.log(`Checker.on_mouse_up_xy>dice_value=${JSON.stringify(dice_value)}`);
+            console.log(`Checker.on_mouse_up_xy>`
+                        + `dice_value=${JSON.stringify(dice_value)}`);
 
             // 使ったダイスを使用済みする
             for (let d1 of dice_value) {
@@ -1735,11 +1742,6 @@ class Checker extends PlayerItem {
                 }
             } // for(d)
 
-            /**
-             * まだ、バーポイントに残っている場合、
-             * もう一つのダイスが使えるか確認
-             * T.B.D.
-             */
         } // if ( ! board.free_move )
         
         emit_msg("dice", { player: this.player,
@@ -2359,16 +2361,45 @@ class Board extends ImageItem {
      *
      */
     get_dst_point1(player, src_p, dice_val) {
-        const dst_p1 = this.calc_dst_point(player, src_p, dice_val);
+        let dst_p1 = this.calc_dst_point(player, src_p, dice_val);
+        console.log(`Board.get_dst_point1>dst_p1=${dst_p1}`);
 
-        if ( player == 0 && dst_p1 == 0 && ! this.all_inner(player) ) {
+        let checkers;
+        
+        if ( player == 0 && dst_p1 <= 0 ) {
+            if ( ! this.all_inner(player) ) {
                 return undefined;
+            }
+            // すべてインナー
+            if ( dst_p1 < 0 ) {
+                // src_p以降のポイントにCheckerが存在するか確認
+                for (let p=src_p+1; p <= 6; p++) {
+                    checkers = this.point[p].checkers;
+                    if ( checkers.length > 0 && checkers[0].player == player) {
+                        return undefined;
+                    }
+                } // for(p)
+                dst_p1 = 0;
+            }
         }
-        if ( player == 1 && dst_p1 == 25 && ! this.all_inner(player) ) {
+        if ( player == 1 && dst_p1 >= 25 ) {
+            if ( ! this.all_inner(player) ) {
                 return undefined;
+            }
+            // すべてインナー
+            if ( dst_p1 > 25 ) {
+                // src_p以降のポイントにCheckerが存在するか確認
+                for (let p=src_p-1; p >= 19; p--) {
+                    checkers = this.point[p].checkers;
+                    if ( checkers.length > 0 && checkers[0].player == player) {
+                        return undefined;
+                    }
+                } // for(p)
+                dst_p1 = 25;
+            }
         }
 
-        const checkers = this.point[dst_p1].checkers;
+        checkers = this.point[dst_p1].checkers;
         if ( checkers.length >= 2 && checkers[0].player != player ) {
             return undefined;
         }
@@ -2465,6 +2496,11 @@ class Board extends ImageItem {
 
         this.gameinfo = gameinfo;
         
+        // player name
+        console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.board.playername)}`);
+        this.playername[0].set(gameinfo.board.playername[0]);
+        this.playername[1].set(gameinfo.board.playername[1]);
+
         // escape checkers
         console.log(`Board.load_gameinfo> escape checkers`);
         for (let player=0; player < 2; player++) {
@@ -2482,30 +2518,6 @@ class Board extends ImageItem {
             this.point[i].checkers = [];
         } // for(i)
 
-        // dice
-        let d = gameinfo.board.dice;
-        console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
-        this.roll_button[0].set(d[0], false);
-        this.roll_button[1].set(d[1], false);
-
-        // cube
-        let c = gameinfo.board.cube;
-        console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
-        this.cube.set(c.value, c.side, c.accepted, false);
-
-        // player name
-        console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.board.playername)}`);
-        this.playername[0].set(gameinfo.board.playername[0]);
-        this.playername[1].set(gameinfo.board.playername[1]);
-
-        // resign
-        console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
-        this.resign = gameinfo.resign;
-
-        // turn
-        console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
-        this.set_turn(gameinfo.turn, this.resign);
-
         // put checkers
         const ch_point = gameinfo.board.checker;
         console.log(
@@ -2522,6 +2534,26 @@ class Board extends ImageItem {
             } // for (p)
         } // for(i)
 
+        // dice
+        let d = gameinfo.board.dice;
+        console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
+        this.roll_button[0].set(d[0], false);
+        this.roll_button[1].set(d[1], false);
+
+        // cube
+        let c = gameinfo.board.cube;
+        console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
+        this.cube.set(c.value, c.side, c.accepted, false);
+
+        // resign
+        console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
+        this.resign = gameinfo.resign;
+
+        // turn
+        console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
+        this.set_turn(gameinfo.turn, this.resign);
+
+        /*
         console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
         if ( gameinfo.resign >= 0 ) {
             // resign
@@ -2532,8 +2564,7 @@ class Board extends ImageItem {
             console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
             this.set_turn(gameinfo.turn, this.resign);
         }
-
-        
+        */
     } // Board.load_gameinfo()
 
     /**
@@ -2622,36 +2653,37 @@ class Board extends ImageItem {
         console.log(`Board.put_checker>idx=${idx})`);
         ch.cur_point = p;
 
-        /*
-        if ( p <= 25 ) { // ヒットされた移動の場合、ダイスチェックは不要
-            if ( this.roll_button[ch.player].check_disable() ) {
-                const dice_values = this.roll_button[ch.player].get();
-                if ( emit ) {
-                    emit_msg("dice", { turn:   this.turn,
-                                       player: ch.player,
-                                       dice:   dice_values,
-                                       roll:   false }, false);
-                }
-            }
-        }
-
-        */
-        
         console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
+
+        // move sound
         if ( p >= 26 && prev_p < 26 ) {
             this.sound_hit.play();
         } else {
             this.sound_put.play();
         }
 
+        // check game over
         if ( this.game_is_finished(ch.player) ) {
             this.finish_game(ch.player);
+            return;
         }
 
+        // check closeout
         if ( this.closeout(1 - this.turn) ) {
             this.pass_button[this.turn].on();
             this.roll_button[this.turn].off();
             this.roll_button[1 - this.turn].off();
+            return;
+        }
+
+        // check disable dice
+        const rb = this.roll_button[ch.player];
+        const active_d = rb.get_active_dice();
+        if ( active_d.length > 0 ) {
+            const modified = rb.check_disable();
+            if ( modified ) {
+                rb.emit_dice(rb.get(), false, true);
+            }
         }
     } // Board.put_checker()
 
