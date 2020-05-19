@@ -51,7 +51,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.73";
+const VERSION = "0.74";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1114,7 +1114,7 @@ class PassButton extends BannerButton {
      * @param {number} x
      * @param {number} y
      */
-    on_mouse_down(x, y) {
+    on_mouse_down_xy(x, y) {
         console.log(`PassButton.on_mouse_down_xy>player=${this.player}`);
 
         this.off();
@@ -2543,18 +2543,6 @@ class Board extends ImageItem {
     } // Board.inverse()
 
     /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_move_xy(x, y) {
-        if ( this.moving_checker === undefined ) {
-            return;
-        }
-
-        this.moving_checker.move(x, y, true);
-    } // Board.on_mouse_move_xy()
-
-    /**
      * checker position(x, y) to  piont index
      * @param {Checker} ch - checker object
      */
@@ -2631,6 +2619,42 @@ class Board extends ImageItem {
         }
     } // Board.put_checker()
 
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_down_xy(x, y) {
+        const roll_button = this.roll_button[this.player];
+        const pass_button = this.pass_button[this.player];
+        const dice = roll_button.dice[0];
+
+        /*
+        if ( roll_button.active ) {
+            roll_button.on_mouse_down_xy(x, y);
+            return;
+        }
+        if ( roll_button.dice_active ) {
+            dice.on_mouse_down_xy(x, y);
+            return;
+        }
+        if ( pass_button.active ) {
+            pass_button.on_mouse_down_xy(x, y);
+            return;
+        }
+        */
+    }
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_move_xy(x, y) {
+        if ( this.moving_checker === undefined ) {
+            return;
+        }
+
+        this.moving_checker.move(x, y, true);
+    } // Board.on_mouse_move_xy()
 } // class Board
 
 /**
@@ -2836,6 +2860,11 @@ const on_key_down = (e, board) => {
     console.log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
     console.log(`e.keyCode=${e.keyCode}`);
 
+    const player = board.player;
+    const roll_button = board.roll_button[player];
+    const pass_button = board.pass_button[player];
+    const dice = roll_button.dice[0];
+
     if ( e.ctrlKey ) {
         if ( e.key == 'z' ) {
             backward_hist();
@@ -2843,6 +2872,24 @@ const on_key_down = (e, board) => {
         }
         if ( e.key == 'y' ) {
             forward_hist();
+            return;
+        }
+    }
+
+    if ( e.key == " " ) {
+        if ( roll_button.active ) {
+            roll_button.on_mouse_down_xy(0, 0);
+            return;
+        }
+        /*
+        if ( roll_button.dice_active ) {
+            dice.on_mouse_down_xy(0, 0);
+            return;
+        }
+        */
+        if ( pass_button.active ) {
+            console.log(`pass_button.active=${pass_button.active}`);
+            pass_button.on_mouse_down_xy(0, 0);
             return;
         }
     }
