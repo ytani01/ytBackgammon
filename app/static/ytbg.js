@@ -48,7 +48,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.72";
+const VERSION = "0.73";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -976,37 +976,10 @@ class RollButton extends BannerButton {
                 }
                 modified = true;
             }
-            /*
-            for (let d=0; d < 4; d++) {
-                this.dice[d].disable();
-            }
-            modified = true;
-            for (let d=0; d < 4; d++) {
-                const dice_value = this.dice[d].value % 10;
-                if ( dice_value < 1 ) {
-                    continue;
-                }
-                let dst_p = dice_value;
-                if ( this.player == 0 ) {
-                    dst_p = 25 - dice_value;
-                }
-                let checkers = this.board.point[dst_p].checkers;
-                if ( checkers.length <= 1
-                     || checkers[0].player == this.player ) {
-                    modified = false;
-                }
-            } // for(d)
-            if ( ! modified ) {
-                for (let d=0; d < 4; d++) {
-                    this.dice[d].enable();
-                } // for(d)
-            }
-            */
             return modified;
         }
 
-        // 全てのチェッカーで、移動できるかのチェック
-        // XXX T.B.D. XXX
+        // T.B.D. 全てのチェッカーで、移動できるかのチェック
 
         return modified;
     } // RollButton.check_disable()
@@ -1744,9 +1717,20 @@ class Checker extends PlayerItem {
 
         } // if ( ! board.free_move )
         
-        emit_msg("dice", { player: this.player,
-                           dice: rb.get(),
-                           roll: false }, true);
+        dice_value = rb.get();
+
+        this.board.put_checker(ch, dst_p, 0.2);
+        if ( this.board.winner_is(ch.player) ) {
+            emit_msg("dice", { player: this.player,
+                               dice: dice_value,
+                               roll: false }, false);
+            this.board.emit_turn(-1, -1, true);
+        } else {
+            emit_msg("dice", { player: this.player,
+                               dice: dice_value,
+                               roll: false }, true);
+        }
+
 
         ch.board.moving_checker = undefined;
 
@@ -2108,6 +2092,9 @@ class Board extends ImageItem {
     } // Board.emit_turn()
 
     /**
+     * ターンを設定
+     * T.B.D. 勝敗判定、バナー表示などを外だしするべき??
+     *
      * @param {number} turn
      *   <= -1 : all off
      *       0 : player 0
@@ -2137,7 +2124,7 @@ class Board extends ImageItem {
                 this.resign_banner_button[resign].on();
             } else {
                 for (let p=0; p < 2; p++) {
-                    if ( this.game_is_finished(p) ) {
+                    if ( this.winner_is(p) ) {
                         winner = p;
                     }
                 } // for(p)
@@ -2190,40 +2177,23 @@ class Board extends ImageItem {
      * @param {number} player
      * @return {boolean}
      */
-    game_is_finished(player) {
-        console.log(`Board.game_is_finished(player=${player})`);
+    winner_is(player) {
+        console.log(`Board.winner_is(player=${player})`);
 
-        console.log(`Board.game_is_finished>resign=${this.resign}`);
+        console.log(`Board.winner_is>resign=${this.resign}`);
         if ( this.resign == 1 - player ) {
             this.resign = -1;
             return true;
         }
 
         const pip_count = this.pip_count(player);
-        console.log(`Board.game_is_finished>pip_count=${pip_count}`);
+        console.log(`Board.winner_is>pip_count=${pip_count}`);
 
         if ( pip_count == 0 ) {
             return true;
         }
         return false;
-    } // Board.game_is_finished()
-
-    /**
-     * @param {number} player - winner
-     */
-    finish_game(player) {
-        console.log(`Board.finish_game(player=${player}`);
-
-        // ダイスを全て使用済みにする
-        const rb = this.roll_button[player];
-        for (let i=0; i < 4; i++) {
-            if ( rb.dice[i].value > 0 ) {
-                rb.dice[i].disable();
-            }
-        } // for(i)
-        
-        this.set_turn(-1, -1);
-    } // Board.finish_game()
+    } // Board.winner_is()
     
     /**
      * @param {number} player
@@ -2552,19 +2522,6 @@ class Board extends ImageItem {
         // turn
         console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
         this.set_turn(gameinfo.turn, this.resign);
-
-        /*
-        console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
-        if ( gameinfo.resign >= 0 ) {
-            // resign
-            console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
-            this.resign = gameinfo.resign;
-            
-            // turn
-            console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
-            this.set_turn(gameinfo.turn, this.resign);
-        }
-        */
     } // Board.load_gameinfo()
 
     /**
@@ -2650,7 +2607,7 @@ class Board extends ImageItem {
 
         // 移動先ポイントに chを加える
         const idx = this.point[p].add(ch, sec);
-        console.log(`Board.put_checker>idx=${idx})`);
+        // console.log(`Board.put_checker>idx=${idx}`);
         ch.cur_point = p;
 
         console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
@@ -2662,28 +2619,12 @@ class Board extends ImageItem {
             this.sound_put.play();
         }
 
-        // check game over
-        if ( this.game_is_finished(ch.player) ) {
-            this.finish_game(ch.player);
-            return;
-        }
-
         // check closeout
         if ( this.closeout(1 - this.turn) ) {
             this.pass_button[this.turn].on();
             this.roll_button[this.turn].off();
             this.roll_button[1 - this.turn].off();
             return;
-        }
-
-        // check disable dice
-        const rb = this.roll_button[ch.player];
-        const active_d = rb.get_active_dice();
-        if ( active_d.length > 0 ) {
-            const modified = rb.check_disable();
-            if ( modified ) {
-                rb.emit_dice(rb.get(), false, true);
-            }
         }
     } // Board.put_checker()
 
@@ -2839,6 +2780,29 @@ const apply_free_move = () => {
     board.apply_free_move();
 };
 
+const on_key_down = (e, board) => {
+    console.log(`on_key_down(board.svr_id=${board.svr_id}`);
+    console.log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
+    console.log(`e.keyCode=${e.keyCode}`);
+
+    if ( e.ctrlKey ) {
+        if ( e.key == 'z' ) {
+            backward_hist();
+            return;
+        }
+        if ( e.key == 'y' ) {
+            forward_hist();
+            return;
+        }
+    }
+};
+
+document.body.onkeydown = e => {
+    if ( e.key.length == 1 ) {
+        on_key_down(e, board);
+    }
+};
+
 /**
  *
  */
@@ -2849,8 +2813,6 @@ window.onload = () => {
     ws = io.connect(url);
 
     console.log(`onload>location.pathname=${location.pathname}`);
-
-    //setTimeout("location.reload()",5000);
 
     const nav_el = document.getElementById("nav-drawer");
     board = new Board("board",

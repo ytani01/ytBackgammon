@@ -118,7 +118,7 @@ class ytBackgammonServer:
         count = 0
         sec = self.SEC_CHECKER_MOVE
         if n == 0:
-            sec = 0
+            sec = 0.1
 
         while self._repeat_flag:
             self._repeat_flag = False
@@ -160,7 +160,7 @@ class ytBackgammonServer:
         count = 0
         sec = self.SEC_CHECKER_MOVE
         if n == 0:
-            sec = 0
+            sec = 0.1
 
         while self._repeat_flag:
             self._repeat_flag = False
