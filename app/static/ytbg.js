@@ -2,9 +2,9 @@
  *=====================================================
  * [Class tree]
  *
- * CookieBase
+ * CookieBase .. cookie manupilation
  *
- * SoundBase
+ * SoundBase .. play audio
  *
  * BackgammonBase .. have (x, y)
  *   |
@@ -17,6 +17,8 @@
  *        |    |    +- BoardButton
  *        |    |    |    |
  *        |    |    |    +- InverseButton
+ *        |    |    |    |
+ *        |    |    |    +- ResignButton
  *        |    |    |    |
  *        |    |    |    +- EmitButton
  *        |    |    |         |
@@ -34,6 +36,7 @@
  *        |    |         |    |
  *        |    |         |    +- RollButton
  *        |    |         |    +- PassButton
+ *        |    |         |    +- ResignBannerButton
  *        |    |         |    +- WinButton
  *        |    |         |
  *        |    |         +- PlayerName
@@ -141,7 +144,7 @@ class SoundBase {
 } // class SoundBase
 
 /**
- * base class for backgammon
+ * base class for ytBackgammon
  */
 class BackgammonBase {
     /**
@@ -2685,6 +2688,8 @@ class BoardPoint extends BoardArea {
 } // class BoardPoint
 
 /**
+ * Emit message to server
+ *
  * @param {string} type
  * @param {Object} data
  * @param {boolean} [history=false]
@@ -2694,53 +2699,84 @@ const emit_msg = (type, data, history=false) => {
     ws.emit("json", {src: "client", type: type, data: data, history: history});
 };
 
+/**
+ * New game
+ */
 const new_game = () => {
     nav.checked=false;
     console.log("new_game()");
     emit_msg("new", {}, false);
 };
 
+/**
+ * Backward history
+ *
+ * @param {number} [n=1]
+ */
 const backward_hist = (n=1) => {
     nav.checked=false;
     console.log(`backward_hist(n=${n})`);
     emit_msg("back", {n: n}, false);
 };
 
+/**
+ * 
+ */
 const back2 = () => {
     nav.checked=false;
     console.log("back2");
     emit_msg("back2", {}, false);
 };
 
+/**
+ *
+ */
 const back_all = () => {
     nav.checked=false;
     console.log("back_all()");
     emit_msg("back_all", {}, false);
 };
 
+/**
+ * Forward history
+ *
+ * @param {number} [n=1]
+ */
 const forward_hist = (n=1) => {
     nav.checked=false;
     console.log(`forward_hist(n=${n})`);
     emit_msg("fwd", {n: n}, false);
 };
 
+/**
+ *
+ */
 const fwd2 = () => {
     nav.checked=false;
     console.log("fwd2");
     emit_msg("fwd2", {}, false);
 };
 
+/**
+ *
+ */
 const fwd_all = () => {
     nav.checked=false;
     console.log("fwd_all()");
     emit_msg("fwd_all", {}, false);
 };
     
+/**
+ *
+ */
 const board_inverse = () => {
     nav.checked=false;
     board.inverse(0.5);
 };
 
+/**
+ *
+ */
 const write_gameinfo = () => {
     nav.checked=false;
     board.write_gameinfo();
@@ -2751,10 +2787,16 @@ const read_gameinfo = () => {
     board.read_gameinfo();
 };
 
+/**
+ *
+ */
 const clear_filename = () => {
     document.getElementById("read_gameinfo").value="";
 };
 
+/**
+ *
+ */
 const emit_playername = () => {
     const el = document.getElementById("player-name");
     const name = el.value;
@@ -2772,14 +2814,23 @@ const emit_playername = () => {
     txt.emit(name, true);
 };
 
+/**
+ *
+ */
 const apply_sound_switch = () => {
     board.apply_sound_switch();
 };
 
+/**
+ *
+ */
 const apply_free_move = () => {
     board.apply_free_move();
 };
 
+/**
+ *
+ */
 const on_key_down = (e, board) => {
     console.log(`on_key_down(board.svr_id=${board.svr_id}`);
     console.log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
@@ -2797,6 +2848,9 @@ const on_key_down = (e, board) => {
     }
 };
 
+/**
+ *
+ */
 document.body.onkeydown = e => {
     if ( e.key.length == 1 ) {
         on_key_down(e, board);
@@ -2828,6 +2882,12 @@ window.onload = () => {
         console.log("ws.on(disconnected)");
     });
 
+    /**
+     * msg := {
+     *   type: str,
+     *   data: Object
+     * }
+     */
     ws.on("json", function(msg) {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
@@ -2840,11 +2900,13 @@ window.onload = () => {
         if ( msg.type == "put_checker" ) {
             console.log(`ws.on(json)>msg.type=put_checker,turn=${board.turn}`);
             if ( board.turn == -1 ) {
+                console.log(`ws.on(json)put_checker>turn=${board.turn}..ignored`);
                 return;
             }
             const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
             console.log(`ws.on(json)put_checker)> ch_id=${ch_id}`);
             let ch = board.search_checker(ch_id);
+
             board.put_checker(ch, msg.data.p, 0.2);
             return;
         } // "put_checker"
