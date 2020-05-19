@@ -1,4 +1,4 @@
-# ytBackgammon -- ネット共有型バックギャモンボード
+# ytBackgammon -- ネットワーク共有型バックギャモンボード (Network Shared Backgammon Board)
 
 http://www.ytani.net:8080/ytbackgammon/
 
