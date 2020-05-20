@@ -94,6 +94,9 @@ class CookieBase {
         return this.data;
     } // CookieBase.load()
 
+    /**
+     * 
+     */
     save() {
         if ( Object.keys(this.data) ) {
             return;
@@ -107,10 +110,17 @@ class CookieBase {
         document.cookie = allcookie;
     }
 
+    /**
+     * @param {string} key
+     * @param {string} value
+     */
     set(key, value) {
         document.cookie = `${key}=${encodeURIComponent(value)};`;
     }
     
+    /**
+     * @param {string} key
+     */
     get(key) {
         if ( this.data[key] === undefined ) {
             return undefined;
@@ -295,11 +305,17 @@ class ImageItem extends BackgammonArea {
         this.e = undefined; // MouseEvent
     } // ImageItem.constructor()
 
+    /**
+     * 
+     */
     on() {
         this.active = true;
         this.el.hidden = false;
     } // ImageItem.on()
 
+    /**
+     * 
+     */
     off() {
         this.active = false;
         this.el.hidden = true;
@@ -330,7 +346,7 @@ class ImageItem extends BackgammonArea {
     set_z(z) {
         this.z = z;
         this.el.style.zIndex = this.z;
-    }
+    } // ImageItem.set_z()
 
     /**
      * @param {number} deg
@@ -690,7 +706,6 @@ class Cube extends BoardItem {
             }
             this.move(this.x1, this.y1[this.player], true, this.move_sec);
         }
-
     } // Cube.set()
 
     /**
@@ -776,7 +791,7 @@ class Cube extends BoardItem {
 } // class Cube
 
 /**
- *
+ * Item owned by player
  */
 class PlayerItem extends BoardItem {
     constructor(id, board, player, x, y) {
@@ -786,9 +801,16 @@ class PlayerItem extends BoardItem {
 } // class PlayerItem
 
 /**
- *
+ * Banner button
  */
 class BannerButton extends PlayerItem {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     */
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
 
@@ -829,7 +851,8 @@ class BannerButton extends PlayerItem {
 class RollButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
-        console.log(`RollButton(id=${id},player=${this.player},x=${this.x},y=${this.y})`);
+        console.log(`RollButton(id=${id},player=${this.player},`
+                    + `x=${this.x},y=${this.y})`);
 
 
         [this.x1, this.y1] = [this.x, this.y];
@@ -843,7 +866,6 @@ class RollButton extends BannerButton {
             this.y0 = this.h;
         }
         console.log(`(x0,y0)=(${this.x0},${this.y0})`);
-        
 
         this.dice_active = false;
 
@@ -853,8 +875,10 @@ class RollButton extends BannerButton {
         for (let i=0; i < 4; i++) {
             let x2 = this.w / 8 * ( i * 2 + 1 );
             x2 += this.x - this.w / 2;
+
             let y2 = this.h / 4 * ((i * 2 + 1) % 4);
             y2 += this.y - this.h / 2;
+
             this.dice.push(new Dice(dice_prefix + i,
                                     this.board, this.player,
                                     x2, y2,
@@ -864,12 +888,18 @@ class RollButton extends BannerButton {
         this.off();
     } // RollButton.constructor()
 
+    /**
+     * 
+     */
     on() {
         this.active = true;
         this.set_z(5);
         this.move(this.x1, this.y1);
     } // RollButton.on()
 
+    /**
+     * 
+     */
     off() {
         if ( ! this.active ) {
             return;
@@ -879,6 +909,9 @@ class RollButton extends BannerButton {
         this.set_z(-1);
     } // RollButton.off()
 
+    /**
+     * 
+     */
     update() {
         const dice = this.get();
         console.log(`RollButton.update>dice=${JSON.stringify(dice)}`);
@@ -1244,15 +1277,25 @@ class PlayerName extends PlayerItem {
         this.default_text = `Player ${player + 1}`;
     } // PlayerName.constructor()
 
+    /**
+     * 
+     */
     get() {
         return this.el.innerHTML;
     } // PlayerName.get()
     
+    /**
+     * @param {string} name
+     * @param {boolean} add_hist
+     */
     emit(name, add_hist=true) {
         emit_msg("set_playername", { player: parseInt(this.player),
                                      name: name }, add_hist);
     } // PlayerName.emit()
 
+    /**
+     * @param {string} name
+     */
     set(name) {
         this.el.innerHTML = this.default_text;
         if ( name.length > 0 ) {
@@ -1260,18 +1303,24 @@ class PlayerName extends PlayerItem {
         }
     } // PlayerName.set()
 
+    /**
+     * 
+     */
     on() {
-        // this.el.style.borderColor = "rgba(255, 255, 255, 0.8)";
         this.el.style.color = "rgba(255, 255, 128, 0.8)";
     } // PlayerName.on()
 
+    /**
+     * 
+     */
     off() {
-        // this.el.style.borderColor = "rgba(0, 0, 0, 0.8)";
         this.el.style.color = "rgba(0, 0, 0, 0.8)";
     } // PlayerName.off()
 
+    /**
+     * 
+     */
     red() {
-        // this.el.style.borderColor = "rgba(255, 0, 0, 0.8)";
         this.el.style.color = "rgba(255, 0, 0, 0.8)";
     } // PlayerName.red()
 } // class PlayerName
@@ -2566,12 +2615,14 @@ class Board extends ImageItem {
      * @param {Object} gameinfo - game information object
      */
     load_gameinfo(gameinfo, sec=0) {
-        console.log(`Board.load_gameinfo(gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
+        console.log(`Board.load_gameinfo(`
+                    + `gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
 
         this.gameinfo = gameinfo;
         
         // player name
-        console.log(`Board.load_gameinfo>playernamer=${JSON.stringify(gameinfo.board.playername)}`);
+        console.log(`Board.load_gameinfo>`
+                    + `playernamer=${JSON.stringify(gameinfo.board.playername)}`);
         this.playername[0].set(gameinfo.board.playername[0]);
         this.playername[1].set(gameinfo.board.playername[1]);
 
@@ -3073,6 +3124,5 @@ window.onload = () => {
         }
         
         console.log("ws.on(json)>msg.type=???");
-    });
-
+    }); // ws.on(json)
 }; // window.onload
