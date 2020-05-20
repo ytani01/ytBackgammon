@@ -135,7 +135,8 @@ class CookieBase {
 class SoundBase {
     constructor(board, soundfile) {
         console.log("SoundBase("
-                    + `board.svr_id=${board.svr_id},soundfile=${soundfile}`);
+                    + `board.svr_id=${board.svr_id},`
+                    + `soundfile=${soundfile}`);
         this.board = board;
         this.soundfile = soundfile;
         this.audio = new Audio(this.soundfile);
