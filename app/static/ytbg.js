@@ -51,7 +51,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.76";
+const VERSION = "0.77";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -70,7 +70,6 @@ sound_turn_change = "/static/sounds/turn_change1.mp3";
 class CookieBase {
     constructor() {
         this.cookie = undefined;
-
         this.data = {};
         this.load();
     }
@@ -80,7 +79,7 @@ class CookieBase {
      */
     load() {
         const allcookie = document.cookie;
-        console.log(`CookieBase.load> allcookie="${allcookie}"`);
+        console.log(`CookieBase.load>allcookie="${allcookie}"`);
 
         if ( allcookie.length == 0 ) {
             return {};
@@ -88,7 +87,7 @@ class CookieBase {
 
         for (let ent of allcookie.split("; ")) {
             let [k, v] = ent.split('=');
-            console.log(`k=${k},v=${v}`);
+            console.log(`CookieBase.load>k=${k},v=${v}`);
             this.data[k] = v;
         } // for(i)
 
@@ -132,9 +131,10 @@ class SoundBase {
         this.audio = new Audio(this.soundfile);
     } // SoundBase.constructor()
 
+    /**
+     * 
+     */
     play() {
-        // console.log(`SoundBase.play>soundfile=${this.soundfile}`);
-        // console.log(`SoundBase.play>sound=${this.board.sound}`);
         if ( this.board.sound ) {
             return this.audio.play();
         } else {
@@ -172,7 +172,8 @@ class BackgammonBase {
     /**
      * ポイントとダイスの目から行き先のポイントを計算
      *
-     * 注1：実際に移動できるかどうかは判断しない。
+     * 注1: 実際に移動できるかどうかは判断しない。
+     * 注2: ゴールを行き過ぎても、補正しない。
      *
      * @param {number} player
      * @param {number} src_p
@@ -183,7 +184,7 @@ class BackgammonBase {
         let dst_p = undefined;
         
         if ( player == 0 ) {
-            if ( src_p == 26 ) {
+            if ( src_p == this.bar_point(player) ) {
                 src_p = 25;
             }
             dst_p = src_p - dice_val;
@@ -193,7 +194,7 @@ class BackgammonBase {
             }
             */
         } else { // player1
-            if ( src_p == 27 ) {
+            if ( src_p == this.bar_point(player) ) {
                 src_p = 0;
             }
             dst_p = src_p + dice_val;
@@ -227,17 +228,6 @@ class BackgammonBase {
         }
         // player == 1
         return (25 - point);
-    }
-
-    /**
-     * @param {number} player
-     */
-    bar_point(player) {
-        let bar_p = 26;
-        if ( player == 1 ) {
-            bar_p = 27;
-        }
-        return bar_p;
     }
 } // class BackgammonBase
 
@@ -680,15 +670,27 @@ class Cube extends BoardItem {
         this.el.firstChild.src = filename;
 
         if ( this.player === undefined ) {
+            this.rotate(0, true);
             this.move(this.x0, this.y0, true, this.move_sec);
         } else if ( accepted ) {
             this.player = player;
+            if ( this.player == 0 ) {
+                this.rotate(90, true);
+            } else {
+                this.rotate(-90, true);
+            }
             this.move(this.x0, this.y2[this.player], true, this.move_sec);
         } else {
             this.player = player;
             this.set_z(100);
+            if ( this.player == 0 ) {
+                this.rotate(90, true);
+            } else {
+                this.rotate(-90, true);
+            }
             this.move(this.x1, this.y1[this.player], true, this.move_sec);
         }
+
     } // Cube.set()
 
     /**
@@ -976,14 +978,14 @@ class RollButton extends BannerButton {
     check_disable() {
         console.log(`RollButton.check_disable()`);
         let modified = false;
-        
-        const bar_p = this.bar_point(this.player);
-
+        const board = this.board;
+        const player = this.player;
+        const bar_p = this.bar_point(player);
         const active_d = this.get_active_dice();
         
-        if ( this.board.point[bar_p].checkers.length > 0 ) {
+        if ( board.point[bar_p].checkers.length > 0 ) {
             // ヒットされている場合は、復活できるか確認
-            const dst_p = this.board.get_dst_points(this.player, bar_p, active_d);
+            const dst_p = board.get_dst_points(player, bar_p, active_d);
             console.log(`RollButton.check_disable>dst_p=${JSON.stringify(dst_p)}`);
             if ( dst_p.length == 0 ) {
                 // 復活できない
@@ -994,56 +996,59 @@ class RollButton extends BannerButton {
                 return modified;
             }
 
-            // 復活できる場合、もう一つのダイスが使えるか確認
+            // T.B.D. 復活できる場合、もう一つのダイスが使えるか確認?
 
             return modified;
         }
 
-        // T.B.D. 全てのチェッカーで、移動できるかのチェック
+        // 全ての持ち駒について、移動できるかのチェック
         for (let i=0; i < 4; i++) {
             let can_use = false;
+
             const dice_val = this.dice[i].value;
             if ( dice_val < 1 || dice_val > 6) {
                 continue;
             }
+
             for (let p=1; p <= 24; p++) {
-                const ch = this.board.point[p].checkers;
+                const ch = board.point[p].checkers;
                 if ( ch.length == 0 ) {
                     continue;
                 }
-                if ( ch[0].player != this.player ) {
+                if ( ch[0].player != player ) {
                     continue;
                 }
-                const dst_p = this.board.get_dst_point1(this.player, p, dice_val);
-                console.log(`RollButton.set>i=${i},p=${p},`
-                            + `dice_val=${dice_val},dst_p=${dst_p}`);
-                if ( dst_p !== undefined ) {
+
+                const dst = board.get_dst_point1(player, p, dice_val);
+                if ( dst !== undefined ) {
                     can_use = true;
                     break;
-                } else {
-                    // もう一つのダイスと足したときに使えるかもチェック
-                    for (let i2=0; i2 < 4; i2++) {
-                        if ( i2 == i ) {
-                            continue;
-                        }
-                        const dice_val2 = this.dice[i2].value;
-                        if ( dice_val2 < 1 || dice_val2 > 6 ) {
-                            continue;
-                        }
-                        const dst_p2 = this.board.get_dst_point1(this.player, p,
-                                                                 dice_val2);
-                        if ( dst_p2 !== undefined ) {
-                            const dst_p3 = this.board.get_dst_point1(
-                                this.player, p, dice_val + dice_val2);
-                            if ( dst_p3 != undefined ) {
-                                can_use = true;
-                                break;
-                            }
-                        }
-                    } // for(i2)
-                    if ( can_use ) {
+                }
+
+                // 使えない場合は、もう一つのダイスと足した場合も確認
+                for (let i2=0; i2 < 4; i2++) {
+                    if ( i2 == i ) {
+                        continue;
+                    }
+                    const dice_val2 = this.dice[i2].value;
+                    if ( dice_val2 < 1 || dice_val2 > 6 ) {
+                        continue;
+                    }
+                    const dst2 = board.get_dst_point1(player, p, dice_val2);
+                    if ( dst2 === undefined ) {
+                        continue;
+                    }
+
+                    // もう一つのダイスが使える場合、出目を足して確認
+                    // 足した目で利用可能なら、dice[i] を利用可とする
+                    const dst3 = board.get_dst_point1(player, p, dice_val+dice_val2);
+                    if ( dst3 !== undefined ) {
+                        can_use = true;
                         break;
                     }
+                } // for(i2)
+                if ( can_use ) {
+                    break;
                 }
             } // for(p)
 
@@ -2198,7 +2203,8 @@ class Board extends ImageItem {
      */
     set_turn(turn, resign=-1) {
         const prev_turn = this.turn;
-        console.log(`Board.set_turn(turn=${turn},resign=${resign})>prev_turn=${prev_turn}`);
+        console.log(`Board.set_turn(`
+                    + `turn=${turn},resign=${resign})>prev_turn=${prev_turn}`);
 
         this.turn = turn;
         this.resign = resign;
@@ -2305,10 +2311,14 @@ class Board extends ImageItem {
     /**
      * クローズアウトしている？
      *
+     * @param {number} player
      */
     closeout(player) {
+        console.log(`Board.closeout(player=${player}`);
+        if ( player != 0 && player != 1 ) {
+            return false;
+        }
         if (this.point[this.bar_point(1-player)].checkers.length == 0) {
-            console.log(`Board.closeout(player=${player}) ==> false`);
             return false;
         }
 
@@ -2714,31 +2724,6 @@ class Board extends ImageItem {
      * @param {number} x
      * @param {number} y
      */
-    on_mouse_down_xy(x, y) {
-        const roll_button = this.roll_button[this.player];
-        const pass_button = this.pass_button[this.player];
-        const dice = roll_button.dice[0];
-
-        /*
-        if ( roll_button.active ) {
-            roll_button.on_mouse_down_xy(x, y);
-            return;
-        }
-        if ( roll_button.dice_active ) {
-            dice.on_mouse_down_xy(x, y);
-            return;
-        }
-        if ( pass_button.active ) {
-            pass_button.on_mouse_down_xy(x, y);
-            return;
-        }
-        */
-    } // Board.on_mosue_down_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
     on_mouse_move_xy(x, y) {
         if ( this.moving_checker === undefined ) {
             return;
@@ -3001,7 +2986,7 @@ document.body.onkeydown = e => {
 window.onload = () => {
     console.log("window.onload()");
     
-    let url = "http://" + document.domain + ":" + location.port + "/";
+    const url = "http://" + document.domain + ":" + location.port + "/";
     ws = io.connect(url);
 
     console.log(`onload>location.pathname=${location.pathname}`);
@@ -3060,7 +3045,7 @@ window.onload = () => {
             if ( board.turn == -1 ) {
                 return;
             }
-            if (JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
+            if ( JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
                 // let playpromise = board.sound_turn_change.play();
             }
 
@@ -3074,13 +3059,15 @@ window.onload = () => {
         } // "dice"
 
         if ( msg.type == "set_turn" ) {
-            console.log(`ws.on(json)set_turn>turn=${msg.data.turn},resign=${msg.data.resign}`);
+            console.log(`ws.on(json)set_turn>turn=${msg.data.turn},`
+                        + `resign=${msg.data.resign}`);
             board.set_turn(msg.data.turn, msg.data.resign);
             return;
         } // set_turn
 
         if ( msg.type == "set_playername" ) {
-            console.log(`ws.on(json)>msg.type=set_playername,player=${msg.data.player},name=${msg.data.name}`);
+            console.log(`ws.on(json)>msg.type=set_playername,`
+                        + `player=${msg.data.player},name=${msg.data.name}`);
             board.playername[msg.data.player].set(msg.data.name);
             return;
         }
