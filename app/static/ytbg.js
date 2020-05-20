@@ -51,7 +51,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.75";
+const VERSION = "0.76";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -984,13 +984,18 @@ class RollButton extends BannerButton {
         if ( this.board.point[bar_p].checkers.length > 0 ) {
             // ヒットされている場合は、復活できるか確認
             const dst_p = this.board.get_dst_points(this.player, bar_p, active_d);
-            console.log(`RollButton.check_disable>dst_p=${dst_p}`);
+            console.log(`RollButton.check_disable>dst_p=${JSON.stringify(dst_p)}`);
             if ( dst_p.length == 0 ) {
+                // 復活できない
                 for (let d=0; d < 4; d++) {
                     this.dice[d].disable();
                 }
                 modified = true;
+                return modified;
             }
+
+            // 復活できる場合、もう一つのダイスが使えるか確認
+
             return modified;
         }
 
@@ -998,7 +1003,7 @@ class RollButton extends BannerButton {
         for (let i=0; i < 4; i++) {
             let can_use = false;
             const dice_val = this.dice[i].value;
-            if ( dice_val < 1 || dice_val > 6 ) {
+            if ( dice_val < 1 || dice_val > 6) {
                 continue;
             }
             for (let p=1; p <= 24; p++) {
@@ -1015,6 +1020,30 @@ class RollButton extends BannerButton {
                 if ( dst_p !== undefined ) {
                     can_use = true;
                     break;
+                } else {
+                    // もう一つのダイスと足したときに使えるかもチェック
+                    for (let i2=0; i2 < 4; i2++) {
+                        if ( i2 == i ) {
+                            continue;
+                        }
+                        const dice_val2 = this.dice[i2].value;
+                        if ( dice_val2 < 1 || dice_val2 > 6 ) {
+                            continue;
+                        }
+                        const dst_p2 = this.board.get_dst_point1(this.player, p,
+                                                                 dice_val2);
+                        if ( dst_p2 !== undefined ) {
+                            const dst_p3 = this.board.get_dst_point1(
+                                this.player, p, dice_val + dice_val2);
+                            if ( dst_p3 != undefined ) {
+                                can_use = true;
+                                break;
+                            }
+                        }
+                    } // for(i2)
+                    if ( can_use ) {
+                        break;
+                    }
                 }
             } // for(p)
 
@@ -1366,16 +1395,35 @@ class Dice extends PlayerItem {
      * @param {MouseEvent} e
      */
     on_mouse_down_xy(x, y) {
-        console.log(`Dice.on_mouse_down_xy>x=${x},y=${y}`);
+        console.log(`Dice.on_mouse_down_xy(${x},${y})`);
+
+        const rb = this.board.roll_button[this.player];
+        const rb1 = this.board.roll_button[1-this.player];
+
+        if ( this.board.free_move ) {
+
+            if ( this.value < 1 ) {
+                return false;
+            }
+            if ( this.value > 6 ) {
+                this.set(this.value % 10);
+                rb.emit_dice(rb.get(), false, true);
+                return false;
+            }
+            let val = this.value + 1;
+            if ( val > 6 ) {
+                val = 1;
+            }
+            this.set(val);
+            rb.emit_dice(rb.get(), false, true);
+            return false;
+        }
 
         if ( this.board.turn < 0 ) {
             console.log(
                 `Dice.on_mouse_down_xy>turn=${this.board.turn} .. ignored`);
             return false;
         }
-
-        const rb = this.board.roll_button[this.player];
-        const rb1 = this.board.roll_button[1-this.player];
 
         if ( this.board.turn >= 2 ) {
             console.log(`Dice.on_mouse_down_xy>turn=${this.board.turn}`);
@@ -1670,9 +1718,13 @@ class Checker extends PlayerItem {
         let dst_p = ch.board.chpos2point(ch);
         console.log(`Checker.on_mouse_up_xy>dst_p=${dst_p}`);
 
+        if ( board.free_move ) {
+            ch.board.emit_put_checker(ch, dst_p, false);
+            this.board.moving_checker = undefined;
+            return;
+        }
+
         let active_dice = this.board.get_active_dice(ch.player);
-        console.log("Checker.on_mouse_up_xy>"
-                    + `active_dice=${JSON.stringify(active_dice)}`);
 
         // 降順にsort
         const koujun = (a, b) => {
@@ -1688,79 +1740,80 @@ class Checker extends PlayerItem {
         console.log("Checker.on_mouse_up_xy>"
                     + `available_p=${JSON.stringify(available_p)}`);
 
-        if ( ! board.free_move ) {
-            if ( dst_p == ch.cur_point ) {
-                //
-                // ワンタッチでのムーブ
-                //
-                if ( available_p.length == 0 ) {
-                    this.cancel_move(ch);
-                    return;
-                }
-
-                dst_p = available_p[0];
-            }
-            
-            console.log("Checker.on_mouse_up_xy>"
-                        + `dst_p=${JSON.stringify(dst_p)}`);
-
-            if ( available_p.indexOf(dst_p) < 0 ) {
+        if ( dst_p == ch.cur_point ) {
+            //
+            // ワンタッチでのムーブ
+            //
+            if ( available_p.length == 0 ) {
                 this.cancel_move(ch);
                 return;
             }
 
-            /**
-             * 移動先ポイントの状態に応じた判定
-             */
-            let hit_ch = undefined;
-            let checkers = ch.board.point[dst_p].checkers;
+            dst_p = available_p[0];
+        }
+        
+        console.log("Checker.on_mouse_up_xy>"
+                    + `dst_p=${JSON.stringify(dst_p)}`);
 
-            if ( checkers.length == 1 && checkers[0].player != ch.player ) {
-                hit_ch = checkers[0];
-                console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
+        if ( available_p.indexOf(dst_p) < 0 ) {
+            this.cancel_move(ch);
+            return;
+        }
+
+        /**
+         * 移動先ポイントの状態に応じた判定
+         */
+        let hit_ch = undefined;
+        let checkers = ch.board.point[dst_p].checkers;
+
+        if ( checkers.length == 1 && checkers[0].player != ch.player ) {
+            hit_ch = checkers[0];
+            console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
+        }
+        
+        // 移動OK. 以降、移動後の処理
+
+        if ( hit_ch !== undefined ) {
+            // hit
+            console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
+
+            let bar_p = 26;
+            if ( hit_ch.player == 1 ) {
+                bar_p = 27;
             }
-            
-            // 移動OK. 以降、移動後の処理
 
-            if ( hit_ch !== undefined ) {
-                // hit
-                console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
-
-                let bar_p = 26;
-                if ( hit_ch.player == 1 ) {
-                    bar_p = 27;
-                }
-
-                ch.board.emit_put_checker(hit_ch, bar_p, false);
-            }
-        } // if (!free_move)
+            ch.board.put_checker(hit_ch, bar_p, 0.2);
+            ch.board.emit_put_checker(hit_ch, bar_p, false);
+        }
 
         // move_checker
         ch.board.emit_put_checker(ch, dst_p, false);
         
         const rb = this.board.roll_button[ch.player];
-
-        if ( ! board.free_move ) {
-            // 使ったダイスの取得
-            dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
-            console.log(`Checker.on_mouse_up_xy>`
-                        + `dice_value=${JSON.stringify(dice_value)}`);
-
-            // 使ったダイスを使用済みする
-            for (let d1 of dice_value) {
-                for (let d of rb.dice ) {
-                    if ( d1 == d.value ) {
-                        d.disable();
-                        break;
-                    }
-                }
-            } // for(d)
-
-        } // if ( ! board.free_move )
         
-        dice_value = rb.get();
+        // 使ったダイスの取得
+        dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
+        console.log(`Checker.on_mouse_up_xy>`
+                    + `dice_value=${JSON.stringify(dice_value)}`);
 
-        this.board.put_checker(ch, dst_p, 0.2);
+        
+        // 使ったダイスを使用済みする
+        for (let d1 of dice_value) {
+            for (let d of rb.dice ) {
+                if ( d1 == d.value ) {
+                    d.disable();
+                    break;
+                }
+            }
+        } // for(d)
+
+        ch.board.put_checker(ch, dst_p, 0.2);
+
+        rb.check_disable();
+
+        dice_value = rb.get();
+        console.log(`Checker.on_mouse_up_xy>dice_value=${JSON.stringify(dice_value)}`);
+
         if ( this.board.winner_is(ch.player) ) {
             emit_msg("dice", { player: this.player,
                                dice: dice_value,
@@ -2680,7 +2733,7 @@ class Board extends ImageItem {
             return;
         }
         */
-    }
+    } // Board.on_mosue_down_xy()
 
     /**
      * @param {number} x
