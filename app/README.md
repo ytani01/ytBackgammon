@@ -52,9 +52,11 @@ http://www.ytani.net:8080/ytbackgammon/
 
 [![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
+
 ### Double --> Take
 
 [![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
+
 
 ### Double --> Resign
 
