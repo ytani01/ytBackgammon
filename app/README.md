@@ -37,18 +37,19 @@ http://www.ytani.net:8080/ytbackgammon/
 * スマホ、PCの Chromeブラウザ
 (なるべく最新版をお使い下さい)
 
-* ネットワーク回線はなるべく高速
+* ネットワークはなるべく高速で安定した回線をお使い下さい。
 (ビデオ会議がストレスなくできるぐらい)
 
 ### 注意事項
 
-* 回線品質によらず、Chromeのバージョンが古い場合は、タイムラグが生じやすいです。
+* 回線品質によらず、
+Chromeのバージョンが古い場合は、タイムラグが生じやすいようです。
 * 表示が崩れたときは、ブラウザの再読込(リロード)をしてみて下さい。
 
 
 ## Usage
 
-### ゲーム開始
+### New game
 
 [![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
