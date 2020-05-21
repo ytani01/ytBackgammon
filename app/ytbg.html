@@ -13,8 +13,9 @@
     <script>
       const set_board = id => {
           console.log(`set_board>id=${id}`);
-          const url = document.getElementById(id).src;
+          const url = document.getElementById(id).src + "?sound=off";
           console.log(`set_board>url=${url}`);
+
           document.cookie = `main_viewer=${encodeURIComponent(id)};`;
           document.getElementById("main_board_id").innerHTML = id;
           document.getElementById("main_viewer").src = url;
@@ -33,7 +34,7 @@
           if ( id === undefined ) {
               return;
           }
-          set_board(id);
+          set_board(decodeURIComponent(id));
       };
     </script>
   </head>
@@ -46,7 +47,9 @@
     <h1 style="color:#AAA;">[Main viewer] <span id="main_board_id"></span></h1>
     <div style="float:left;">
       <div style="width:1000px;height:570px">
-        <iframe id="main_viewer" name="main" src=""
+        <iframe id="main_viewer"
+                name="main"
+                src=""
                 width="1150px" height="650px"
                 style="transform:scale(0.835);transform-origin:left top;">
         </iframe>
@@ -55,10 +58,13 @@
 
     <div style="float:left;">
       <a href="http://www.ytani.net:5001/"
-         target="main" style="color:#AAA;"
+         target="main"
+         style="color:#AAA;"
          onClick="set_board('Board_1');">[ Board_1 ]</a>
+
       <div style="width:500px;height:270px">
-        <iframe id="Board_1" src="http://www.ytani.net:5001"
+        <iframe id="Board_1"
+                src="http://www.ytani.net:5001"
                 width="1150px" height="650px"
                 style="transform:scale(0.4);transform-origin:left top;">
         </iframe>
@@ -67,10 +73,13 @@
 
     <div style="float:left;">
       <a href="http://www.ytani.net:5002/"
-         target="main" style="color:#AAA;"
+         target="main"
+         style="color:#AAA;"
          onClick="set_board('Board_2');">[ Board_2 ]</a>
+
       <div style="width:500px;height:270px">
-        <iframe id="Board_2" src="http://www.ytani.net:5002"
+        <iframe id="Board_2"
+                src="http://www.ytani.net:5002"
                 width="1150px" height="650px"
                 style="transform:scale(0.4);transform-origin:left top;">
         </iframe>
@@ -79,10 +88,12 @@
 
     <div style="float:left;">
       <a href="http://www.ytani.net:5003/"
-         target="main" style="color:#AAA;"
+         target="main"
+         style="color:#AAA;"
          onClick="set_board('Board_3');">[ Board_3 ]</a>
       <div style="width:500px;height:270px">
-        <iframe id="Board_3" src="http://www.ytani.net:5003"
+        <iframe id="Board_3"
+                src="http://www.ytani.net:5003"
                 width="1150px" height="650px"
                 style="transform:scale(0.4);transform-origin:left top;">
         </iframe>
@@ -91,32 +102,17 @@
 
     <div style="float:left;">
       <a href="http://www.ytani.net:5004/"
-         target="main" style="color:#AAA;"
+         target="main"
+         style="color:#AAA;"
          onClick="set_board('Board_4')">[ Board_4 ]</a>
       <div style="width:500px;height:270px">
-        <iframe id="Board_4" src="http://www.ytani.net:5004"
+        <iframe id="Board_4"
+                src="http://www.ytani.net:5004"
                 width="1150px" height="650px"
                 style="transform:scale(0.4);transform-origin:left top;">
         </iframe>
       </div>
     </div>
 
-    <br />
-    <!-- 
-    <div style="width:625px;height:325px;display:inline-block;">
-      <a href="http://www.ytani.net:5001/" target="main">Board 1</a>
-      <div style="width:625px;height:325px;">
-        <iframe src="http://www.ytani.net:5001/" name="sub1"
-                style="width:1250px;height:650px;transform-origin:left top;transform:scale(.4);"></iframe>
-      </div>
-    </div>
-    <div style="width:625px;height:325px;display:inline-block;">
-      <a href="http://www.ytani.net:5002/" target="main">Board 2</a>
-      <div style="width:625px;height:325px;">
-        <iframe src="http://www.ytani.net:5002/" name="sub1"
-                style="width:1250px;height:650px;transform-origin:left top;transform:scale(.4);"></iframe>
-      </div>
-    </div>
-    -->
   </body>
 </html>

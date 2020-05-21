@@ -2,6 +2,8 @@
  *=====================================================
  * [Class tree]
  *
+ * QueryStringBase .. querystring manupilation
+ *
  * CookieBase .. cookie manupilation
  *
  * SoundBase .. play audio
@@ -51,7 +53,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.77";
+const VERSION = "0.78";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -59,10 +61,49 @@ let ws = undefined;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
+let GlobalSoundSwitch = "on";
 const SOUND_ROLL = "/static/sounds/roll1.mp3";
 const SOUND_PUT = "/static/sounds/put1.mp3";
 const SOUND_HIT = "/static/sounds/hit1.mp3";
 const SOUND_TURN_CHANGE = "/static/sounds/turn_change1.mp3";
+
+/**
+ *
+ */
+class QueryStringBase {
+    constructor() {
+        this.querystring = '';
+        this.data = [];
+        this.load();
+    } // constructor()
+
+    load() {
+        this.querystring = window.location.search || '';
+        this.querystring = this.querystring.substr(1, this.querystring.length);
+        console.log(`QueryStringBase.load>querystring=${this.querystring}`);
+
+        if ( this.querystring.length == 0 ) {
+            return {};
+        }
+
+        for (let ent of this.querystring.split("&")) {
+            let [k, v] = ent.split("=");
+            this.data[k] = v;
+        } // for(ent)
+
+        return this.data;
+    } // QueryStringBase.load()
+
+    /**
+     * @param {string} key
+     */
+    get(key) {
+        if ( this.data[key] === undefined ) {
+            return undefined;
+        }
+        return decodeURIComponent(this.data[key]);
+    } // QueryStringBase.get()
+} // class QueryStringBase
 
 /**
  *
@@ -146,7 +187,9 @@ class SoundBase {
      * 
      */
     play() {
-        if ( this.board.sound ) {
+        console.log(`SoundBase.play>`
+                    + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
+        if ( this.board.sound && GlobalSoundSwitch != "off" ) {
             return this.audio.play();
         } else {
             return false;
@@ -639,12 +682,13 @@ class Cube extends BoardItem {
     } // Cube.constructor()
 
     emit(val, player=undefined, accepted) {
+        /*
         console.log("Cube.emit("
                     + `val=${val},`
                     + `player=${player},`
                     + `accepted=${accepted}`
                     + ")");
-
+        */
         if ( player < 0 ) {
             player = undefined;
         }
@@ -1459,8 +1503,8 @@ class Dice extends PlayerItem {
     on_mouse_down_xy(x, y) {
         console.log(`Dice.on_mouse_down_xy(${x},${y})`);
 
-        const rb = this.board.roll_button[this.player];
-        const rb1 = this.board.roll_button[1-this.player];
+        const roll_button = this.board.roll_button[this.player];
+        const roll_button1 = this.board.roll_button[1-this.player];
 
         if ( this.board.free_move ) {
 
@@ -1469,7 +1513,7 @@ class Dice extends PlayerItem {
             }
             if ( this.value > 6 ) {
                 this.set(this.value % 10);
-                rb.emit_dice(rb.get(), false, true);
+                roll_button.emit_dice(roll_button.get(), false, true);
                 return false;
             }
             let val = this.value + 1;
@@ -1477,7 +1521,7 @@ class Dice extends PlayerItem {
                 val = 1;
             }
             this.set(val);
-            rb.emit_dice(rb.get(), false, true);
+            roll_button.emit_dice(roll_button.get(), false, true);
             return false;
         }
 
@@ -1490,35 +1534,35 @@ class Dice extends PlayerItem {
         if ( this.board.turn >= 2 ) {
             console.log(`Dice.on_mouse_down_xy>turn=${this.board.turn}`);
             // Opening roll
-            if ( ! rb1.dice_active ) {
+            if ( ! roll_button1.dice_active ) {
                 return false;
             }
 
             // 双方が振った後、数値が大きい方が先手
-            const d0 = rb.get_active_dice()[0];
-            const d1 = rb1.get_active_dice()[0];
+            const d0 = roll_button.get_active_dice()[0];
+            const d1 = roll_button1.get_active_dice()[0];
 
             if ( d0 > d1 ) {
-                rb1.clear(true, false);
-                rb.emit_dice([d0, 0, 0, d1], false);
+                roll_button1.clear(true, false);
+                roll_button.emit_dice([d0, 0, 0, d1], false);
                 this.board.emit_turn(this.player, -1, true);
                 return false;
             }
             if ( d0 < d1 ) {
-                rb.clear(true, false);
-                rb1.emit_dice([d0, 0, 0, d1], false);
+                roll_button.clear(true, false);
+                roll_button1.emit_dice([d0, 0, 0, d1], false);
                 this.board.emit_turn(1-this.player, -1, true);
                 return false;
             }
 
             // 同じ目だった場合は、もう一度
-            rb.clear(true, false);
-            rb1.clear(true, false);
+            roll_button.clear(true, false);
+            roll_button1.clear(true, false);
             this.board.emit_turn(2, -1, true);
             return false;
         }
 
-        rb.clear(true, false);
+        roll_button.clear(true, false);
         this.board.emit_turn(1 - this.player, -1, true);
         return false;
     } // Dice.on_mouse_down_xy()
@@ -1611,7 +1655,7 @@ class Checker extends PlayerItem {
     } // Checker.is_inner()
 
     /**
-     * 移動に使用するダイスの目を取得する
+     * 移動に使用するダイスの目の組み合わせを取得する
      *
      * @param {number} player
      * @param {number[]} active_dice
@@ -1621,7 +1665,8 @@ class Checker extends PlayerItem {
      *                    0: そこには移動できない
      */
     dice_check(active_dice, from_p, to_p) {
-        console.log(`dice_check(active_dice=${JSON.stringify(active_dice)}, `
+        console.log(`Checker.dice_check(`
+                    + `active_dice=${JSON.stringify(active_dice)},`
                     + `from_p=${from_p}, to_p=${to_p}`);
 
         if ( from_p >= 26 ) {
@@ -1643,12 +1688,22 @@ class Checker extends PlayerItem {
         console.log(`Checker.dice_check>diff_p=${diff_p}`);
 
         let dice_vals = [];
+        if ( diff_p == active_dice[0] ) {
+            dice_vals = [active_dice[0]];
+        } else if ( diff_p == active_dice[1] ) {
+            dice_vals = [active_dice[1]];
+        } else if ( diff_p == active_dice[0] + active_dice[1] ) {
+            dice_vals = [active_dice[0], active_dice[1]];
+        }
+
+        /*
         const dice_idx = active_dice.indexOf(diff_p);
         if ( dice_idx >= 0 ) {
             dice_vals = [active_dice[dice_idx]];
         } else if ( diff_p == active_dice[0] + active_dice[1] ) {
             dice_vals = [active_dice[0], active_dice[1]];
         }
+        */
 
         if ( active_dice.length >= 3 ) {
             let sum_d = active_dice[0] * 3;
@@ -1834,8 +1889,9 @@ class Checker extends PlayerItem {
             console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
         }
         
-        // 移動OK. 以降、移動後の処理
-
+        /**
+         * 移動OK. 以降、移動後の処理
+         */
         if ( hit_ch !== undefined ) {
             // hit
             console.log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
@@ -1845,24 +1901,29 @@ class Checker extends PlayerItem {
                 bar_p = 27;
             }
 
-            ch.board.put_checker(hit_ch, bar_p, 0.2);
             ch.board.emit_put_checker(hit_ch, bar_p, false);
+            /**
+             * 上でemitしたメッセージ受信後に、put_checker()が 実行されるが、
+             * この後のダイスチェックなどのために、先行して、
+             * ここで put_checker() を実行する。
+             * このため、ここでは効果音は鳴らさない。
+             */
+            ch.board.put_checker(hit_ch, bar_p, 0.2, false);
         }
 
         // move_checker
         ch.board.emit_put_checker(ch, dst_p, false);
         
-        const rb = this.board.roll_button[ch.player];
-        
-        // 使ったダイスの取得
+        // 使ったダイスの組み合わせを取得
         dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
         console.log(`Checker.on_mouse_up_xy>`
                     + `dice_value=${JSON.stringify(dice_value)}`);
 
+        const roll_button = this.board.roll_button[ch.player];
         
         // 使ったダイスを使用済みする
         for (let d1 of dice_value) {
-            for (let d of rb.dice ) {
+            for (let d of roll_button.dice ) {
                 if ( d1 == d.value ) {
                     d.disable();
                     break;
@@ -1870,11 +1931,17 @@ class Checker extends PlayerItem {
             }
         } // for(d)
 
-        ch.board.put_checker(ch, dst_p, 0.2);
+        /**
+         * 上でemitしたメッセージ受信後に、put_checker()が 実行されるが、
+         * この後のダイスチェックなどのために、先行して、
+         * ここで put_checker() を実行する。
+         * このため、ここでは効果音は鳴らさない。
+         */
+        ch.board.put_checker(ch, dst_p, 0.2, false);
 
-        rb.check_disable();
+        roll_button.check_disable();
 
-        dice_value = rb.get();
+        dice_value = roll_button.get();
         console.log(`Checker.on_mouse_up_xy>`
                     + `dice_value=${JSON.stringify(dice_value)}`);
 
@@ -2047,61 +2114,62 @@ class Board extends ImageItem {
             let cn = 5;
             let pw = (this.bx[3] - this.bx[2]) / 6;
             let ph = this.h / 2 - this.by[0];
+            let x0, y0, xn, x;
 
             if ( p == 0 ) {
-                let x0 = this.bx[6];
-                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                x0 = this.bx[6];
+                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 this.point.push(new BoardPoint(this, x0, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 1 && p <= 6 ) {
-                let x0 = this.bx[4];
-                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
-                let xn = 6 - p;
-                let x = x0 + pw * xn;
+                x0 = this.bx[4];
+                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                xn = 6 - p;
+                x = x0 + pw * xn;
                 this.point.push(new BoardPoint(this, x, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 7 && p <= 12 ) {
-                let x0 = this.bx[2];
-                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
-                let xn = 12 - p;
-                let x = x0 + pw * xn;
+                x0 = this.bx[2];
+                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                xn = 12 - p;
+                x = x0 + pw * xn;
                 this.point.push(new BoardPoint(this, x, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 13 && p <= 18 ) {
-                let x0 = this.bx[2];
-                let y0 = this.by[0];
-                let xn = p - 13;
-                let x = x0 + pw * xn;
+                x0 = this.bx[2];
+                y0 = this.by[0];
+                xn = p - 13;
+                x = x0 + pw * xn;
                 this.point.push(new BoardPoint(this, x, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p >= 19 && p <= 24 ) {
-                let x0 = this.bx[4];
-                let y0 = this.by[0];
-                let xn = p - 19;
-                let x = x0 + pw * xn;
+                x0 = this.bx[4];
+                y0 = this.by[0];
+                xn = p - 19;
+                x = x0 + pw * xn;
                 this.point.push(new BoardPoint(this, x, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p == 25 ) {
-                let x0 = this.bx[6];
-                let y0 = this.by[0];
+                x0 = this.bx[6];
+                y0 = this.by[0];
                 this.point.push(new BoardPoint(this, x0, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p == 26 ) {
-                let x0 = this.bx[3];
-                let y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                x0 = this.bx[3];
+                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
                 this.point.push(new BoardPoint(this, x0, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p == 27 ) {
-                let x0 = this.bx[3];
-                let y0 = this.by[0];
+                x0 = this.bx[3];
+                y0 = this.by[0];
                 let pw = this.bx[4] - this.bx[3];
                 this.point.push(new BoardPoint(this, x0, y0, pw, ph,
                                                p, -1, cn));
@@ -2746,9 +2814,10 @@ class Board extends ImageItem {
      * @param {Checker} ch - Checker
      * @param {number} p - point index
      * @param {number} [sec=0]
+     * @param {boolean} [sound=true]
      */
-    put_checker(ch, p, sec=0) {
-        // console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
+    put_checker(ch, p, sec=0, sound=true) {
+        console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
 
         const prev_p = ch.cur_point;
         // console.log(`Board.put_checker>prev_p=${prev_p})`);
@@ -2772,10 +2841,12 @@ class Board extends ImageItem {
         // console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
 
         // move sound
-        if ( p >= 26 && prev_p < 26 ) {
-            this.sound_hit.play();
-        } else {
-            this.sound_put.play();
+        if ( sound ) {
+            if ( p >= 26 && prev_p < 26 ) {
+                this.sound_hit.play();
+            } else {
+                this.sound_put.play();
+            }
         }
 
         // check closeout
@@ -3051,8 +3122,12 @@ document.body.onkeydown = e => {
  *
  */
 window.onload = () => {
-    console.log("window.onload()");
-    
+    console.log(`window.onload()>`);
+
+    const q_str = new QueryStringBase();
+    GlobalSoundSwitch = q_str.get("sound") || "on";
+    console.log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
+
     const url = "http://" + document.domain + ":" + location.port + "/";
     ws = io.connect(url);
 
@@ -3090,7 +3165,8 @@ window.onload = () => {
         if ( msg.type == "put_checker" ) {
             console.log(`ws.on(json)>msg.type=put_checker,turn=${board.turn}`);
             if ( board.turn == -1 ) {
-                console.log(`ws.on(json)put_checker>turn=${board.turn}..ignored`);
+                console.log(`ws.on(json)put_checker>`
+                            + `turn=${board.turn}..ignored`);
                 return;
             }
             const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
