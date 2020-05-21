@@ -9,32 +9,98 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=0.4, minimum-scale=0.05, maximum-scale=3">
     <title>ytBackgammon: network shared backgammon board (alpha)</title>
+
+    <script>
+      const set_board = id => {
+          console.log(`set_board>id=${id}`);
+          const url = document.getElementById(id).src;
+          console.log(`set_board>url=${url}`);
+          document.cookie = `main_viewer=${encodeURIComponent(id)};`;
+          document.getElementById("main_board_id").innerHTML = id;
+          document.getElementById("main_viewer").src = url;
+      };
+      window.onload = () => {
+          let id = undefined;
+          for (let ent of document.cookie.split("; ")) {
+              console.log(`window.onload>ent=${ent}`);
+              const [key, val] = ent.split("=");
+              if ( key == "main_viewer" ) {
+                  id = val;
+                  break;
+              }
+          }
+          console.log(`window.onload>id=${id}`);
+          if ( id === undefined ) {
+              return;
+          }
+          set_board(id);
+      };
+    </script>
   </head>
   <body style="background-image:url(./bg.png);width:1200px;">
     <h1 style="color:#AAA;">【ytBackgammon】</h1>
     <h2 style="color:#AAA;">ネットワーク共有型バックギャモンボード</h2>
     <h2 style="color:#AAA;">(network shared backgammon board)</h2>
     <hr />
-    <h1><a href="http://www.ytani.net:5001/"
-           target="_blank" style="color:#AAA;">[ Board 1 ]</a></h1>
-    <iframe src="http://www.ytani.net:5001"
-            width="1150px" height="650px"
-            style="transform:scale(1);"></iframe>
-    <h1><a href="http://www.ytani.net:5002/"
-           target="_blank" style="color:#AAA;">[ Board 2 ]</a></h1>
-    <iframe src="http://www.ytani.net:5002"
-            width="1150px" height="650px"
-            style="transform:scale(1);"></iframe>
-    <h1><a href="http://www.ytani.net:5003/"
-           target="_blank" style="color:#AAA;">[ Board 3 ]</a></h1>
-    <iframe src="http://www.ytani.net:5003"
-            width="1150px" height="650px"
-            style="transform:scale(1);"></iframe>
-    <h1><a href="http://www.ytani.net:5004/"
-           target="_blank" style="color:#AAA;">[ Board 4 ]</a></h1>
-    <iframe src="http://www.ytani.net:5004"
-            width="1150px" height="650px"
-            style="transform:scale(1);"></iframe>
+
+    <h1 style="color:#AAA;">[Main viewer] <span id="main_board_id"></span></h1>
+    <div style="float:left;">
+      <div style="width:1000px;height:570px">
+        <iframe id="main_viewer" name="main" src=""
+                width="1150px" height="650px"
+                style="transform:scale(0.835);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5001/"
+         target="main" style="color:#AAA;"
+         onClick="set_board('Board_1');">[ Board_1 ]</a>
+      <div style="width:500px;height:270px">
+        <iframe id="Board_1" src="http://www.ytani.net:5001"
+                width="1150px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5002/"
+         target="main" style="color:#AAA;"
+         onClick="set_board('Board_2');">[ Board_2 ]</a>
+      <div style="width:500px;height:270px">
+        <iframe id="Board_2" src="http://www.ytani.net:5002"
+                width="1150px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5003/"
+         target="main" style="color:#AAA;"
+         onClick="set_board('Board_3');">[ Board_3 ]</a>
+      <div style="width:500px;height:270px">
+        <iframe id="Board_3" src="http://www.ytani.net:5003"
+                width="1150px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5004/"
+         target="main" style="color:#AAA;"
+         onClick="set_board('Board_4')">[ Board_4 ]</a>
+      <div style="width:500px;height:270px">
+        <iframe id="Board_4" src="http://www.ytani.net:5004"
+                width="1150px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
     <br />
     <!-- 
     <div style="width:625px;height:325px;display:inline-block;">
