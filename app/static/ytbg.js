@@ -79,7 +79,7 @@ class CookieBase {
      */
     load() {
         const allcookie = document.cookie;
-        console.log(`CookieBase.load>allcookie="${allcookie}"`);
+        // console.log(`CookieBase.load>allcookie="${allcookie}"`);
 
         if ( allcookie.length == 0 ) {
             return {};
@@ -87,7 +87,7 @@ class CookieBase {
 
         for (let ent of allcookie.split("; ")) {
             let [k, v] = ent.split('=');
-            console.log(`CookieBase.load>k=${k},v=${v}`);
+            // console.log(`CookieBase.load>k=${k},v=${v}`);
             this.data[k] = v;
         } // for(i)
 
@@ -662,11 +662,13 @@ class Cube extends BoardItem {
      * @param {boolean} accepted
      */
     set(val, player=undefined, accepted=false) {
+        /*
         console.log("Cube.set("
                     + `val=${val},`
                     + `player=${player},`
                     + `accepted=${accepted}`
                     + ")");
+        */
         
         this.value = val;
         this.player = player;
@@ -852,12 +854,13 @@ class BannerButton extends PlayerItem {
 class RollButton extends BannerButton {
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
+        /*
         console.log(`RollButton(id=${id},player=${this.player},`
                     + `x=${this.x},y=${this.y})`);
-
+        */
 
         [this.x1, this.y1] = [this.x, this.y];
-        console.log(`(x1,y1)=(${this.x1},${this.y1})`);
+        // console.log(`(x1,y1)=(${this.x1},${this.y1})`);
 
         if ( this.player == 0 ) {
             this.x0 = this.board.w - this.w;
@@ -866,7 +869,7 @@ class RollButton extends BannerButton {
             this.x0 = this.w;
             this.y0 = this.h;
         }
-        console.log(`(x0,y0)=(${this.x0},${this.y0})`);
+        // console.log(`(x0,y0)=(${this.x0},${this.y0})`);
 
         this.dice_active = false;
 
@@ -915,7 +918,7 @@ class RollButton extends BannerButton {
      */
     update() {
         const dice = this.get();
-        console.log(`RollButton.update>dice=${JSON.stringify(dice)}`);
+        // console.log(`RollButton.update>dice=${JSON.stringify(dice)}`);
 
         if ( this.board.turn != this.player && this.board.turn < 2 ) {
             this.off();
@@ -946,10 +949,11 @@ class RollButton extends BannerButton {
      * @param {boolean} [roll_flag=false] 
      */
     set(dice_value, roll_flag=false) {
+        /*
         console.log(`RollButton[${this.player}].set(`
                     + `dive_value=${JSON.stringify(dice_value)},`
                     + `roll_flag=${roll_flag})`);
-        
+        */
         if ( roll_flag ) {
             this.board.sound_roll.play();
         }
@@ -981,7 +985,6 @@ class RollButton extends BannerButton {
         for (let i=0; i < this.dice.length; i++) {
             values.push(this.dice[i].value);
         }
-        console.log(`RollButton.get> values=${JSON.stringify(values)}`);
         return values;
     } // RollButton.get()
 
@@ -1010,7 +1013,7 @@ class RollButton extends BannerButton {
      * @return {boolean} - modified
      */
     check_disable() {
-        console.log(`RollButton.check_disable()`);
+        // console.log(`RollButton.check_disable()`);
         let modified = false;
         const board = this.board;
         const player = this.player;
@@ -1104,7 +1107,7 @@ class RollButton extends BannerButton {
      * @return {number[]} - dice values
      */
     roll() {
-        console.log(`RollButton.roll()`);
+        // console.log(`RollButton.roll()`);
         this.clear();
 
         let d1 = Math.floor(Math.random()  * 4);
@@ -1120,20 +1123,20 @@ class RollButton extends BannerButton {
         const value2 = Math.floor(Math.random() * 6) + 1;
 
         // Dice histogram
-        this.board.dice_histogram[this.player][value1 - 1]++;
-        this.board.dice_histogram[this.player][value2 - 1]++;
-        console.log("RollButton.roll>"
-                    + `dice_histogram=${JSON.stringify(this.board.dice_histogram)}`);
+        const histo = this.board.dice_histogram;
+        histo[this.player][value1 - 1]++;
+        histo[this.player][value2 - 1]++;
+        // console.log(`RollButton.roll>histo=${JSON.stringify(histo)}`);
         let histogram_str = "";
         for (let p=0; p < 2; p++) {
             for (let i=0; i < 6; i++) {
                 let a = 0;
-                a = this.board.dice_histogram[p][i];
+                a = histo[p][i];
                 histogram_str += a + " ";
             } // for (i)
             histogram_str += "<br />";
         } // for(p)
-        console.log(`histogram_str=${histogram_str}`);
+        // console.log(`histogram_str=${histogram_str}`);
         document.getElementById("dice-histogram").innerHTML = histogram_str;
 
         let dice = [0, 0, 0, 0];
@@ -1152,9 +1155,10 @@ class RollButton extends BannerButton {
         const modified = this.check_disable();
         const dice_values = this.get();
         this.clear();
+        /*
         console.log("RollButton.roll()>"
                     + `dice_value=${JSON.stringify(dice_values)}`);
-        
+        */
         this.emit_dice(dice_values, true, true);
         
         return dice_values;
@@ -1176,7 +1180,7 @@ class RollButton extends BannerButton {
      * @param {boolean} add_hist
      */
     clear(emit=false, add_hist=false) {
-        console.log(`RollButton.clear(emit=${emit})`);
+        // console.log(`RollButton.clear(emit=${emit})`);
 
         this.dice_active = false;
         for ( let d=0; d < 4; d++ ) {
@@ -1335,7 +1339,7 @@ class PlayerName extends PlayerItem {
 class Dice extends PlayerItem {
     constructor(id, board, player, x1, y1, file_prefix) {
         super(id, board, player, x1, y1);
-        console.log(`Dice> (x1,y1)=(${x1},${y1})`);
+        // console.log(`Dice> (x1,y1)=(${x1},${y1})`);
         this.file_prefix = file_prefix;
 
         [this.x1, this.y1] = [x1, y1];
@@ -1425,7 +1429,7 @@ class Dice extends PlayerItem {
      * @param {boolean} [roll_flag=false]
      */
     set(val, roll_flag=false) {
-        console.log(`Dice.set(val=${val},roll_flag=${roll_flag})>`);
+        // console.log(`Dice.set(val=${val},roll_flag=${roll_flag})>`);
         this.value = val;
 
         this.enable();
@@ -1555,7 +1559,7 @@ class Checker extends PlayerItem {
                     if ( d < this.w ) {
                         let z1 = ch.z + 1;
                         z = Math.max(z, z1);
-                        console.log(`Checker.calc_z> d=${d}, z=${z}`);
+                        // console.log(`Checker.calc_z> d=${d}, z=${z}`);
                     }
                 }
             } // for (i)
@@ -1633,7 +1637,7 @@ class Checker extends PlayerItem {
             from_p = 25 - from_p;
             to_p = 25 - to_p;
         }
-        console.log(`Checker.dice_check>from_p=${from_p} ==> to_p=${to_p}`);
+        // console.log(`Checker.dice_check>from_p=${from_p} ==> to_p=${to_p}`);
         
         let diff_p = from_p - to_p;
         console.log(`Checker.dice_check>diff_p=${diff_p}`);
@@ -1667,7 +1671,8 @@ class Checker extends PlayerItem {
             dice_vals = [ Math.max(...active_dice) ];
         }
 
-        console.log(`Checker.dice_check> dice_vals=${JSON.stringify(dice_vals)}`);
+        console.log(
+            `Checker.dice_check>dice_vals=${JSON.stringify(dice_vals)}`);
         return dice_vals;
     } // Checker.dice_check()
 
@@ -1870,7 +1875,8 @@ class Checker extends PlayerItem {
         rb.check_disable();
 
         dice_value = rb.get();
-        console.log(`Checker.on_mouse_up_xy>dice_value=${JSON.stringify(dice_value)}`);
+        console.log(`Checker.on_mouse_up_xy>`
+                    + `dice_value=${JSON.stringify(dice_value)}`);
 
         if ( this.board.winner_is(ch.player) ) {
             emit_msg("dice", { player: this.player,
@@ -2153,7 +2159,7 @@ class Board extends ImageItem {
                     + `cookie_sound=${this.cookie_sound}`);
 
         const s = this.cookie.get(this.cookie_sound);
-        console.log(`Board.load_sound_switch>s=${s}`);
+        // console.log(`Board.load_sound_switch>s=${s}`);
         if ( s === undefined ) {
             this.sound = false;
         } else {
@@ -2256,9 +2262,11 @@ class Board extends ImageItem {
      */
     set_turn(turn, resign=-1) {
         const prev_turn = this.turn;
+        /*
         console.log(`Board.set_turn(`
-                    + `turn=${turn},resign=${resign})>prev_turn=${prev_turn}`);
-
+                    + `turn=${turn},`
+                    + `resign=${resign})>prev_turn=${prev_turn}`);
+        */
         this.turn = turn;
         this.resign = resign;
         
@@ -2322,7 +2330,7 @@ class Board extends ImageItem {
         for (let ch of this.checker[player]) {
             count += ch.pip();
         } // for(ch)
-        console.log(`Board.pip_count>count=${count}`);
+        // console.log(`Board.pip_count>count=${count}`);
         return count;
     } // Board.pip_count()
 
@@ -2331,17 +2339,16 @@ class Board extends ImageItem {
      * @return {boolean}
      */
     winner_is(player) {
-        console.log(`Board.winner_is(player=${player})`);
+        // console.log(`Board.winner_is(player=${player})`);
 
-        console.log(`Board.winner_is>resign=${this.resign}`);
+        // console.log(`Board.winner_is>resign=${this.resign}`);
         if ( this.resign == 1 - player ) {
             this.resign = -1;
             return true;
         }
 
         const pip_count = this.pip_count(player);
-        console.log(`Board.winner_is>pip_count=${pip_count}`);
-
+        // console.log(`Board.winner_is>pip_count=${pip_count}`);
         if ( pip_count == 0 ) {
             return true;
         }
@@ -2367,7 +2374,7 @@ class Board extends ImageItem {
      * @param {number} player
      */
     closeout(player) {
-        console.log(`Board.closeout(player=${player}`);
+        // console.log(`Board.closeout(player=${player})`);
         if ( player != 0 && player != 1 ) {
             return false;
         }
@@ -2625,13 +2632,16 @@ class Board extends ImageItem {
         this.gameinfo = gameinfo;
         
         // player name
-        console.log(`Board.load_gameinfo>`
-                    + `playernamer=${JSON.stringify(gameinfo.board.playername)}`);
+        /*
+        console.log(
+            `Board.load_gameinfo>`
+                + `playernamer=${JSON.stringify(gameinfo.board.playername)}`);
+        */
         this.playername[0].set(gameinfo.board.playername[0]);
         this.playername[1].set(gameinfo.board.playername[1]);
 
         // escape checkers
-        console.log(`Board.load_gameinfo> escape checkers`);
+        // console.log(`Board.load_gameinfo> escape checkers`);
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
                 let ch = this.checker[player][i];
@@ -2642,15 +2652,17 @@ class Board extends ImageItem {
         }
 
         // clear points
-        console.log(`Board.load_gameinfo> clear points`);
+        // console.log(`Board.load_gameinfo> clear points`);
         for (let i=0; i < this.point.length; i++) {
             this.point[i].checkers = [];
         } // for(i)
 
         // put checkers
         const ch_point = gameinfo.board.checker;
+        /*
         console.log(
             `Board.load_gameinfo> ch_point=${JSON.stringify(ch_point)}`);
+        */
         for (let i=0; i < 15; i++) {
             for (let p=0; p < 2; p++) {
                 for (let c=0; c < 15; c++) {
@@ -2665,21 +2677,21 @@ class Board extends ImageItem {
 
         // dice
         let d = gameinfo.board.dice;
-        console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
+        // console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
         this.roll_button[0].set(d[0], false);
         this.roll_button[1].set(d[1], false);
 
         // cube
         let c = gameinfo.board.cube;
-        console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
+        // console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
         this.cube.set(c.value, c.side, c.accepted, false);
 
         // resign
-        console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
+        // console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
         this.resign = gameinfo.resign;
 
         // turn
-        console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
+        // console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
         this.set_turn(gameinfo.turn, this.resign);
     } // Board.load_gameinfo()
 
@@ -2736,10 +2748,10 @@ class Board extends ImageItem {
      * @param {number} [sec=0]
      */
     put_checker(ch, p, sec=0) {
-        console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
+        // console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
 
         const prev_p = ch.cur_point;
-        console.log(`Board.put_checker>prev_p=${prev_p})`);
+        // console.log(`Board.put_checker>prev_p=${prev_p})`);
 
         if (prev_p !== undefined ) {
             //
@@ -2757,7 +2769,7 @@ class Board extends ImageItem {
         // console.log(`Board.put_checker>idx=${idx}`);
         ch.cur_point = p;
 
-        console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
+        // console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
 
         // move sound
         if ( p >= 26 && prev_p < 26 ) {
@@ -2825,7 +2837,7 @@ class BoardPoint extends BoardArea {
      * @return {number} - position index
      */
     add(ch, sec=0) {
-        console.log(`BoardPoint.add(ch.id=${ch.id},sec=${sec})`);
+        // console.log(`BoardPoint.add(ch.id=${ch.id},sec=${sec})`);
         const n = this.checkers.length;
         const n2 = n % this.max_n;
         const n3 = Math.floor(n / this.max_n);
@@ -2833,7 +2845,7 @@ class BoardPoint extends BoardArea {
         const y = parseInt(Math.round(this.y0
                                       + ch.h * (0.5 + n2 * 0.75 + 0.1 * n3)
                                       * this.direction));
-        console.log(`BoardPoint.add()> n=${n},y=${y}`);
+        // console.log(`BoardPoint.add()> n=${n},y=${y}`);
         ch.move(x, y, true, sec);
         ch.set_z(n);
         ch.cur_point = this.id;
