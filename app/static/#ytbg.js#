@@ -59,10 +59,10 @@ let ws = undefined;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
-const sound_roll = "/static/sounds/roll1.mp3";
-const sound_put = "/static/sounds/put1.mp3";
-const sound_hit = "/static/sounds/hit1.mp3";
-const sound_turn_change = "/static/sounds/turn_change1.mp3";
+const SOUND_ROLL = "/static/sounds/roll1.mp3";
+const SOUND_PUT = "/static/sounds/put1.mp3";
+const SOUND_HIT = "/static/sounds/hit1.mp3";
+const SOUND_TURN_CHANGE = "/static/sounds/turn_change1.mp3";
 
 /**
  *
@@ -1962,10 +1962,10 @@ class Board extends ImageItem {
         this.el_sound = document.getElementById("sound-switch");
         this.sound = false;
         this.load_sound_switch();
-        this.sound_turn_change = new SoundBase(this, sound_turn_change);
-        this.sound_roll = new SoundBase(this, sound_roll);
-        this.sound_put = new SoundBase(this, sound_put);
-        this.sound_hit = new SoundBase(this, sound_hit);
+        this.sound_turn_change = new SoundBase(this, SOUND_TURN_CHANGE);
+        this.sound_roll = new SoundBase(this, SOUND_ROLL);
+        this.sound_put = new SoundBase(this, SOUND_PUT);
+        this.sound_hit = new SoundBase(this, SOUND_HIT);
 
         // Player name
         if ( this.load_player() === undefined ) {
