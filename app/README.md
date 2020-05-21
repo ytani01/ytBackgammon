@@ -50,6 +50,7 @@ http://www.ytani.net:8080/ytbackgammon/
 
 * [メニュー]-[ゲーム開始]を選択すると下記のような画面になります。
 
+
 ![](docs/ytbackgammon1-1.png)
 
 * 両プレーヤーが、「Roll」と書かれたダイスカップをクリックすると、
