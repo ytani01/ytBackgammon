@@ -1,3 +1,5 @@
+[![](docs/ytBackgammon-demo-4boards.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-demo-4boards.mp4)
+
 # ytBackgammon -- ネットワーク共有型バックギャモンボード (Network Shared Backgammon Board)
 
 http://www.ytani.net:8080/ytbackgammon/
@@ -46,21 +48,18 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## Usage
 
-[![](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
-
 ### ゲーム開始
 
-* [メニュー]-[ゲーム開始]を選択すると下記のような画面になります。
+[![](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
+### Double --> Take
 
-![](docs/ytbackgammon1-1.png)
+[![](docs/ytBackgammon-double-accept.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
 
-* 両プレーヤーが、「Roll」と書かれたダイスカップをクリックすると、
-それぞれ、一つずつダイスを振ります。
+### Double --> Resign
 
-![](docs/ytbackgammon1-3.png)
+[![](docs/ytBackgammon-double-resign.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
 
-* 大きな目を出したプレーヤーが先行でゲームを開始します。
 
 ## Implementation
 
