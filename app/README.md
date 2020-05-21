@@ -54,11 +54,11 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ### Double --> Take
 
-[![a](docs/ytBackgammon-double-accept.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
+[![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
 
 ### Double --> Resign
 
-[![a](docs/ytBackgammon-double-resign.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
+[![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
 
 
 ## Implementation
