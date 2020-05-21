@@ -46,7 +46,7 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## Usage
 
-[!test](docs/movies/ytBackgammon-opening.mp4)
+[!test](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
 ### ゲーム開始
 
