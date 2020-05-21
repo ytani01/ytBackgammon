@@ -34,6 +34,7 @@
       css_el.setAttribute("rel", "stylesheet");
       css_el.setAttribute("type", "text/css");
       css_el.setAttribute("href", css_url);
+      css_el.setAttribute("charset", "utf-8");
       head_el.appendChild(css_el);
     </script>
   </head>
@@ -60,6 +61,7 @@
             <li><a href="#" onClick="fwd2();">連続で進める</a>
             <li><a href="#" onClick="fwd_all();">連続で進める(高速)</a>
           </ul>
+          <!--
           <ul id="nav">
             <li><a id="write_gameinfo" href="#"
                    download="gameinfo.json"
@@ -70,6 +72,7 @@
                        onClick="clear_filename();"
                        onChange="read_gameinfo();"></label>
           </ul>
+          -->
           <ul id="nav">
             <li><a href="#" onClick="new_game();">New Game</a>
           </ul>
