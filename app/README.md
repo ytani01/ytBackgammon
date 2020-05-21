@@ -1,4 +1,4 @@
-[![](docs/ytBackgammon-demo-4boards.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-demo-4boards.mp4)
+[![a](docs/ytBackgammon-demo-4boards.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-demo-4boards.mp4)
 
 # ytBackgammon -- ネットワーク共有型バックギャモンボード (Network Shared Backgammon Board)
 
@@ -50,15 +50,15 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ### ゲーム開始
 
-[![](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
+[![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
 ### Double --> Take
 
-[![](docs/ytBackgammon-double-accept.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
+[![a](docs/ytBackgammon-double-accept.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
 
 ### Double --> Resign
 
-[![](docs/ytBackgammon-double-resign.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
+[![a](docs/ytBackgammon-double-resign.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
 
 
 ## Implementation
