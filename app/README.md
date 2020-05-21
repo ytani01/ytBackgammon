@@ -46,6 +46,8 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## Usage
 
+[!test](docs/movies/ytBackgammon-opening.mp4)
+
 ### ゲーム開始
 
 * [メニュー]-[ゲーム開始]を選択すると下記のような画面になります。
