@@ -120,6 +120,13 @@ class ytBackgammon:
         self._log.debug('data=%s', data)
         self._gameinfo['board']['playername'][data['player']] = data['name']
 
+    def set_score(self, data):
+        """
+        data = {'player': int, 'score': int}
+        """
+        self._log.debug('data=%s', data)
+        self._gameinfo['score'][data['player']] = data['score']
+
     def resign(self, data):
         """
         resign game

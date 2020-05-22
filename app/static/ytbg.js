@@ -19,7 +19,6 @@
  *        |    |    +- BoardButton
  *        |    |    |    |
  *        |    |    |    +- InverseButton
- *        |    |    |    |
  *        |    |    |    +- ResignButton
  *        |    |    |    |
  *        |    |    |    +- EmitButton
@@ -34,6 +33,8 @@
  *        |    |    |
  *        |    |    +- PlayerItem .. owned by player
  *        |    |         |
+ *        |    |         +- ScoreButton
+ *        |    |         |
  *        |    |         +- BannerButton
  *        |    |         |    |
  *        |    |         |    +- RollButton
@@ -41,7 +42,12 @@
  *        |    |         |    +- ResignBannerButton
  *        |    |         |    +- WinButton
  *        |    |         |
- *        |    |         +- PlayerName
+ *        |    |         +- PlayerText
+ *        |    |         |    |
+ *        |    |         |    +- PlayerName
+ *        |    |         |    +- PlayerScore
+ *        |    |         |
+ *        |    |         +- Score
  *        |    |         +- Dice
  *        |    |         +- Checker
  *        |    +- Board
@@ -53,7 +59,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.78";
+const VERSION = "0.79";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -350,6 +356,18 @@ class ImageItem extends BackgammonArea {
     } // ImageItem.constructor()
 
     /**
+     * @param {number} w
+     * @param {number} h
+     */
+    set_wh(w, h) {
+        this.w = w;
+        this.h = h;
+
+        this.el.style.width = `${this.w}px`;
+        this.el.style.height = `${this.h}px`;
+    } // ImageItem.set_wh()
+
+    /**
      * 
      */
     on() {
@@ -557,7 +575,10 @@ class ResignButton extends BoardButton {
     } // ResignButton.constructor()
 
     on_mouse_down_xy(x, y) {
-        this.board.emit_turn(-1, this.board.player, true);
+        const score = this.board.calc_gammon(1 - this.board.player);
+        console.log(`ResignButton.on_mouse_down_xy>score=${score}`);
+        this.board.emit_turn(-1, this.board.player, false);
+        this.board.score[1 - this.board.player].up(score);
     } // ResignButton.on_mouse_down_xy()
 } // class ResignButton
 
@@ -652,7 +673,7 @@ class FwdAllButton extends EmitButton {
  *                | |   ||p1          p0   |26 |p0               || 0 | |
  * y2[0] ------------>+ ||p1          p0   |   |p0             p1||   | |
  *                | |   ||p1          p0   |   |p0             p1||   | |
- *        by[1] --->+-------------------------------------------------  |
+ *        by[9] --->+-------------------------------------------------  |
  *                |       12 11 10  9  8  7      6  5  4  3  2  1       |
  *                 ----------------------------------------------------- 
  */
@@ -669,7 +690,7 @@ class Cube extends BoardItem {
         this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
         this.x1 = (this.board.bx[2] + this.board.bx[3]) / 2;
         this.y0 = this.board.h / 2;
-        this.y2 = [this.board.by[1] - this.h / 2,
+        this.y2 = [this.board.by[9] - this.h / 2,
                    this.board.by[0] + this.h / 2];
         this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
                    (this.y2[1] + this.board.h / 2) / 2];
@@ -846,6 +867,40 @@ class PlayerItem extends BoardItem {
         this.player = player;
     } // PlayerItem.constructor()
 } // class PlayerItem
+
+/**
+ *
+ */
+class ScoreButton extends PlayerItem {
+    constructor(id, board, player, x, y, w, h, score_obj, offset) {
+        super(id, board, player, x, y);
+        this.set_wh(w, h);
+        this.score_obj = score_obj;
+        this.offset = offset;
+
+        this.el.style.backgroundColor = "#FFF";
+        this.image_el.style.opacity = 0;
+    } // ScoreButton.constructor()
+
+    set_wh(w, h) {
+        super.set_wh(w, h);
+        this.image_el.style.width = `${this.w}px`;
+        this.image_el.style.height = `${this.h}px`;
+    }
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_down_xy(x, y) {
+        console.log(`ScoreButton.on_mouse_down_xy()`);
+        if ( this.offset > 0 ) {
+            this.score_obj.up();
+        } else {
+            this.score_obj.down();
+        }
+    } // ScoreButton.on_mouse_down_xy()
+} // class ScoreButton
 
 /**
  * Banner button
@@ -1257,7 +1312,7 @@ class RollButton extends BannerButton {
         if ( this.another().dice_active ) {
             console.log(`settimeout`);
             const click_dice = this.dice[0].on_mouse_down_xy.bind(this);
-            setTimeout(click_dice, 1500);
+            setTimeout(click_dice, 2000);
         }
     } // RollButton.on_mouse_down_xy()
 } // class RollButton
@@ -1319,23 +1374,74 @@ class WinButton extends BannerButton {
 /**
  *
  */
-class PlayerName extends PlayerItem {
+class PlayerText extends PlayerItem {
+    /**
+     * @param {string} id - ID string
+     * @param {Board} board
+     * @param {number} plyaer
+     * @param {number} x
+     * @param {number} y
+     */
     constructor(id, board, player, x, y) {
         super(id, board, player, x, y);
 
         this.el.style.removeProperty("width");
         this.el.style.removeProperty("height");
 
-        this.default_text = `Player ${player + 1}`;
-    } // PlayerName.constructor()
+        this.el.innerHTML = "";
+        this.set("");
+    } // PlayerText.constructor()
 
     /**
      * 
      */
     get() {
         return this.el.innerHTML;
-    } // PlayerName.get()
+    } // PlayerText.get()
     
+    /**
+     * @param {string} txt
+     */
+    set(txt) {
+        this.el.innerHTML = this.default_text;
+        if ( txt.length > 0 ) {
+            this.el.innerHTML = txt;
+        }
+    } // PlayerText.set()
+
+    /**
+     * 
+     */
+    on() {
+        this.el.style.color = "rgba(255, 255, 128, 0.8)";
+    } // PlayerText.on()
+
+    /**
+     * 
+     */
+    off() {
+        this.el.style.color = "rgba(0, 0, 0, 0.8)";
+    } // PlayerText.off()
+
+    /**
+     * 
+     */
+    red() {
+        this.el.style.color = "rgba(255, 0, 0, 0.8)";
+    } // PlayerText.red()
+} // class PlayerText
+
+/**
+ *
+ */
+class PlayerName extends PlayerText {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+
+        this.default_text = `Player ${player + 1}`;
+        this.set("");
+    } // PlayerName.constructor()
+
     /**
      * @param {string} name
      * @param {boolean} add_hist
@@ -1344,38 +1450,70 @@ class PlayerName extends PlayerItem {
         emit_msg("set_playername", { player: parseInt(this.player),
                                      name: name }, add_hist);
     } // PlayerName.emit()
-
-    /**
-     * @param {string} name
-     */
-    set(name) {
-        this.el.innerHTML = this.default_text;
-        if ( name.length > 0 ) {
-            this.el.innerHTML = name;
-        }
-    } // PlayerName.set()
-
-    /**
-     * 
-     */
-    on() {
-        this.el.style.color = "rgba(255, 255, 128, 0.8)";
-    } // PlayerName.on()
-
-    /**
-     * 
-     */
-    off() {
-        this.el.style.color = "rgba(0, 0, 0, 0.8)";
-    } // PlayerName.off()
-
-    /**
-     * 
-     */
-    red() {
-        this.el.style.color = "rgba(255, 0, 0, 0.8)";
-    } // PlayerName.red()
 } // class PlayerName
+
+/**
+ *
+ */
+class PlayerScore extends PlayerText {
+    constructor(id, board, player, x, y) {
+        super(id, board, player, x, y);
+
+        this.score = 0;
+
+        this.el.style.width = "42px";
+        this.el.style.textAlign = "center";
+        this.el.style.fontSize = "30px";
+        this.el.style.transform = "rotate(-90deg)";
+        this.el.style.transformOrigin = "left top";
+
+        this.default_text = `${this.score}`;
+        this.set("");
+    } // Score.constructor()
+
+    set(score) {
+        this.score = score;
+        super.set(`${score}`);
+    }
+
+    get() {
+        return parseInt(super.get());
+    }
+
+    up(score) {
+        this.score += score;
+        if ( this.score > 99 ) {
+            this.score = 99;
+        }
+        this.emit(this.score, true);
+    }
+
+    clear() {
+        this.score = 0;
+        if ( this.score < 0 ) {
+            this.score = 0;
+        }
+        this.emit(this.score, true);
+    }
+
+    /**
+     * @param {number} score
+     * @param {boolean} add_hist
+     */
+    emit(score, add_hist=true) {
+        emit_msg("set_score", { player: parseInt(this.player),
+                                score: parseInt(score) }, add_hist);
+    } // PlayerName.emit()
+
+    on_mouse_down_xy(x, y) {
+        console.log(`PlayerScore[${this.player}].on_mouse_down_xy()`);
+        if ( this.board.score_btn[this.player].up.in_this(x, y) ) {
+            this.up(1);
+        } else if ( this.board.score_btn[this.player].down.in_this(x, y) ) {
+            this.clear();
+        }
+    }
+} // class PlayerScore
 
 /**
  *
@@ -1945,20 +2083,20 @@ class Checker extends PlayerItem {
         console.log(`Checker.on_mouse_up_xy>`
                     + `dice_value=${JSON.stringify(dice_value)}`);
 
-        if ( this.board.winner_is(ch.player) ) {
+        const score = this.board.winner_is(ch.player);
+        if ( score > 0 ) {
             emit_msg("dice", { player: this.player,
                                dice: dice_value,
                                roll: false }, false);
-            this.board.emit_turn(-1, -1, true);
+            this.board.emit_turn(-1, -1, false);
+            this.board.score[ch.player].up(score);
         } else {
             emit_msg("dice", { player: this.player,
                                dice: dice_value,
                                roll: false }, true);
         }
 
-
         ch.board.moving_checker = undefined;
-
     } // Checker.on_mouse_up_xy()
 
     /**
@@ -1984,19 +2122,19 @@ class Checker extends PlayerItem {
  *         | v     13 14 15 16 17 18v   v19 20 21 22 23 24vv   v |
  * by[0] --->+----------------------+---+-----------------++---+ |
  *         | |   ||p0          p1   |   |p1             p0||   | |
- *         | |   ||p0          p1   |   |p1 tx          p0||   | |
- *         | |   ||p0          p1   |27 |p1 |             ||25 | |
+ * by[1] --->+---||p0          p1   |   |p1 tx          p0||   | |
+ * by[2] --->+---||p0          p1   |27 |p1 |             ||25 | |
  *         | |   ||p0               |   |p1 |             ||   | |
- *         | |   ||p0               |   |p1 v             ||   | |
- *         | |   ||         ty ------------>+------       ||   | |
+ * by[3] --->+---||p0               |   |p1 v             ||   | |
+ * by[4] --->+---||         ty ------------>+------       ||   | |
  *         | |   ||                 |---|   |      |      ||---| |
- *         | |   ||                 |   |    ------       ||   | |
+ * by[5] --->+---||                 |   |    ------       ||   | |
+ * by[6] --->+---||p1               |   |p0               ||   | |
  *         | |   ||p1               |   |p0               ||   | |
- *         | |   ||p1               |   |p0               ||   | |
- *         | |   ||p1          p0   |26 |p0               || 0 | |
+ * by[7] --->+---||p1          p0   |26 |p0               || 0 | |
+ * by[8] --->+---||p1          p0   |   |p0             p1||   | |
  *         | |   ||p1          p0   |   |p0             p1||   | |
- *         | |   ||p1          p0   |   |p0             p1||   | |
- * by[1] --->+-------------------------------------------------  |
+ * by[9] --->+-------------------------------------------------  |
  *         |       12 11 10  9  8  7      6  5  4  3  2  1       |
  *          ----------------------------------------------------- 
  *
@@ -2018,7 +2156,7 @@ class Board extends ImageItem {
         this.free_move = false;
         
         this.bx = [27, 81, 108, 432, 495, 819, 846];
-        this.by = [30, 520];
+        this.by = [30, 83, 124, 208, 249, 302, 243, 425, 466, 520];
 
         this.resign = -1;
         
@@ -2045,6 +2183,8 @@ class Board extends ImageItem {
             this.set_player(0);
         }
 
+        this.score = [0, 0];
+        
         this.turn = -1;
 
         this.gameinfo = undefined;
@@ -2076,14 +2216,49 @@ class Board extends ImageItem {
         
         // <body>
         let body_el = document.body;
-        body_el.style.width = (
-            this.button_back.x + this.button_back.w + 50) + "px";
+        body_el.style.width = (this.button_back.x
+                               + this.button_back.w + 50) + "px";
         body_el.style.height = (this.y + this.h + 10) + "px";
+
+        // PlayerScore
+        let [sw, sh] = [23, 53];
+
+        let sx1 = this.bx[0] + 3;
+        let sx2 = sx1 + sw + 2;
+
+        let sy_offset = 20;
+        let sy1 = this.by[2] + sy_offset;
+        let sy2 = this.by[7] - sy_offset - sh;
+
+        let psx = sx1 + 3;
+        let psy1 = sy1 + sh - 4;
+        let psy2 = sy2 + sh - 4;
+
+        this.score = [];
+        this.score[1] = new PlayerScore("p1score", this, 1, psx, psy1);
+        this.score[0] = new PlayerScore("p0score", this, 0, psx, psy2);
+
+        // Score buttons
+        this.score_btn = [{}, {}];
+
+        this.score_btn[1].up = new ScoreButton(
+            "score_up1",   this, 0, sx1, sy1, sw, sh,
+            this.score[1], +1);
+        this.score_btn[1].down = new ScoreButton(
+            "score_down1", this, 0, sx2, sy1, sw, sh,
+            this.score[1], -1);
+
+        this.score_btn[0].up = new ScoreButton(
+            "score_up0",   this, 0, sx1, sy2, sw, sh,
+            this.score[0], +1);
+        this.score_btn[0].down = new ScoreButton(
+            "score_down0", this, 0, sx2, sy2, sw, sh,
+            this.score[0], -1);
 
         // PlayerName
         this.playername = [];
         this.playername.push(new PlayerName(
-            "p0text", this, 0, this.bx[4], this.by[1] + 4));
+            "p0text", this, 0, this.bx[4], this.by[9] + 4));
         this.playername.push(new PlayerName(
             "p1text", this, 1, this.bx[3], this.by[0] - 4));
         this.playername[1].rotate(180);
@@ -2118,13 +2293,13 @@ class Board extends ImageItem {
 
             if ( p == 0 ) {
                 x0 = this.bx[6];
-                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 this.point.push(new BoardPoint(this, x0, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 1 && p <= 6 ) {
                 x0 = this.bx[4];
-                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 xn = 6 - p;
                 x = x0 + pw * xn;
                 this.point.push(new BoardPoint(this, x, y0, pw, ph,
@@ -2132,7 +2307,7 @@ class Board extends ImageItem {
             }
             if ( p >= 7 && p <= 12 ) {
                 x0 = this.bx[2];
-                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 xn = 12 - p;
                 x = x0 + pw * xn;
                 this.point.push(new BoardPoint(this, x, y0, pw, ph,
@@ -2162,7 +2337,7 @@ class Board extends ImageItem {
             }
             if ( p == 26 ) {
                 x0 = this.bx[3];
-                y0 = this.by[0] + (this.by[1] - this.by[0]) / 2;
+                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
                 this.point.push(new BoardPoint(this, x0, y0, pw, ph,
                                                p, 1, cn));
@@ -2347,20 +2522,22 @@ class Board extends ImageItem {
         } // for(p)
 
         if ( turn < 0 ) {
+            let score = 0;
             let winner = -1;
             if ( resign >= 0 ) {
                 winner = 1 - resign;
                 this.resign_banner_button[resign].on();
             } else {
                 for (let p=0; p < 2; p++) {
-                    if ( this.winner_is(p) ) {
+                    score = this.winner_is(p);
+                    if ( score ) {
                         winner = p;
                     }
                 } // for(p)
             }
 
             if ( winner >= 0 ) {
-                console.log(`Board.set_turn>plyaer${winner} win!`);
+                console.log(`Board.set_turn>plyaer${winner} win ${score}!`);
                 this.win_button[winner].on();
             }
             return;
@@ -2403,8 +2580,48 @@ class Board extends ImageItem {
     } // Board.pip_count()
 
     /**
+     * plyaer の勝利が確定していることが前提で、
+     * ノーマル/ギャモン/バックギャモン の判定
+     * Cubeのポイントも掛けた結果を返す
+     *
      * @param {number} player
-     * @return {boolean}
+     * @return {number} point - 1:normal, 2:gammon, 3:backgammon
+     */
+    calc_gammon(player) {
+        let cube_val = this.cube.value;
+        if ( ! this.cube.accepted ) {
+            cube_val /= 2;
+        }
+
+        const g_checkers = this.point[this.goal_point(1 - player)].checkers;
+        if ( ! this.cube.accepted || g_checkers.length > 0 ) {
+            console.log(`Board.calc_gammon(${player})>${cube_val}`);
+            return cube_val;
+        }
+
+        let points = [];
+        if ( 1 - player == 0 ) {
+            points = [19, 20, 21, 22, 23, 24, this.bar_point(0)];
+        } else {
+            points = [1, 2, 3, 4, 5, 6, this.bar_point(1)];
+        }
+        for (let p of points) {
+            const checkers = this.point[p].checkers;
+            if ( checkers.length > 0 ) {
+                // backgammon !
+                console.log(`Board.calc_gammon(${player})>${cube_val*3}`);
+                return (cube_val * 3);
+            }
+        } // for (p)
+
+        // gammon !
+        console.log(`Board.calc_gammon(${player})>${cube_val*2}`);
+        return (cube_val * 2);
+    } // Board.calc_gammon()
+
+    /**
+     * @param {number} player
+     * @return {number} points
      */
     winner_is(player) {
         // console.log(`Board.winner_is(player=${player})`);
@@ -2412,15 +2629,15 @@ class Board extends ImageItem {
         // console.log(`Board.winner_is>resign=${this.resign}`);
         if ( this.resign == 1 - player ) {
             this.resign = -1;
-            return true;
+            return this.calc_gammon(player);
         }
 
         const pip_count = this.pip_count(player);
         // console.log(`Board.winner_is>pip_count=${pip_count}`);
         if ( pip_count == 0 ) {
-            return true;
+            return this.calc_gammon(player);
         }
-        return false;
+        return 0;
     } // Board.winner_is()
     
     /**
@@ -2761,6 +2978,13 @@ class Board extends ImageItem {
         // turn
         // console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
         this.set_turn(gameinfo.turn, this.resign);
+
+        // score
+        this.score[0].set(gameinfo.score[0]);
+        this.score[1].set(gameinfo.score[1]);
+        console.log(`Board.load_gameinfo>score[]=[`
+                    + `${this.score[0].score},`
+                    + `${this.score[1].score}]`);
     } // Board.load_gameinfo()
 
     /**
@@ -3212,6 +3436,13 @@ window.onload = () => {
             console.log(`ws.on(json)>msg.type=set_playername,`
                         + `player=${msg.data.player},name=${msg.data.name}`);
             board.playername[msg.data.player].set(msg.data.name);
+            return;
+        }
+        
+        if ( msg.type == "set_score" ) {
+            console.log(`ws.on(json)>msg.type=set_score,`
+                        + `player=${msg.data.player},score=${msg.data.score}`);
+            board.score[msg.data.player].set(msg.data.score);
             return;
         }
         

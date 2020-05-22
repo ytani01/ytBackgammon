@@ -58,10 +58,14 @@ class ytBackgammonServer:
         """
         self._log.debug('')
 
+        score0 = self._bg._gameinfo['score'][0];
+        score1 = self._bg._gameinfo['score'][1];
         player0_name = self._bg._gameinfo['board']['playername'][0]
         player1_name = self._bg._gameinfo['board']['playername'][1]
 
         self._bg.init_gameinfo()
+        self._bg._gameinfo['score'][0] = score0;
+        self._bg._gameinfo['score'][1] = score1;
         self._bg._gameinfo['board']['playername'][0] = player0_name
         self._bg._gameinfo['board']['playername'][1] = player1_name
         
@@ -370,6 +374,10 @@ class ytBackgammonServer:
         if msg['type'] == 'set_playername':
             # data: {'player': int, 'name': str}
             self._bg.set_playername(msg['data'])
+
+        if msg['type'] == 'set_score':
+            # data: {'player': int, 'score': int}
+            self._bg.set_score(msg['data'])
 
         if msg['type'] == 'resign':
             # data: {'player': int}

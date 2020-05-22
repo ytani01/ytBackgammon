@@ -17,11 +17,6 @@ div, span {
 }
 
 .onboardtext {
-    /*
-    border: 4px solid;
-    border-color: rgba(255,255,255,1);
-    padding: 3px;
-    */
     color: rgba(255,255,255,1);
     font-weight: bold;
 }
