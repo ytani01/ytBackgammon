@@ -10,7 +10,7 @@
  *
  * BgBase .. have (x, y)
  *   |
- *   +- BgArea .. have (w, h) / without image
+ *   +- BgArea .. have (w, h), without image
  *        |
  *        +- BgText .. have a text / unclickable(?)     XXX T.B.D. XXX
  *        |    |
@@ -18,8 +18,8 @@
  *        |         |
  *        |         +- PlayerText .. owned by player
  *        |              |
- *        |              +- PlayerName
- *        |              +- Score
+ *        |              +- PlayerName                  XXX
+ *        |              +- Score                       XXX
  *        |
  *        +- BgImage .. have a image, mouse handlers
  *        |    |
@@ -68,7 +68,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.79";
+const VERSION = "0.80";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -219,12 +219,60 @@ class SoundBase {
  */
 class BgBase {
     /**
+     * @param {string} id
      * @param {number} x
      * @param {number} y
      */
-    constructor(x, y) {
+    constructor(id, x, y) {
         [this.x, this.y] = [x, y];
+        this.id = id;
+        
+        if ( this.id.length > 0 ) {
+            this.el = document.getElementById(this.id);
+        } else {
+            this.el = undefined;
+        }
     } // BgBase.constructor()
+
+    /**
+     * move to (x, y)
+     * @param {number} x
+     * @param {number} y
+     * @param {boolean} center - center flag
+     */
+    move(x, y, center=false, sec=0) {
+        [this.x, this.y] = [x, y];
+
+        this.el.style.transitionTimingFunction = "liner";
+        this.el.style.transitionDuration = sec + "s";
+        this.el.style.left = this.x + "px";
+        this.el.style.top = this.y + "px";
+        if ( center ) {
+            this.el.style.left = (this.x - this.w / 2) + "px";
+            this.el.style.top = (this.y - this.h / 2) + "px";
+        }
+    } // BgImage.move()
+
+    /**
+     * @param {number} z
+     */
+    set_z(z) {
+        this.z = z;
+        this.el.style.zIndex = this.z;
+    } // BgImage.set_z()
+
+    /**
+     * @param {number} deg
+     */
+    rotate(deg, center=false, sec=0) {
+        // console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
+        this.el.style.transformOrigin = "top left";
+        if ( center ) {
+            this.el.style.transformOrigin = "center center";
+        }
+        this.el.style.transitionDuration = sec + "s";
+        this.el.style.transform = `rotate(${deg}deg)`;
+    } // BgImage.rotate()
 
     /**
      * @param {number} player
@@ -312,9 +360,16 @@ class BgArea extends BgBase {
      * @param {number} w
      * @param {number} h
      */
-    constructor(x, y, w, h) {
-        super(x, y);
+    constructor(id, x, y, w=undefined, h=undefined) {
+        super(id, x, y);
         [this.w, this.h] = [w, h];
+
+        if ( w === undefined ) {
+            this.w = this.el.clientWidth;
+        }
+        if ( h === undefined ) {
+            this.h = this.el.clientHeight;
+        }
     }
 
     /**
@@ -329,22 +384,46 @@ class BgArea extends BgBase {
 } // class BgArea
 
 /**
+ * <div id="${id}">some text</div>
+ */
+class BgText extends BgArea {
+    /**
+     * @param {string} id
+     * @param {number} x
+     * @param {number} y
+     * @param {number} w
+     * @param {number} h
+     */
+    constructor(id, x, y, w, h) {
+        super(id, x, y, w, h);
+
+        console.log(`BgText.constructor>${this.el.clientWidth}`);
+        
+        this.text = this.el.innerHTML;
+        console.log(`BgText.constructor>text=${this.text}`);
+
+        this.move(this.x, this.y, false);
+    } // BgText.constructor()
+} // class BgText
+
+/**
  * <div id="${id}"><image src="${image_dir}/.."></div>
  */
 class BgImage extends BgArea {
-    constructor(id, x, y) {
-        super(x, y, 0, 0);
-        this.id = id;
+    constructor(id, x, y, w=undefined, h=undefined) {
+        super(id, x, y, w, h);
 
         this.image_dir = "/static/images/";
         this.file_suffix = ".png";
 
-        this.el = document.getElementById(this.id);
-
         this.image_el = this.el.firstChild;
 
-        this.w = this.image_el.width;
-        this.h = this.image_el.height;
+        if ( w === undefined ) {
+            this.w = this.image_el.width;
+        }
+        if ( h === undefined ) {
+            this.h = this.image_el.height;
+        }
 
         this.el.style.width = `${this.w}px`;
         this.el.style.height = `${this.h}px`;
@@ -393,46 +472,6 @@ class BgImage extends BgArea {
         this.active = false;
         this.el.hidden = true;
     } // BgImage.off()
-
-    /**
-     * move to (x, y)
-     * @param {number} x
-     * @param {number} y
-     * @param {boolean} center - center flag
-     */
-    move(x, y, center=false, sec=0) {
-        [this.x, this.y] = [x, y];
-
-        this.el.style.transitionTimingFunction = "liner";
-        this.el.style.transitionDuration = sec + "s";
-        this.el.style.left = this.x + "px";
-        this.el.style.top = this.y + "px";
-        if ( center ) {
-            this.el.style.left = (this.x - this.w / 2) + "px";
-            this.el.style.top = (this.y - this.h / 2) + "px";
-        }
-    } // BgImage.move()
-
-    /**
-     * @param {number} z
-     */
-    set_z(z) {
-        this.z = z;
-        this.el.style.zIndex = this.z;
-    } // BgImage.set_z()
-
-    /**
-     * @param {number} deg
-     */
-    rotate(deg, center=false, sec=0) {
-        // console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
-        this.el.style.transformOrigin = "top left";
-        if ( center ) {
-            this.el.style.transformOrigin = "center center";
-        }
-        this.el.style.transitionDuration = sec + "s";
-        this.el.style.transform = `rotate(${deg}deg)`;
-    } // BgImage.rotate()
 
     /**
      * touch event to mouse event
@@ -2186,6 +2225,7 @@ class Board extends BgImage {
         this.ws = ws;
 
         this.free_move = false;
+        this.disp_pip = false;
         
         this.bx = [27, 81, 108, 432, 495, 819, 846];
         this.by = [30, 83, 124, 208, 249, 302, 243, 425, 466, 520];
@@ -2210,7 +2250,7 @@ class Board extends BgImage {
         this.sound_put = new SoundBase(this, SOUND_PUT);
         this.sound_hit = new SoundBase(this, SOUND_HIT);
 
-        // Player name
+        // Player
         if ( this.load_player() === undefined ) {
             this.set_player(0);
         }
@@ -2290,15 +2330,20 @@ class Board extends BgImage {
         // PlayerName
         this.player_name = [];
         this.player_name.push(new PlayerName(
-            "p0text", this, 0, this.bx[4], this.by[9] + 4));
+            "p0name", this, 0, this.bx[4], this.by[9] + 4));
         this.player_name.push(new PlayerName(
-            "p1text", this, 1, this.bx[3], this.by[0] - 4));
+            "p1name", this, 1, this.bx[3], this.by[0] - 4));
         this.player_name[1].rotate(180);
 
         for (let p=0; p < 2; p++) {
             this.player_name[p].set("");
             this.player_name[p].on();
         }
+
+        // Pip count XXX
+        this.pip = [];
+        this.pip.push(new BgText("p0pip", 0, 0));
+        this.pip.push(new BgText("p1pip", 0, 0));
 
         // Checkers
         this.checker = [Array(15), Array(15)];
@@ -2326,7 +2371,7 @@ class Board extends BgImage {
             if ( p == 0 ) {
                 x0 = this.bx[6];
                 y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 1 && p <= 6 ) {
@@ -2334,7 +2379,7 @@ class Board extends BgImage {
                 y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 xn = 6 - p;
                 x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 7 && p <= 12 ) {
@@ -2342,7 +2387,7 @@ class Board extends BgImage {
                 y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 xn = 12 - p;
                 x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
                                                p, -1, cn));
             }
             if ( p >= 13 && p <= 18 ) {
@@ -2350,7 +2395,7 @@ class Board extends BgImage {
                 y0 = this.by[0];
                 xn = p - 13;
                 x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p >= 19 && p <= 24 ) {
@@ -2358,27 +2403,27 @@ class Board extends BgImage {
                 y0 = this.by[0];
                 xn = p - 19;
                 x = x0 + pw * xn;
-                this.point.push(new BoardPoint(this, x, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p == 25 ) {
                 x0 = this.bx[6];
                 y0 = this.by[0];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p == 26 ) {
                 x0 = this.bx[3];
                 y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
                 let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
                                                p, 1, cn));
             }
             if ( p == 27 ) {
                 x0 = this.bx[3];
                 y0 = this.by[0];
                 let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint(this, x0, y0, pw, ph,
+                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
                                                p, -1, cn));
             }
         } // for
@@ -2462,7 +2507,7 @@ class Board extends BgImage {
     } // Board.apply_sound_switch()
 
     /**
-     * 
+     * @return {boolean} free_move
      */
     apply_free_move() {
         console.log(`Board.apply_free_move()`);
@@ -2472,6 +2517,18 @@ class Board extends BgImage {
 
         return this.free_move;
     } // Board.apply_free_move()
+
+    /**
+     * @return {boolean} disp_pip
+     */
+    apply_disp_pip() {
+        console.log(`Board.apply_disp_pip()`);
+
+        this.disp_pip = document.getElementById("disp-pip").checked;
+        console.log(`Board.apply_disp_pip>disp_pip=${this.disp_pip}`);
+
+        return this.disp_pip;
+    } // Board.apply_disp_pip()
 
     /**
      * load player number from cookie
@@ -3125,8 +3182,8 @@ class Board extends BgImage {
  *
  */
 class BoardArea extends BgArea {
-    constructor(board, x, y, w, h) {
-        super(x, y, w, h);
+    constructor(id, board, x, y, w, h) {
+        super(id, x, y, w, h);
         this.board = board;
     } // BoardArea.constructor()
 } // class BoardArea
@@ -3135,9 +3192,20 @@ class BoardArea extends BgArea {
  * 
  */
 class BoardPoint extends BoardArea {
-    constructor(board, x, y, w, h, id, direction, max_n) {
-        super(board, x, y, w, h);
-        this.id = id;
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} x
+     * @param {number} y
+     * @param {number} w
+     * @param {number} h
+     * @param {number} idx - point index number
+     * @param {number} direction - -1: 上から下, 1: 下から上
+     * @param {number} max_n
+     */
+    constructor(id, board, x, y, w, h, idx, direction, max_n) {
+        super(id, board, x, y, w, h);
+        this.idx = idx;
         this.direction = direction; // up: +1, down: -1
         this.max_n = max_n;
 
@@ -3169,7 +3237,7 @@ class BoardPoint extends BoardArea {
         // console.log(`BoardPoint.add()> n=${n},y=${y}`);
         ch.move(x, y, true, sec);
         ch.set_z(n);
-        ch.cur_point = this.id;
+        ch.cur_point = this.idx;
         this.checkers.push(ch);
         return n;
     } // BoardPoint.add()
@@ -3314,6 +3382,13 @@ const apply_sound_switch = () => {
  */
 const apply_free_move = () => {
     board.apply_free_move();
+};
+
+/**
+ *
+ */
+const apply_disp_pip = () => {
+    board.apply_disp_pip
 };
 
 /**

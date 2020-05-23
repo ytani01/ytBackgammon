@@ -94,13 +94,20 @@
       <input id="free-move" type="checkbox"
              onChange="apply_free_move();">
       &nbsp;
+      Disp pip
+      <input id="disp-pip" type="checkbox"
+             onChange="apply_disp_pip();">
+      &nbsp;
       <span id="dice-histogram" style="font-size:small"></span>
     </header>
     <div id="board"><image src="/static/images/board-base.png">
+        <div id="p0pip">abc</div>
+        <div id="p1pip"></div>
+
         <div class="onboardtext"
-             id="p0text"><image src="/static/images/checker0.png"></div>
+             id="p0name"><image src="/static/images/checker0.png"></div>
         <div class="onboardtext"
-             id="p1text"><image src="/static/images/checker1.png"></div>
+             id="p1name"><image src="/static/images/checker1.png"></div>
 
         <div id="score_up0"><image src="/static/images/cube01.png"></div>
         <div id="score_down0"><image src="/static/images/cube01.png"></div>
