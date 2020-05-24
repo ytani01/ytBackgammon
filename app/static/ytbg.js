@@ -67,7 +67,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.81";
+const VERSION = "0.82";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -2114,7 +2114,7 @@ class Checker extends PlayerItem {
         console.log(`Checker.on_mouse_up_xy>dst_p=${dst_p}`);
 
         if ( board.free_move ) {
-            ch.board.emit_put_checker(ch, dst_p, false);
+            ch.board.emit_put_checker(ch, dst_p, true);
             this.board.moving_checker = undefined;
             return;
         }
