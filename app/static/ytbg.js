@@ -2,72 +2,66 @@
  *=====================================================
  * [Class tree]
  *
+ * BgBase .. have (x, y, w, h), without image
+ *    |
+ *    +- BgText .. have a text
+ *    |    |
+ *    |    +- BoardText .. on board
+ *    |         |
+ *    |         +- PlayerText .. owned by player
+ *    |              |
+ *    |              +- PlayerName
+ *    |              +- PlayerPipCount
+ *    |              +- PlayerScore
+ *    |
+ *    +- BgImage .. have a image, mouse handlers
+ *    |    |
+ *    |    +- OnBoardImage .. on board
+ *    |    |    |
+ *    |    |    +- OnBoardButton
+ *    |    |    |    |
+ *    |    |    |    +- InverseButton
+ *    |    |    |    +- ResignButton
+ *    |    |    |    |
+ *    |    |    |    +- EmitButton
+ *    |    |    |         |
+ *    |    |    |         +- BackButton
+ *    |    |    |         +- Back2Button
+ *    |    |    |         +- BackAllButton
+ *    |    |    |         +- FwdButton 
+ *    |    |    |         +- Fwd2Button 
+ *    |    |    |         +- FwdAllButton 
+ *    |    |    +- Cube
+ *    |    |    |
+ *    |    |    +- PlayerItem .. owned by player
+ *    |    |         |
+ *    |    |         +- ScoreButton
+ *    |    |         |
+ *    |    |         +- BannerButton
+ *    |    |         |    |
+ *    |    |         |    +- RollButton
+ *    |    |         |    +- PassButton
+ *    |    |         |    +- ResignBannerButton
+ *    |    |         |    +- WinButton
+ *    |    |         |
+ *    |    |         +- Dice
+ *    |    |         +- Checker
+ *    |    +- Board
+ *    |         
+ *    +- BoardArea .. on board
+ *         |
+ *         +- BoardPoint
+ *
  * QueryStringBase .. querystring manupilation
  *
  * CookieBase .. cookie manupilation
  *
  * SoundBase .. play audio
  *
- * BgBase .. have (x, y, w, h), without image
- *        |
- *        +- BgText .. have a text
- *        |    |
- *        |    +- BoardText .. on board
- *        |         |
- *        |         +- PlayerText2 .. owned by player
- *        |              |
- *        |              +- PlayerName                  XXX
- *        |              +- PlayerScore                 XXX
- *        |              +- PlayerPipCount
- *        |
- *        +- BgImage .. have a image, mouse handlers
- *        |    |
- *        |    +- OnBoardImage .. on board
- *        |    |    |
- *        |    |    +- OnBoardButton
- *        |    |    |    |
- *        |    |    |    +- InverseButton
- *        |    |    |    +- ResignButton
- *        |    |    |    |
- *        |    |    |    +- EmitButton
- *        |    |    |         |
- *        |    |    |         +- BackButton
- *        |    |    |         +- Back2Button
- *        |    |    |         +- BackAllButton
- *        |    |    |         +- FwdButton 
- *        |    |    |         +- Fwd2Button 
- *        |    |    |         +- FwdAllButton 
- *        |    |    +- Cube
- *        |    |    |
- *        |    |    +- PlayerItem .. owned by player
- *        |    |         |
- *        |    |         +- ScoreButton
- *        |    |         |
- *        |    |         +- BannerButton
- *        |    |         |    |
- *        |    |         |    +- RollButton
- *        |    |         |    +- PassButton
- *        |    |         |    +- ResignBannerButton
- *        |    |         |    +- WinButton
- *        |    |         |
- *        |    |         +- PlayerText
- *        |    |         |    |
- *        |    |         |    +- PlayerName
- *        |    |         |    +- PlayerScore
- *        |    |         |
- *        |    |         +- Score
- *        |    |         +- Dice
- *        |    |         +- Checker
- *        |    +- Board
- *        |         
- *        +- BoardArea .. on board
- *             |
- *             +- BoardPoint
- *
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.82";
+const VERSION = "0.83";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -82,139 +76,6 @@ const SOUND_HIT = "/static/sounds/hit1.mp3";
 const SOUND_TURN_CHANGE = "/static/sounds/turn_change1.mp3";
 
 /**
- *
- */
-class QueryStringBase {
-    constructor() {
-        this.querystring = '';
-        this.data = [];
-        this.load();
-    } // constructor()
-
-    load() {
-        this.querystring = window.location.search || '';
-        this.querystring = this.querystring.substr(
-            1, this.querystring.length);
-        console.log(`QueryStringBase.load>querystring=${this.querystring}`);
-
-        if ( this.querystring.length == 0 ) {
-            return {};
-        }
-
-        for (let ent of this.querystring.split("&")) {
-            let [k, v] = ent.split("=");
-            this.data[k] = v;
-        } // for(ent)
-
-        return this.data;
-    } // QueryStringBase.load()
-
-    /**
-     * @param {string} key
-     */
-    get(key) {
-        if ( this.data[key] === undefined ) {
-            return undefined;
-        }
-        return decodeURIComponent(this.data[key]);
-    } // QueryStringBase.get()
-} // class QueryStringBase
-
-/**
- *
- */
-class CookieBase {
-    constructor() {
-        this.cookie = undefined;
-        this.data = {};
-        this.load();
-    }
-
-    /**
-     * @return {Object} data
-     */
-    load() {
-        const allcookie = document.cookie;
-        // console.log(`CookieBase.load>allcookie="${allcookie}"`);
-
-        if ( allcookie.length == 0 ) {
-            return {};
-        }
-
-        for (let ent of allcookie.split("; ")) {
-            let [k, v] = ent.split('=');
-            // console.log(`CookieBase.load>k=${k},v=${v}`);
-            this.data[k] = v;
-        } // for(i)
-
-        return this.data;
-    } // CookieBase.load()
-
-    /**
-     * 
-     */
-    save() {
-        if ( Object.keys(this.data) ) {
-            return;
-        }
-
-        let allcookie = "";
-        for (let key in this.data) {
-            allcookie += `${key}=${this.data[key]};`;
-        } // for (key)
-
-        document.cookie = allcookie;
-    }
-
-    /**
-     * @param {string} key
-     * @param {string} value
-     */
-    set(key, value) {
-        document.cookie = `${key}=${encodeURIComponent(value)};`;
-    }
-    
-    /**
-     * @param {string} key
-     */
-    get(key) {
-        if ( this.data[key] === undefined ) {
-            return undefined;
-        }
-        return decodeURIComponent(this.data[key]);
-    } // CookieBase.get()
-} // class CookieBase
-
-/**
- *
- */
-class SoundBase {
-    constructor(board, soundfile) {
-        console.log("SoundBase("
-                    + `board.svr_id=${board.svr_id},`
-                    + `soundfile=${soundfile}`);
-        this.board = board;
-        this.soundfile = soundfile;
-        this.audio = new Audio(this.soundfile);
-    } // SoundBase.constructor()
-
-    /**
-     * 
-     */
-    play() {
-        /*
-        console.log(`SoundBase.play>`
-                    + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
-        */
-        if ( this.board.sound && GlobalSoundSwitch != "off" ) {
-            return this.audio.play();
-        } else {
-            return false;
-        }
-    } // SoundBase.play()
-} // class SoundBase
-
-/**
  * base class for ytBackgammon
  */
 class BgBase {
@@ -223,9 +84,10 @@ class BgBase {
      * @param {number} x
      * @param {number} y
      */
-    constructor(id, x, y, w=undefined, h=undefined) {
+    constructor(id, x, y, deg=0, w=undefined, h=undefined) {
         [this.x, this.y] = [x, y];
         [this.w, this.h] = [w, h];
+        this.deg = deg;
         this.id = id;
         
         if ( this.id.length > 0 ) {
@@ -241,10 +103,28 @@ class BgBase {
             this.h = this.el.clientHeight;
         }
 
+        if ( this.el ) {
+            this.el.onmousedown = this.on_mouse_down.bind(this);
+            this.el.ontouchstart = this.on_mouse_down.bind(this);
+            this.el.onmouseup = this.on_mouse_up.bind(this);
+            this.el.ontouchend = this.on_mouse_up.bind(this);
+            this.el.onmousemove = this.on_mouse_move.bind(this);
+            this.el.ontouchmove = this.on_mouse_move.bind(this);
+            this.el.ondragstart = this.null_handler.bind(this);
+        }
     } // BgBase.constructor()
 
     /**
-     * move to (x, y)
+     * @param {number} x
+     * @param {number} y
+     * @return {boolean}
+     */
+    in_this(x, y) {
+        return (x >= this.x) && (x < this.x + this.w)
+            && (y >= this.y) && (y < this.y + this.h);
+    }
+
+    /**
      * @param {number} x
      * @param {number} y
      * @param {boolean} center - center flag
@@ -264,16 +144,6 @@ class BgBase {
     } // BgImage.move()
 
     /**
-     * @param {number} x
-     * @param {number} y
-     * @return {boolean}
-     */
-    in_this(x, y) {
-        return (x >= this.x) && (x < this.x + this.w)
-            && (y >= this.y) && (y < this.y + this.h);
-    }
-
-    /**
      * @param {number} z
      */
     set_z(z) {
@@ -286,13 +156,15 @@ class BgBase {
      */
     rotate(deg, center=false, sec=0) {
         // console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
+        this.deg = deg;
         if ( center ) {
             this.el.style.transformOrigin = "center center";
         } else {
             this.el.style.transformOrigin = "top left";
         }
+        this.el.style.transitionTimingFunction = "liner";
         this.el.style.transitionDuration = sec + "s";
-        this.el.style.transform = `rotate(${deg}deg)`;
+        this.el.style.transform = `rotate(${this.deg}deg)`;
     } // BgImage.rotate()
 
     /**
@@ -354,13 +226,14 @@ class BgBase {
      * @param {number} point
      * @return {number} - pip count
      */
-    pip(player, point) {
+    get_pip(player, point) {
+        // console.log(`get_pip(player=${player},point=${point}`);
         if ( point === undefined ) {
             return undefined;
         }
 
         if ( point > 25 ) {
-            point = 25;
+            return 25;
         }
         
         if ( this.player == 0 ) {
@@ -368,7 +241,99 @@ class BgBase {
         }
         // player == 1
         return (25 - point);
-    }
+    } // BgBase.get_pip()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_down_xy(x, y) {
+        // to be overridden
+    } // BgBase.on_mouse_down_xy()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_up_xy(x, y) {
+        // to be overridden
+    } // BgBase.on_mouse_down_xy()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_move_xy(x, y) {
+        // to be overridden
+    } // BgBase.on_mouse_down_xy()
+
+    /**
+     * touch event to mouse event
+     * only for get_xy() function
+     *
+     * @param {MouseEvent} e
+     */
+    touch2mouse(e) {
+        // console.log(`BgBase.touch2mouse()`);
+        e.preventDefault();
+        if ( e.changedTouches ) {
+            e = e.changedTouches[0];
+        }
+        return e;
+    } // BgBase.touch2mouse()
+    
+    /**
+     * @param {MouseEvent} e
+     */
+    get_xy(e) {
+        e = this.touch2mouse(e);
+        let [origin_x, origin_y] = [this.x, this.y];
+        if ( this.board ) {
+            [origin_x, origin_y] = [this.board.x, this.board.y];
+        }
+        
+        let [x, y] = [e.pageX - origin_x, e.pageY - origin_y];
+
+        let player = this.player;
+        if ( this.board) {
+            player = this.board.player;
+        }
+        if ( player == 1 ) {
+            [x, y] = this.inverse_xy(e);
+        }
+        return [x, y];
+    } // BgBase.get_xy()
+
+    /**
+     * @param {MouseEvent} e
+     */
+    on_mouse_down(e) {
+        let [x, y] = this.get_xy(e);
+        this.on_mouse_down_xy(x, y);
+    } // BgBase.on_mouse_down()
+
+    /**
+     * @param {MouseEvent} e
+     */
+    on_mouse_up(e) {
+        let [x, y] = this.get_xy(e);
+        this.on_mouse_up_xy(x, y);
+    } // BgBase.on_mouse_up()
+
+    /**
+     * @param {MouseEvent} e
+     */
+    on_mouse_move(e) {
+        let [x, y] = this.get_xy(e);
+        this.on_mouse_move_xy(x, y);
+    } // BgBase.on_mouse_move()
+
+    /**
+     * @param {MouseEvent} e
+     */
+    null_handler(e) {
+        return false;
+    } // BgBase.null_handler()
 } // class BgBase
 
 /**
@@ -379,20 +344,34 @@ class BgText extends BgBase {
      * @param {string} id
      * @param {number} x
      * @param {number} y
+     * @param {number} deg
+     * @param {string} [text=""]
      */
     constructor(id, x, y, deg, text="") {
-        super(id, x, y, undefined, undefined);
-        this.deg = deg;
+        super(id, x, y, deg, undefined, undefined);
 
-        this.set(text);
-        this.move(this.x, this.y, true, 0);
-        this.rotate(this.deg, true, 0);
+        // set text
+        this.text = text;
+        this.el.innerHTML = this.text;
+
+        // set width
+        this.w = this.el.clientWidth;
+        this.h = this.el.clientHeight;
+
+        // move
+        this.el.style.left = this.x + "px";
+        this.el.style.top = this.y + "px";
+
+        // rotate
+        this.el.style.transform = `rotate(${this.deg}deg)`;
     } // BgText.constructor()
+
     /**
-     * 
+     * @return {string} this.text
      */
     get() {
-        return this.el.innerHTML;
+        this.text = this.el.innerHTML;
+        return this.text;
     } // BgText.get()
     
     /**
@@ -401,18 +380,19 @@ class BgText extends BgBase {
     set(txt) {
         this.el.innerHTML = "";
         if ( txt.length > 0 ) {
-            this.el.innerHTML = txt;
+            this.text = txt;
+            this.el.innerHTML = this.text;
         }
         this.w = this.el.clientWidth;
         this.h = this.el.clientHeight;
-        this.move(this.x, this.y, true, 0);
+        this.move(this.x, this.y);
+        this.rotate(this.deg);
     } // BgText.set()
 
     /**
      * 
      */
     on() {
-        // this.el.style.color = "rgba(255, 255, 128, 0.8)";
         this.el.style.opacity = 1;
     } // BgText.on()
 
@@ -420,66 +400,241 @@ class BgText extends BgBase {
      * 
      */
     off() {
-        // this.el.style.color = "rgba(0, 0, 0, 0.8)";
         this.el.style.opacity = 0;
     } // BgText.off()
-
-    /**
-     * 
-     */
-    red() {
-        this.el.style.color = "rgba(255, 0, 0, 0.8)";
-    } // BgText.red()
 } // class BgText
 
 /**
  * <div id="${id}">some text</div>
  */
 class BoardText extends BgText {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} x
+     * @param {number} y
+     * @param {number} deg
+     */
     constructor(id, board, x, y, deg) {
-        super(id, x, y, deg);
+        super(id, x, y, deg, "");
         this.board = board;
         
     } // BoardText.constructor()
 } // class BoardText
 
 /**
- * <div id="${id}">some text</div>
+ * <div id="${id}">${text}</div>
  */
-class PlayerText2 extends BoardText {
+class PlayerText extends BoardText {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     * @param {number} deg
+     */
     constructor(id, board, player, x, y, deg) {
         super(id, board, x, y, deg);
         this.player = player;
-    } // PlayerText2.constructor()
-} // class PlayerText2
+    } // PlayerText.constructor()
+} // class PlayerText
 
 /**
- * <div id="${id}">some text</div>
+ * <div id="${id}">${name}</div>
  */
-class PlayerPipCount extends PlayerText2 {
+class PlayerName extends PlayerText {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     * @param {number} deg
+     */
     constructor(id, board, player, x, y, deg) {
         super(id, board, player, x, y, deg);
 
-        console.log(`board=${this.board}, w=${this.w}, h=${this.h}`);
+        this.def_name = `Player ${this.player}`;
+        this.name = this.def_name;
+    } // PlayerName.constructor()
+
+    /**
+     * @param {string} name
+     */
+    set(name) {
+        console.log(`name=${name}`);
+        this.name = name;
+        if ( name.length == 0 ) {
+            this.name = this.def_name;
+        }
+        super.set(this.name);
+
+        document.getElementById("player-name").value = "";
+    } // PlayerName.set()
+
+    /**
+     * 
+     */
+    on() {
+        this.el.style.color = "rgba(255, 255, 128, 0.8)";
+    } // PlayerName.on()
+
+    /**
+     * 
+     */
+    off() {
+        this.el.style.color = "rgba(0, 0, 0, 0.8)";
+    } // PlayerName.off()
+
+    /**
+     * @param {string} name
+     * @param {boolean} add_hist
+     */
+    emit(name, add_hist=true) {
+        emit_msg("set_playername", { player: parseInt(this.player),
+                                     name: name }, add_hist);
+    } // PlayerName.emit()
+} // class PlayerName
+
+/**
+ * <div id="${id}">Pip: ${pip_count}</div>
+ */
+class PlayerPipCount extends PlayerText {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     * @param {number} deg
+     */
+    constructor(id, board, player, x, y, deg) {
+        super(id, board, player, x, y, deg);
 
         this.prefix = "Pip:";
         this.pip_count = 167;
         this.set(this.pip_count);
-        this.off();
+
+        if ( document.getElementById("disp-pip").checked ) {
+            this.on();
+        } else {
+            this.off();
+        }
     } // PlayerPipCount.constructor()
 
+    /**
+     * @param {number} pip_count
+     */
     set(pip_count) {
         this.pip_count = pip_count;
         super.set(`${this.prefix} ${this.pip_count}`);
+        this.move(this.x, this.y);
+        this.rotate(this.deg);
     } // PlayerPipCount.set()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    move(x, y) {
+        super.move(x, y, true, 0);
+    } // PlayerPipCount.move()
+
+    /**
+     * @param {number} deg
+     */
+    rotate(deg) {
+        super.rotate(deg, true, 0);
+    }
 } // class PlayerPipCount
 
 /**
- * <div id="${id}"><image src="${image_dir}/.."></div>
+ * <div id="${id}">${score}</div>
+ */
+class PlayerScore extends PlayerText {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     * @param {number} [deg=0]
+     */
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, player, x, y, deg);
+
+        this.score = 0;
+
+        this.el.style.width = "42px";
+        this.el.style.textAlign = "center";
+        this.el.style.fontSize = "30px";
+        this.el.style.transform = "rotate(-90deg)";
+        this.el.style.transformOrigin = "left top";
+
+        this.default_text = `${this.score}`;
+        this.set("");
+    } // Score.constructor()
+
+    /**
+     * @param {number} score
+     */
+    set(score) {
+        this.score = score;
+        super.set(`${score}`);
+    }
+
+    /**
+     * @return {number} score
+     */
+    get() {
+        return parseInt(super.get());
+    }
+
+    /**
+     * @param {number} score
+     */
+    up(score) {
+        this.score += score;
+        if ( this.score > 99 ) {
+            this.score = 99;
+        }
+        this.emit(this.score, true);
+    }
+
+    /**
+     *
+     */
+    clear() {
+        this.score = 0;
+        this.emit(this.score, true);
+    }
+
+    /**
+     * @param {number} score
+     * @param {boolean} add_hist
+     */
+    emit(score, add_hist=true) {
+        emit_msg("set_score", { player: parseInt(this.player),
+                                score: parseInt(score) }, add_hist);
+    } // PlayerScore.emit()
+
+    on_mouse_down_xy(x, y) {
+        console.log(`PlayerScore[${this.player}].on_mouse_down_xy()`);
+        if ( this.board.score_btn[this.player].up.in_this(x, y) ) {
+            this.up(1);
+        } else if ( this.board.score_btn[this.player].down.in_this(x, y) ) {
+            this.clear();
+        }
+    }
+} // class PlayerScore
+
+/**
+ * <div id="${id}"><image src="${image_dir}/..${image_suffix}"></div>
  */
 class BgImage extends BgBase {
-    constructor(id, x, y, w=undefined, h=undefined) {
-        super(id, x, y, w, h);
+    constructor(id, x, y, deg=0, w=undefined, h=undefined) {
+        super(id, x, y, deg, w, h);
 
         this.image_dir = "/static/images/";
         this.file_suffix = ".png";
@@ -499,14 +654,6 @@ class BgImage extends BgBase {
         this.active = true;
         this.el.hidden = false;
         this.el.draggable = false;
-
-        this.el.onmousedown = this.on_mouse_down.bind(this);
-        this.el.ontouchstart = this.on_mouse_down.bind(this);
-        this.el.onmouseup = this.on_mouse_up.bind(this);
-        this.el.ontouchend = this.on_mouse_up.bind(this);
-        this.el.onmousemove = this.on_mouse_move.bind(this);
-        this.el.ontouchmove = this.on_mouse_move.bind(this);
-        this.el.ondragstart = this.null_handler.bind(this);
 
         this.move(this.x, this.y, false);
 
@@ -540,21 +687,6 @@ class BgImage extends BgBase {
         this.active = false;
         this.el.hidden = true;
     } // BgImage.off()
-
-    /**
-     * touch event to mouse event
-     * only for get_xy() function
-     *
-     * @param {MouseEvent} e
-     */
-    touch2mouse(e) {
-        // console.log(`BgImage.touch2mouse()`);
-        e.preventDefault();
-        if ( e.changedTouches ) {
-            e = e.changedTouches[0];
-        }
-        return e;
-    } // BgImage.touch2mouse()
     
     /**
      * only for get_xy() function
@@ -571,103 +703,24 @@ class BgImage extends BgBase {
         
         return [w - e.pageX + origin_x, h - e.pageY + origin_y];
     } // BgImage.inverse_xy()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    get_xy(e) {
-        e = this.touch2mouse(e);
-        let [origin_x, origin_y] = [this.x, this.y];
-        if ( this.board ) {
-            [origin_x, origin_y] = [this.board.x, this.board.y];
-        }
-        
-        let [x, y] = [e.pageX - origin_x, e.pageY - origin_y];
-
-        let player = this.player;
-        if ( this.board) {
-            player = this.board.player;
-        }
-        if ( player == 1 ) {
-            [x, y] = this.inverse_xy(e);
-        }
-        return [x, y];
-    } // BgImage.get_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_down_xy(x, y) {
-        // to be overridden
-    } // BgImage.on_mouse_down_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_up_xy(x, y) {
-        // to be overridden
-    } // BgImage.on_mouse_down_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_move_xy(x, y) {
-        // to be overridden
-    } // BgImage.on_mouse_down_xy()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    on_mouse_down(e) {
-        let [x, y] = this.get_xy(e);
-        this.on_mouse_down_xy(x, y);
-    } // BgImage.on_mouse_down()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    on_mouse_up(e) {
-        let [x, y] = this.get_xy(e);
-        this.on_mouse_up_xy(x, y);
-    } // BgImage.on_mouse_up()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    on_mouse_move(e) {
-        let [x, y] = this.get_xy(e);
-        this.on_mouse_move_xy(x, y);
-    } // BgImage.on_mouse_move()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    null_handler(e) {
-        return false;
-    } // BgImage.null_handler()
 } // class BgImage
 
 /**
  * item on board
  */
 class OnBoardImage extends BgImage {
-    constructor(id, board, x, y) {
-        super(id, x, y);
+    constructor(id, board, x, y, deg=0) {
+        super(id, x, y, deg, undefined, undefined);
         this.board = board;
     }
 } // class OnBoardImage
 
 /**
  * button on board
- *
- * T.B.D. この中間クラスはいらないかも？
  */
 class OnBoardButton extends OnBoardImage {
-    constructor(id, board, x, y) {
-        super(id, board, x, y);
+    constructor(id, board, x, y, deg=0) {
+        super(id, board, x, y, deg);
     }
 } // class OnBoardButton
 
@@ -809,7 +862,7 @@ class FwdAllButton extends EmitButton {
  */
 class Cube extends OnBoardImage {
     constructor(id, board) {
-        super(id, board, 0, 0);
+        super(id, board, 0, 0, 0);
 
         this.player = undefined;
         this.value = 1;
@@ -833,13 +886,6 @@ class Cube extends OnBoardImage {
     } // Cube.constructor()
 
     emit(val, player=undefined, accepted) {
-        /*
-        console.log("Cube.emit("
-                    + `val=${val},`
-                    + `player=${player},`
-                    + `accepted=${accepted}`
-                    + ")");
-        */
         if ( player < 0 ) {
             player = undefined;
         }
@@ -1001,8 +1047,8 @@ class Cube extends OnBoardImage {
  * Item owned by player
  */
 class PlayerItem extends OnBoardImage {
-    constructor(id, board, player, x, y) {
-        super(id, board, x, y);
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, x, y, deg);
         this.player = player;
     } // PlayerItem.constructor()
 } // class PlayerItem
@@ -1012,7 +1058,7 @@ class PlayerItem extends OnBoardImage {
  */
 class ScoreButton extends PlayerItem {
     constructor(id, board, player, x, y, w, h, score_obj, offset) {
-        super(id, board, player, x, y);
+        super(id, board, player, x, y, 0);
         this.set_wh(w, h);
         this.score_obj = score_obj;
         this.offset = offset;
@@ -1021,6 +1067,10 @@ class ScoreButton extends PlayerItem {
         this.image_el.style.opacity = 0;
     } // ScoreButton.constructor()
 
+    /**
+     * @param {number} w
+     * @param {number} h
+     */
     set_wh(w, h) {
         super.set_wh(w, h);
         this.image_el.style.width = `${this.w}px`;
@@ -1033,10 +1083,11 @@ class ScoreButton extends PlayerItem {
      */
     on_mouse_down_xy(x, y) {
         console.log(`ScoreButton.on_mouse_down_xy()`);
+        console.log(`ScoreButton.on_mouse_down_xy>offset=${this.offset}`);
         if ( this.offset > 0 ) {
-            this.score_obj.up();
+            this.score_obj.up(1);
         } else {
-            this.score_obj.down();
+            this.score_obj.clear();
         }
     } // ScoreButton.on_mouse_down_xy()
 } // class ScoreButton
@@ -1052,8 +1103,8 @@ class BannerButton extends PlayerItem {
      * @param {number} x
      * @param {number} y
      */
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, player, x, y, deg);
 
         this.el.style.opacity = 0.9;
         this.move(this.x, this.y);
@@ -1090,8 +1141,8 @@ class BannerButton extends PlayerItem {
  *
  */
 class RollButton extends BannerButton {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, player, x, y, deg);
         /*
         console.log(`RollButton(id=${id},player=${this.player},`
                     + `x=${this.x},y=${this.y})`);
@@ -1460,8 +1511,8 @@ class RollButton extends BannerButton {
  *
  */
 class PassButton extends BannerButton {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, player, x, y, deg);
     } // PassButton.constructor()
 
     /**
@@ -1480,8 +1531,8 @@ class PassButton extends BannerButton {
  *
  */
 class ResignBannerButton extends BannerButton {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, player, x, y, deg);
     } // ResignBannerButton.constructor()
 
     /**
@@ -1497,8 +1548,8 @@ class ResignBannerButton extends BannerButton {
  *
  */
 class WinButton extends BannerButton {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
+    constructor(id, board, player, x, y, deg=0) {
+        super(id, board, player, x, y, deg);
     } // WinButton.constructor()
 
     /**
@@ -1513,153 +1564,9 @@ class WinButton extends BannerButton {
 /**
  *
  */
-class PlayerText extends PlayerItem {
-    /**
-     * @param {string} id - ID string
-     * @param {Board} board
-     * @param {number} plyaer
-     * @param {number} x
-     * @param {number} y
-     */
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
-
-        this.el.style.removeProperty("width");
-        this.el.style.removeProperty("height");
-
-        this.el.innerHTML = "";
-        this.set("");
-    } // PlayerText.constructor()
-
-    /**
-     * 
-     */
-    get() {
-        return this.el.innerHTML;
-    } // PlayerText.get()
-    
-    /**
-     * @param {string} txt
-     */
-    set(txt) {
-        this.el.innerHTML = this.default_text;
-        if ( txt.length > 0 ) {
-            this.el.innerHTML = txt;
-        }
-    } // PlayerText.set()
-
-    /**
-     * 
-     */
-    on() {
-        this.el.style.color = "rgba(255, 255, 128, 0.8)";
-    } // PlayerText.on()
-
-    /**
-     * 
-     */
-    off() {
-        this.el.style.color = "rgba(0, 0, 0, 0.8)";
-    } // PlayerText.off()
-
-    /**
-     * 
-     */
-    red() {
-        this.el.style.color = "rgba(255, 0, 0, 0.8)";
-    } // PlayerText.red()
-} // class PlayerText
-
-/**
- *
- */
-class PlayerName extends PlayerText {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
-
-        this.default_text = `Player ${player + 1}`;
-        this.set("");
-    } // PlayerName.constructor()
-
-    /**
-     * @param {string} name
-     * @param {boolean} add_hist
-     */
-    emit(name, add_hist=true) {
-        emit_msg("set_playername", { player: parseInt(this.player),
-                                     name: name }, add_hist);
-    } // PlayerName.emit()
-} // class PlayerName
-
-/**
- *
- */
-class PlayerScore extends PlayerText {
-    constructor(id, board, player, x, y) {
-        super(id, board, player, x, y);
-
-        this.score = 0;
-
-        this.el.style.width = "42px";
-        this.el.style.textAlign = "center";
-        this.el.style.fontSize = "30px";
-        this.el.style.transform = "rotate(-90deg)";
-        this.el.style.transformOrigin = "left top";
-
-        this.default_text = `${this.score}`;
-        this.set("");
-    } // Score.constructor()
-
-    set(score) {
-        this.score = score;
-        super.set(`${score}`);
-    }
-
-    get() {
-        return parseInt(super.get());
-    }
-
-    up(score) {
-        this.score += score;
-        if ( this.score > 99 ) {
-            this.score = 99;
-        }
-        this.emit(this.score, true);
-    }
-
-    clear() {
-        this.score = 0;
-        if ( this.score < 0 ) {
-            this.score = 0;
-        }
-        this.emit(this.score, true);
-    }
-
-    /**
-     * @param {number} score
-     * @param {boolean} add_hist
-     */
-    emit(score, add_hist=true) {
-        emit_msg("set_score", { player: parseInt(this.player),
-                                score: parseInt(score) }, add_hist);
-    } // PlayerScore.emit()
-
-    on_mouse_down_xy(x, y) {
-        console.log(`PlayerScore[${this.player}].on_mouse_down_xy()`);
-        if ( this.board.score_btn[this.player].up.in_this(x, y) ) {
-            this.up(1);
-        } else if ( this.board.score_btn[this.player].down.in_this(x, y) ) {
-            this.clear();
-        }
-    }
-} // class PlayerScore
-
-/**
- *
- */
 class Dice extends PlayerItem {
     constructor(id, board, player, x1, y1, file_prefix) {
-        super(id, board, player, x1, y1);
+        super(id, board, player, x1, y1, 0);
         // console.log(`Dice> (x1,y1)=(${x1},${y1})`);
         this.file_prefix = file_prefix;
 
@@ -1855,7 +1762,7 @@ class Checker extends PlayerItem {
      * @param {Board} board - board object
      */
     constructor(id, board, player) {
-        super(id, board, player, 0, 0);
+        super(id, board, player, 0, 0, 0);
 
         [this.src_x, this.src_y] = [this.x, this.y];
         this.z = 0;
@@ -1902,17 +1809,17 @@ class Checker extends PlayerItem {
     /**
      * @return {number} - pip count
      */
-    pip() {
-        return super.pip(this.player, this.cur_point);
-    } // Checker.pip()
+    get_pip() {
+        return super.get_pip(this.player, this.cur_point);
+    } // Checker.get_pip()
 
     /**
      * @return {boolean}
      */
     is_last_man() {
-        const pip = this.pip();
+        const pip = this.get_pip();
         for (let i=0; i < 15; i++) {
-            const pip2 = this.board.checker[this.player][i].pip();
+            const pip2 = this.board.checker[this.player][i].get_pip();
             if ( pip2 > pip ) {
                 return false;
             }
@@ -1972,15 +1879,6 @@ class Checker extends PlayerItem {
         } else if ( diff_p == active_dice[0] + active_dice[1] ) {
             dice_vals = [active_dice[0], active_dice[1]];
         }
-
-        /*
-        const dice_idx = active_dice.indexOf(diff_p);
-        if ( dice_idx >= 0 ) {
-            dice_vals = [active_dice[dice_idx]];
-        } else if ( diff_p == active_dice[0] + active_dice[1] ) {
-            dice_vals = [active_dice[0], active_dice[1]];
-        }
-        */
 
         if ( active_dice.length >= 3 ) {
             let sum_d = active_dice[0] * 3;
@@ -2288,7 +2186,7 @@ class Board extends BgImage {
      */
     constructor(id, x, y, ws) {
         console.log(`Board(id=${id},x=${x},y=${y})`);
-        super(id, x, y);
+        super(id, x, y, 0, undefined, undefined);
 
         this.ws = ws;
 
@@ -2375,8 +2273,8 @@ class Board extends BgImage {
         let psy2 = sy2 + sh - 4;
 
         this.score = [];
-        this.score[1] = new PlayerScore("p1score", this, 1, psx, psy1);
-        this.score[0] = new PlayerScore("p0score", this, 0, psx, psy2);
+        this.score[1] = new PlayerScore("p1score", this, 1, psx, psy1, -90);
+        this.score[0] = new PlayerScore("p0score", this, 0, psx, psy2, -90);
 
         // Score buttons
         this.score_btn = [{}, {}];
@@ -2398,10 +2296,9 @@ class Board extends BgImage {
         // PlayerName
         this.player_name = [];
         this.player_name.push(new PlayerName(
-            "p0name", this, 0, this.bx[4], this.by[9] + 3));
+            "p0name", this, 0, this.bx[4], this.by[9]+3, 0));
         this.player_name.push(new PlayerName(
-            "p1name", this, 1, this.bx[3], this.by[0] - 3));
-        this.player_name[1].rotate(180);
+            "p1name", this, 1, this.bx[3], this.by[0]-3, 180));
 
         for (let p=0; p < 2; p++) {
             this.player_name[p].set("");
@@ -2633,6 +2530,7 @@ class Board extends BgImage {
 
     /**
      * search checker object by checker id
+     *
      * @param {string} ch_id - checker id
      * @return {Checker | undefined} - checker object or undefined
      */
@@ -2666,7 +2564,6 @@ class Board extends BgImage {
 
     /**
      * ターンを設定
-     * T.B.D. 勝敗判定、バナー表示などを外だしするべき??
      *
      * @param {number} turn
      *   <= -1 : all off
@@ -2738,14 +2635,19 @@ class Board extends BgImage {
     } // Board.set_turn()
 
     /**
-     * cals pip count
+     * calcurate pip count
      *
      * @param {number} player
      */
     pip_count(player) {
         let count = 0;
         for (let ch of this.checker[player]) {
-            count += ch.pip();
+            count += ch.get_pip();
+            // console.log(`count=${count}`);
+            if ( isNaN(count) ) {
+                count = undefined;
+                break;
+            }
         } // for(ch)
         // console.log(`Board.pip_count>count=${count}`);
 
@@ -3153,6 +3055,9 @@ class Board extends BgImage {
         console.log(`Board.load_gameinfo>score[]=[`
                     + `${this.score[0].score},`
                     + `${this.score[1].score}]`);
+
+        this.pip_count(0);
+        this.pip_count(1);
     } // Board.load_gameinfo()
 
     /**
@@ -3230,7 +3135,8 @@ class Board extends BgImage {
         // console.log(`Board.put_checker>idx=${idx}`);
         ch.cur_point = p;
 
-        // console.log(`Board.put_checker>p=${p},prev_p=${prev_p}`);
+        // pip count
+        this.pip_count(ch.player);
 
         // move sound
         if ( sound ) {
@@ -3247,8 +3153,6 @@ class Board extends BgImage {
             this.roll_btn[this.turn].off();
             this.roll_btn[1 - this.turn].off();
         }
-
-        this.pip_count(ch.player);
     } // Board.put_checker()
 
     /**
@@ -3269,7 +3173,7 @@ class Board extends BgImage {
  */
 class BoardArea extends BgBase {
     constructor(id, board, x, y, w, h) {
-        super(id, x, y, w, h);
+        super(id, x, y, 0, w, h);
         this.board = board;
     } // BoardArea.constructor()
 } // class BoardArea
@@ -3328,6 +3232,139 @@ class BoardPoint extends BoardArea {
         return n;
     } // BoardPoint.add()
 } // class BoardPoint
+
+/**
+ *
+ */
+class QueryStringBase {
+    constructor() {
+        this.querystring = '';
+        this.data = [];
+        this.load();
+    } // constructor()
+
+    load() {
+        this.querystring = window.location.search || '';
+        this.querystring = this.querystring.substr(
+            1, this.querystring.length);
+        console.log(`QueryStringBase.load>querystring=${this.querystring}`);
+
+        if ( this.querystring.length == 0 ) {
+            return {};
+        }
+
+        for (let ent of this.querystring.split("&")) {
+            let [k, v] = ent.split("=");
+            this.data[k] = v;
+        } // for(ent)
+
+        return this.data;
+    } // QueryStringBase.load()
+
+    /**
+     * @param {string} key
+     */
+    get(key) {
+        if ( this.data[key] === undefined ) {
+            return undefined;
+        }
+        return decodeURIComponent(this.data[key]);
+    } // QueryStringBase.get()
+} // class QueryStringBase
+
+/**
+ *
+ */
+class CookieBase {
+    constructor() {
+        this.cookie = undefined;
+        this.data = {};
+        this.load();
+    }
+
+    /**
+     * @return {Object} data
+     */
+    load() {
+        const allcookie = document.cookie;
+        // console.log(`CookieBase.load>allcookie="${allcookie}"`);
+
+        if ( allcookie.length == 0 ) {
+            return {};
+        }
+
+        for (let ent of allcookie.split("; ")) {
+            let [k, v] = ent.split('=');
+            // console.log(`CookieBase.load>k=${k},v=${v}`);
+            this.data[k] = v;
+        } // for(i)
+
+        return this.data;
+    } // CookieBase.load()
+
+    /**
+     * 
+     */
+    save() {
+        if ( Object.keys(this.data) ) {
+            return;
+        }
+
+        let allcookie = "";
+        for (let key in this.data) {
+            allcookie += `${key}=${this.data[key]};`;
+        } // for (key)
+
+        document.cookie = allcookie;
+    }
+
+    /**
+     * @param {string} key
+     * @param {string} value
+     */
+    set(key, value) {
+        document.cookie = `${key}=${encodeURIComponent(value)};`;
+    }
+    
+    /**
+     * @param {string} key
+     */
+    get(key) {
+        if ( this.data[key] === undefined ) {
+            return undefined;
+        }
+        return decodeURIComponent(this.data[key]);
+    } // CookieBase.get()
+} // class CookieBase
+
+/**
+ *
+ */
+class SoundBase {
+    constructor(board, soundfile) {
+        console.log("SoundBase("
+                    + `board.svr_id=${board.svr_id},`
+                    + `soundfile=${soundfile}`);
+        this.board = board;
+        this.soundfile = soundfile;
+        this.audio = new Audio(this.soundfile);
+    } // SoundBase.constructor()
+
+    /**
+     * 
+     */
+    play() {
+        /*
+        console.log(`SoundBase.play>`
+                    + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
+        */
+        if ( this.board.sound && GlobalSoundSwitch != "off" ) {
+            return this.audio.play();
+        } else {
+            return false;
+        }
+    } // SoundBase.play()
+} // class SoundBase
 
 /**
  * Emit message to server
@@ -3443,9 +3480,9 @@ const emit_playername = () => {
     const el = document.getElementById("player-name");
     const name = el.value;
 
-    const txt = board.player_name[board.player];
-    const cur_name = txt.get();
-    const def_name = txt.default_text;
+    const player_name = board.player_name[board.player];
+    const cur_name = player_name.get();
+    const def_name = player_name.default_text;
 
     console.log(`emit_player>player=${board.player},`
                 + `cur_name=${cur_name},`
@@ -3453,7 +3490,7 @@ const emit_playername = () => {
                 + ")");
     
     //board.emit_playername();
-    txt.emit(name, true);
+    player_name.emit(name, true);
 };
 
 /**
