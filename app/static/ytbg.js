@@ -61,7 +61,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.83";
+const VERSION = "0.84";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -471,9 +471,35 @@ class PlayerName extends PlayerText {
     constructor(id, board, player, x, y, deg) {
         super(id, board, player, x, y, deg);
 
-        this.def_name = `Player ${this.player}`;
+        // this.def_name = `Player ${this.player}`;
+        this.def_name = "[Click and input name]";
         this.name = this.def_name;
+
+        this.el_input = document.getElementById(`${id}-input`);
+        this.el_input.style.left = this.board.x + this.x + "px";
+        this.el_input.style.top = this.board.y + this.y + "px";
+        //this.el_input.transitionDuration = "5s";
+        this.el_input.style.transformOrigin = "left top";
+        this.el_input.style.transform = `rotate(${this.deg}deg)`;
+        this.el_input.style.zIndex = -1;
     } // PlayerName.constructor()
+
+    inverse() {
+        const x0 = parseInt(this.el_input.style.left.slice(0,-2));
+        const y0 = parseInt(this.el_input.style.top.slice(0, -2));
+        const deg0 = parseInt(this.el_input.style.transform.slice(7,-4));
+        console.log(`x0=${x0},y0=${y0},deg0=${deg0}`);
+        const dx0 = x0 - this.board.x - this.board.w / 2;
+        const dy0 = y0 - this.board.y - this.board.h / 2;
+        console.log(`dx0=${dx0},dy0=${dy0}`);
+        const x1 = this.board.x + this.board.w / 2 - dx0;
+        const y1 = this.board.y + this.board.h / 2 - dy0;
+        const deg1 = (deg0 + 180) % 360;
+        console.log(`x1=${x1},y1=${y1},deg1=${deg1}`);
+        this.el_input.style.left = x1 + "px";
+        this.el_input.style.top = y1 + "px";
+        this.el_input.style.transform = `rotate(${deg1}deg)`;
+    }
 
     /**
      * @param {string} name
@@ -485,7 +511,7 @@ class PlayerName extends PlayerText {
         }
         super.set(this.name);
 
-        document.getElementById("player-name").value = "";
+        //document.getElementById("player-name").value = "";
     } // PlayerName.set()
 
     /**
@@ -510,6 +536,16 @@ class PlayerName extends PlayerText {
         emit_msg("set_playername", { player: parseInt(this.player),
                                      name: name }, add_hist);
     } // PlayerName.emit()
+
+    /**
+     * 
+     */
+    on_mouse_down_xy(x, y) {
+        console.log('PlayerName.on_mouse_down_xy');
+        this.el_input.value = "";
+        this.el_input.style.zIndex = 10;
+        this.el_input.focus();
+    }
 } // class PlayerName
 
 /**
@@ -2296,9 +2332,9 @@ class Board extends BgImage {
         // PlayerName
         this.player_name = [];
         this.player_name.push(new PlayerName(
-            "p0name", this, 0, this.bx[4], this.by[9]+3, 0));
+            "p0name", this, 0, this.bx[4], this.by[9]+2, 0));
         this.player_name.push(new PlayerName(
-            "p1name", this, 1, this.bx[3], this.by[0]-3, 180));
+            "p1name", this, 1, this.bx[3], this.by[0]-2, 180));
 
         for (let p=0; p < 2; p++) {
             this.player_name[p].set("");
@@ -3053,7 +3089,7 @@ class Board extends BgImage {
         // score
         this.score[0].set(gameinfo.score[0]);
         this.score[1].set(gameinfo.score[1]);
-        console.log(`Board.load_gameinfo>score[]=[`
+       console.log(`Board.load_gameinfo>score[]=[`
                     + `${this.score[0].score},`
                     + `${this.score[1].score}]`);
 
@@ -3074,6 +3110,9 @@ class Board extends BgImage {
         } else {
             this.rotate(180, true, sec);
         }
+
+        this.player_name[0].inverse();
+        this.player_name[1].inverse();
     } // Board.inverse()
 
     /**
@@ -3476,23 +3515,24 @@ const clear_filename = () => {
 };
 
 /**
- *
+ * @param {number} player
  */
-const emit_playername = () => {
-    const el = document.getElementById("player-name");
+const emit_playername = (player) => {
+    const el = document.getElementById(`p${player}name-input`);
     const name = el.value;
 
-    const player_name = board.player_name[board.player];
+    const player_name = board.player_name[player];
     const cur_name = player_name.get();
     const def_name = player_name.default_text;
 
-    console.log(`emit_player>player=${board.player},`
+    console.log(`emit_playername2>player=${player},`
                 + `cur_name=${cur_name},`
                 + `name=${name}`
                 + ")");
     
-    //board.emit_playername();
     player_name.emit(name, true);
+
+    el.style.zIndex = -2;
 };
 
 /**

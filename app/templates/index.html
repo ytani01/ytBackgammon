@@ -82,10 +82,11 @@
       <strong>{{ name }} Ver. {{ version }}</strong> /
       <strong id="version">Version Number</strong>
       &nbsp;
+      <!--
       Name:
       <input id="player-name" type="text" onChange="emit_playername();">
-      <!-- <input type="button" value="Clear" onClick="emit_playername();"> -->
       &nbsp;
+      -->
       <input class="checkbox" id="sound-switch" type="checkbox"
              onChange="apply_sound_switch();">
       <label class="checkboxlabel" for="sound-switch">Sound</label>
@@ -100,6 +101,7 @@
       &nbsp;
       <span id="dice-histogram" style="font-size:small"></span>
     </header>
+
     <div id="board">
       <image src="/static/images/board-base.png">
         <div class="bordertext" id="p0pip">167</div>
@@ -192,6 +194,15 @@
           <image src="/static/images/button-resign.png" width="100px"
                  style="transform:rotate(180deg);"></div>
     </div>
+
+    <input id="p0name-input" class="bordertext" type="text"
+           style="position:absolute;border:none;"
+           onFocusOut="emit_playername(0);"
+           onChange="emit_playername(0);">
+    <input id="p1name-input" class="bordertext" type="text"
+           style="position:absolute;border:none;"
+           onFocusOut="emit_playername(1);"
+           onChange="emit_playername(1);">
 
     <div id="buttons">
       <div id="button-resign">
