@@ -654,7 +654,7 @@ class BgImage extends BgBase {
         this.image_dir = "/static/images/";
         this.file_suffix = ".png";
 
-        this.image_el = this.el.firstChild;
+        this.image_el = this.el.children[0];
 
         if ( w === undefined ) {
             this.w = this.image_el.width;
@@ -926,7 +926,7 @@ class Cube extends OnBoardImage {
         filename += ("0" + file_val).slice(-2);
         filename += this.file_suffix;
 
-        this.el.firstChild.src = filename;
+        this.el.children[0].src = filename;
 
         if ( this.player === undefined ) {
             this.rotate(0, true);
@@ -1101,6 +1101,7 @@ class BannerButton extends PlayerItem {
      * @param {number} player
      * @param {number} x
      * @param {number} y
+     * @param {number} deg
      */
     constructor(id, board, player, x, y, deg=0) {
         super(id, board, player, x, y, deg);
@@ -1670,7 +1671,7 @@ class Dice extends PlayerItem {
             this.disable();
         }
 
-        this.el.firstChild.src = this.get_filename(val % 10);
+        this.el.children[0].src = this.get_filename(val % 10);
 
         if ( roll_flag ) {
             this.deg = Math.floor(Math.random() * 720 - 360);
@@ -2397,7 +2398,7 @@ class Board extends BgImage {
                 this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
                                                p, -1, cn));
             }
-        } // for
+        } // for (p)
 
         // RollButton
         const bx1 = 160;

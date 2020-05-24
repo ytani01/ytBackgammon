@@ -21,7 +21,7 @@
       const head_el = document.getElementsByTagName("head")[0];
 
       const js_url = "/static/ytbg.js?ts=" + ts;
-      //const js_url = "/static/ytbg.js"; // for debug
+      // const js_url = "/static/ytbg.js"; // for debug
       const script_el = document.createElement("script");
       console.log(`js_url=${js_url}`);
       script_el.setAttribute("type", "text/javascript");
@@ -100,25 +100,24 @@
       &nbsp;
       <span id="dice-histogram" style="font-size:small"></span>
     </header>
-    <div id="board"><image src="/static/images/board-base.png">
+    <div id="board">
+      <image src="/static/images/board-base.png">
         <div class="bordertext" id="p0pip">167</div>
         <div class="bordertext" id="p1pip">167</div>
-
-        <div class="bordertext"
-             id="p0name"><image src="/static/images/checker0.png"></div>
-        <div class="bordertext"
-             id="p1name"><image src="/static/images/checker1.png"></div>
+        
+        <div class="bordertext" id="p0name">
+          <image src="/static/images/checker0.png"></div>
+        <div class="bordertext" id="p1name">
+          <image src="/static/images/checker1.png"></div>
 
         <div id="score_up0"><image src="/static/images/cube01.png"></div>
         <div id="score_down0"><image src="/static/images/cube01.png"></div>
         <div id="score_up1"><image src="/static/images/cube01.png"></div>
         <div id="score_down1"><image src="/static/images/cube01.png"></div>
 
-        <div id="p0score"
-             style="font-weight:bold;color:#333;">
+        <div id="p0score" style="font-weight:bold;color:#333;">
           <image src="/static/images/checker0.png"></div>
-        <div id="p1score"
-             style="font-weight:bold;color:#333;">
+        <div id="p1score" style="font-weight:bold;color:#333;">
           <image src="/static/images/checker1.png"></div>
 
         <div id="p000"><image src="/static/images/checker0.png"></div>
@@ -155,33 +154,6 @@
 
         <div id="cube"><image src="/static/images/cube01.png"></div>
 
-        <div id="resignbutton0"><image
-                                  src="/static/images/button-resign.png"
-                                  width="100px"></div>
-        <div id="resignbutton1"><image
-                                  src="/static/images/button-resign.png"
-                                  width="100px"
-                                  style="transform:rotate(180deg);"></div>
-
-        <div id="rollbutton0"><image src="/static/images/dicecup.png"
-                                     width="100px"
-                                     style="transform:rotate(-10deg);"></div>
-        <div id="rollbutton1"><image src="/static/images/dicecup.png"
-                                     width="100px"
-                                     style="transform:rotate(170deg);"></div>
-
-        <div id="passbutton0"><image src="/static/images/pass.png"
-                                     width="180px"></div>
-        <div id="passbutton1"><image src="/static/images/pass.png"
-                                     width="180px"
-                                     style="transform:rotate(180deg);"></div>
-
-        <div id="winbutton0"><image src="/static/images/win.png"
-                                    width="180px"></div>
-        <div id="winbutton1"><image src="/static/images/win.png"
-                                    width="180px"
-                                    style="transform:rotate(180deg);"></div>
-
         <div id="dice00"><image src="/static/images/dice01.png"></div>
         <div id="dice01"><image src="/static/images/dice01.png"></div>
         <div id="dice02"><image src="/static/images/dice01.png"></div>
@@ -191,31 +163,48 @@
         <div id="dice11"><image src="/static/images/dice11.png"></div>
         <div id="dice12"><image src="/static/images/dice11.png"></div>
         <div id="dice13"><image src="/static/images/dice11.png"></div>
-    </div>
-    <div id="buttons">
-      <!-- 
-      <div style="display:table;width:100%;height:10px">
-        <i style="font-size:40px;color:#FFF;vertical-align:middle;"
-           class="fas fa-bars"></i>
-      </div>
-      -->
-      <div id="button-resign"><image src="/static/images/button-resign.png"
-                                     width="70px"></div>
 
-      <div id="button-inverse"><image src="/static/images/button-inverse.png"
-                                      width="70px"></div>
-      <div id="button-fwd"><image src="/static/images/button-fwd.png"
-                                  width="70px"></div>
-      <!--
-      <div id="button-fwd2"><image src="/static/images/button-fwd2.png"></div>
-      <div id="button-fwd_all"><image src="/static/images/button-fwd3.png"></div>
-      -->
-      <div id="button-back"><image src="/static/images/button-bak.png"
-                                   width="70px"></div>
-      <!--
-      <div id="button-back2"><image src="/static/images/button-bak2.png"></div>
-      <div id="button-back_all"><image src="/static/images/button-bak3.png"></div>
-      -->
+        <div id="rollbutton0">
+          <image src="/static/images/dicecup.png" width="100px"
+                 style="transform:rotate(-10deg);"></div>
+        <div id="rollbutton1">
+          <image src="/static/images/dicecup.png" width="100px"
+                 style="transform:rotate(170deg);"></div>
+
+        <div id="passbutton0">
+          <image src="/static/images/pass.png" width="180px"
+                 style="transform:rotate(0deg);"></div>
+        <div id="passbutton1">
+          <image src="/static/images/pass.png" width="180px"
+                 style="transform:rotate(180deg);"></div>
+
+        <div id="winbutton0">
+          <image src="/static/images/win.png" width="180px"
+                 style="transform:rotate(0deg);"></div>
+        <div id="winbutton1">
+          <image src="/static/images/win.png" width="180px"
+                 style="transform:rotate(180deg);"></div>
+
+        <div id="resignbutton0">
+          <image src="/static/images/button-resign.png" width="100px"
+                 style="transform:rotate(0deg);"></div>
+        <div id="resignbutton1">
+          <image src="/static/images/button-resign.png" width="100px"
+                 style="transform:rotate(180deg);"></div>
+    </div>
+
+    <div id="buttons">
+      <div id="button-resign">
+        <image src="/static/images/button-resign.png" width="70px"></div>
+    
+      <div id="button-inverse">
+        <image src="/static/images/button-inverse.png" width="70px"></div>
+    
+      <div id="button-fwd">
+        <image src="/static/images/button-fwd.png" width="70px"></div>
+    
+      <div id="button-back">
+        <image src="/static/images/button-bak.png" width="70px"></div>
     </div>
   </body>
 </html>
