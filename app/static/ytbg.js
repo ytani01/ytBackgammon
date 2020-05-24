@@ -505,8 +505,9 @@ class PlayerName extends PlayerText {
      * @param {string} name
      */
     set(name) {
-        this.name = name;
-        if ( name.length == 0 ) {
+        this.name = name.trim();
+        console.log(`name=${JSON.stringify(this.name)},length=${this.name.length}`);
+        if ( this.name.length == 0 ) {
             this.name = this.def_name;
         }
         super.set(this.name);
@@ -1039,7 +1040,7 @@ class Cube extends OnBoardImage {
      * @param {number} x
      * @param {number} y
      */
-    on_mouse_down_xy(x, y) {
+    on_mouse_up_xy(x, y) {
         console.log(`Cube.on_mouse_down_xy>this.player=${this.player},`
                     + `this.board.player=${this.board.player}`);
 
