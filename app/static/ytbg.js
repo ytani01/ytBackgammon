@@ -3664,14 +3664,14 @@ window.onload = () => {
                         + `player=${msg.data.player},name=${msg.data.name}`);
             board.player_name[msg.data.player].set(msg.data.name);
             return;
-        }
+        } // set_playername
         
         if ( msg.type == "set_score" ) {
             console.log(`ws.on(json)>msg.type=set_score,`
                         + `player=${msg.data.player},score=${msg.data.score}`);
             board.score[msg.data.player].set(msg.data.score);
             return;
-        }
+        } // set_score
         
         console.log("ws.on(json)>msg.type=???");
     }); // ws.on(json)
