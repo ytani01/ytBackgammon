@@ -8,18 +8,17 @@
  *
  * SoundBase .. play audio
  *
- * BgBase .. have (x, y)
- *   |
- *   +- BgArea .. have (w, h), without image
+ * BgBase .. have (x, y, w, h), without image
  *        |
- *        +- BgText .. have a text / unclickable(?)     XXX T.B.D. XXX
+ *        +- BgText .. have a text
  *        |    |
  *        |    +- BoardText .. on board
  *        |         |
- *        |         +- PlayerText .. owned by player
+ *        |         +- PlayerText2 .. owned by player
  *        |              |
  *        |              +- PlayerName                  XXX
- *        |              +- Score                       XXX
+ *        |              +- PlayerScore                 XXX
+ *        |              +- PlayerPipCount
  *        |
  *        +- BgImage .. have a image, mouse handlers
  *        |    |
@@ -68,7 +67,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.80";
+const VERSION = "0.81";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -94,7 +93,8 @@ class QueryStringBase {
 
     load() {
         this.querystring = window.location.search || '';
-        this.querystring = this.querystring.substr(1, this.querystring.length);
+        this.querystring = this.querystring.substr(
+            1, this.querystring.length);
         console.log(`QueryStringBase.load>querystring=${this.querystring}`);
 
         if ( this.querystring.length == 0 ) {
@@ -223,8 +223,9 @@ class BgBase {
      * @param {number} x
      * @param {number} y
      */
-    constructor(id, x, y) {
+    constructor(id, x, y, w=undefined, h=undefined) {
         [this.x, this.y] = [x, y];
+        [this.w, this.h] = [w, h];
         this.id = id;
         
         if ( this.id.length > 0 ) {
@@ -232,6 +233,14 @@ class BgBase {
         } else {
             this.el = undefined;
         }
+
+        if ( w === undefined && this.el ) {
+            this.w = this.el.clientWidth;
+        }
+        if ( h === undefined && this.el ) {
+            this.h = this.el.clientHeight;
+        }
+
     } // BgBase.constructor()
 
     /**
@@ -245,13 +254,24 @@ class BgBase {
 
         this.el.style.transitionTimingFunction = "liner";
         this.el.style.transitionDuration = sec + "s";
-        this.el.style.left = this.x + "px";
-        this.el.style.top = this.y + "px";
         if ( center ) {
             this.el.style.left = (this.x - this.w / 2) + "px";
             this.el.style.top = (this.y - this.h / 2) + "px";
+        } else {
+            this.el.style.left = this.x + "px";
+            this.el.style.top = this.y + "px";
         }
     } // BgImage.move()
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @return {boolean}
+     */
+    in_this(x, y) {
+        return (x >= this.x) && (x < this.x + this.w)
+            && (y >= this.y) && (y < this.y + this.h);
+    }
 
     /**
      * @param {number} z
@@ -266,9 +286,10 @@ class BgBase {
      */
     rotate(deg, center=false, sec=0) {
         // console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
-        this.el.style.transformOrigin = "top left";
         if ( center ) {
             this.el.style.transformOrigin = "center center";
+        } else {
+            this.el.style.transformOrigin = "top left";
         }
         this.el.style.transitionDuration = sec + "s";
         this.el.style.transform = `rotate(${deg}deg)`;
@@ -351,65 +372,112 @@ class BgBase {
 } // class BgBase
 
 /**
- *
- */
-class BgArea extends BgBase {
-    /**
-     * @param {number} x
-     * @param {number} y
-     * @param {number} w
-     * @param {number} h
-     */
-    constructor(id, x, y, w=undefined, h=undefined) {
-        super(id, x, y);
-        [this.w, this.h] = [w, h];
-
-        if ( w === undefined ) {
-            this.w = this.el.clientWidth;
-        }
-        if ( h === undefined ) {
-            this.h = this.el.clientHeight;
-        }
-    }
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     * @return {boolean}
-     */
-    in_this(x, y) {
-        return (x >= this.x) && (x < this.x + this.w)
-            && (y >= this.y) && (y < this.y + this.h);
-    }
-} // class BgArea
-
-/**
  * <div id="${id}">some text</div>
  */
-class BgText extends BgArea {
+class BgText extends BgBase {
     /**
      * @param {string} id
      * @param {number} x
      * @param {number} y
-     * @param {number} w
-     * @param {number} h
      */
-    constructor(id, x, y, w, h) {
-        super(id, x, y, w, h);
+    constructor(id, x, y, deg, text="") {
+        super(id, x, y, undefined, undefined);
+        this.deg = deg;
 
-        console.log(`BgText.constructor>${this.el.clientWidth}`);
-        
-        this.text = this.el.innerHTML;
-        console.log(`BgText.constructor>text=${this.text}`);
-
-        this.move(this.x, this.y, false);
+        this.set(text);
+        this.move(this.x, this.y, true, 0);
+        this.rotate(this.deg, true, 0);
     } // BgText.constructor()
+    /**
+     * 
+     */
+    get() {
+        return this.el.innerHTML;
+    } // BgText.get()
+    
+    /**
+     * @param {string} txt
+     */
+    set(txt) {
+        this.el.innerHTML = "";
+        if ( txt.length > 0 ) {
+            this.el.innerHTML = txt;
+        }
+        this.w = this.el.clientWidth;
+        this.h = this.el.clientHeight;
+        this.move(this.x, this.y, true, 0);
+    } // BgText.set()
+
+    /**
+     * 
+     */
+    on() {
+        // this.el.style.color = "rgba(255, 255, 128, 0.8)";
+        this.el.style.opacity = 1;
+    } // BgText.on()
+
+    /**
+     * 
+     */
+    off() {
+        // this.el.style.color = "rgba(0, 0, 0, 0.8)";
+        this.el.style.opacity = 0;
+    } // BgText.off()
+
+    /**
+     * 
+     */
+    red() {
+        this.el.style.color = "rgba(255, 0, 0, 0.8)";
+    } // BgText.red()
 } // class BgText
+
+/**
+ * <div id="${id}">some text</div>
+ */
+class BoardText extends BgText {
+    constructor(id, board, x, y, deg) {
+        super(id, x, y, deg);
+        this.board = board;
+        
+    } // BoardText.constructor()
+} // class BoardText
+
+/**
+ * <div id="${id}">some text</div>
+ */
+class PlayerText2 extends BoardText {
+    constructor(id, board, player, x, y, deg) {
+        super(id, board, x, y, deg);
+        this.player = player;
+    } // PlayerText2.constructor()
+} // class PlayerText2
+
+/**
+ * <div id="${id}">some text</div>
+ */
+class PlayerPipCount extends PlayerText2 {
+    constructor(id, board, player, x, y, deg) {
+        super(id, board, player, x, y, deg);
+
+        console.log(`board=${this.board}, w=${this.w}, h=${this.h}`);
+
+        this.prefix = "Pip:";
+        this.pip_count = 167;
+        this.set(this.pip_count);
+        this.off();
+    } // PlayerPipCount.constructor()
+
+    set(pip_count) {
+        this.pip_count = pip_count;
+        super.set(`${this.prefix} ${this.pip_count}`);
+    } // PlayerPipCount.set()
+} // class PlayerPipCount
 
 /**
  * <div id="${id}"><image src="${image_dir}/.."></div>
  */
-class BgImage extends BgArea {
+class BgImage extends BgBase {
     constructor(id, x, y, w=undefined, h=undefined) {
         super(id, x, y, w, h);
 
@@ -1574,7 +1642,7 @@ class PlayerScore extends PlayerText {
     emit(score, add_hist=true) {
         emit_msg("set_score", { player: parseInt(this.player),
                                 score: parseInt(score) }, add_hist);
-    } // PlayerName.emit()
+    } // PlayerScore.emit()
 
     on_mouse_down_xy(x, y) {
         console.log(`PlayerScore[${this.player}].on_mouse_down_xy()`);
@@ -2227,7 +2295,7 @@ class Board extends BgImage {
         this.free_move = false;
         this.disp_pip = false;
         
-        this.bx = [27, 81, 108, 432, 495, 819, 846];
+        this.bx = [27, 81, 108, 432, 495, 819, 846, 900];
         this.by = [30, 83, 124, 208, 249, 302, 243, 425, 466, 520];
 
         this.resign = -1;
@@ -2330,9 +2398,9 @@ class Board extends BgImage {
         // PlayerName
         this.player_name = [];
         this.player_name.push(new PlayerName(
-            "p0name", this, 0, this.bx[4], this.by[9] + 4));
+            "p0name", this, 0, this.bx[4], this.by[9] + 3));
         this.player_name.push(new PlayerName(
-            "p1name", this, 1, this.bx[3], this.by[0] - 4));
+            "p1name", this, 1, this.bx[3], this.by[0] - 3));
         this.player_name[1].rotate(180);
 
         for (let p=0; p < 2; p++) {
@@ -2342,8 +2410,15 @@ class Board extends BgImage {
 
         // Pip count XXX
         this.pip = [];
-        this.pip.push(new BgText("p0pip", 0, 0));
-        this.pip.push(new BgText("p1pip", 0, 0));
+        let py_offset = 14;
+        this.pip.push(new PlayerPipCount("p0pip", this, 0,
+                                         (this.bx[6] + this.bx[7]) / 2,
+                                         this.h - py_offset,
+                                         0));
+        this.pip.push(new PlayerPipCount("p1pip", this, 1,
+                                         (this.bx[6] + this.bx[7]) / 2,
+                                         py_offset,
+                                         180));
 
         // Checkers
         this.checker = [Array(15), Array(15)];
@@ -2527,6 +2602,14 @@ class Board extends BgImage {
         this.disp_pip = document.getElementById("disp-pip").checked;
         console.log(`Board.apply_disp_pip>disp_pip=${this.disp_pip}`);
 
+        if ( this.disp_pip ) {
+            this.pip[0].on();
+            this.pip[1].on();
+        } else {
+            this.pip[0].off();
+            this.pip[1].off();
+        }
+
         return this.disp_pip;
     } // Board.apply_disp_pip()
 
@@ -2665,6 +2748,8 @@ class Board extends BgImage {
             count += ch.pip();
         } // for(ch)
         // console.log(`Board.pip_count>count=${count}`);
+
+        this.pip[player].set(count);
         return count;
     } // Board.pip_count()
 
@@ -3161,8 +3246,9 @@ class Board extends BgImage {
             this.pass_btn[this.turn].on();
             this.roll_btn[this.turn].off();
             this.roll_btn[1 - this.turn].off();
-            return;
         }
+
+        this.pip_count(ch.player);
     } // Board.put_checker()
 
     /**
@@ -3181,7 +3267,7 @@ class Board extends BgImage {
 /**
  *
  */
-class BoardArea extends BgArea {
+class BoardArea extends BgBase {
     constructor(id, board, x, y, w, h) {
         super(id, x, y, w, h);
         this.board = board;
@@ -3388,7 +3474,7 @@ const apply_free_move = () => {
  *
  */
 const apply_disp_pip = () => {
-    board.apply_disp_pip
+    board.apply_disp_pip();
 };
 
 /**
@@ -3438,6 +3524,9 @@ const on_key_down = (e, board) => {
  *
  */
 document.body.onkeydown = e => {
+    if ( e.key.length === undefined ) {
+        return;
+    }
     if ( e.key.length == 1 ) {
         on_key_down(e, board);
     }

@@ -16,9 +16,17 @@ div, span {
     user-select: none;
 }
 
-.onboardtext {
-    color: rgba(255,255,255,1);
+.bordertext {
+    font-size: 19px;
     font-weight: bold;
+}
+
+.checkbox {
+    transform: scale(1.8);
+}
+
+.checkboxlabel {
+    font-size: 22px;
 }
 
 /*******/
