@@ -283,6 +283,22 @@ class BgBase {
     } // BgBase.touch2mouse()
     
     /**
+     * only for get_xy() function
+     *
+     * @param {MouseEvent} e
+     */
+    inverse_xy(e) {
+        let [origin_x, origin_y] = [this.x, this.y];
+        let [w, h] = [this.w, this.h];
+        if ( this.board ) {
+            [origin_x, origin_y] = [this.board.x, this.board.y];
+            [w, h] = [this.board.w, this.board.h];
+        }
+        
+        return [w - e.pageX + origin_x, h - e.pageY + origin_y];
+    } // BgBase.inverse_xy()
+
+    /**
      * @param {MouseEvent} e
      */
     get_xy(e) {
@@ -463,7 +479,6 @@ class PlayerName extends PlayerText {
      * @param {string} name
      */
     set(name) {
-        console.log(`name=${name}`);
         this.name = name;
         if ( name.length == 0 ) {
             this.name = this.def_name;
@@ -687,22 +702,6 @@ class BgImage extends BgBase {
         this.active = false;
         this.el.hidden = true;
     } // BgImage.off()
-    
-    /**
-     * only for get_xy() function
-     *
-     * @param {MouseEvent} e
-     */
-    inverse_xy(e) {
-        let [origin_x, origin_y] = [this.x, this.y];
-        let [w, h] = [this.w, this.h];
-        if ( this.board ) {
-            [origin_x, origin_y] = [this.board.x, this.board.y];
-            [w, h] = [this.board.w, this.board.h];
-        }
-        
-        return [w - e.pageX + origin_x, h - e.pageY + origin_y];
-    } // BgImage.inverse_xy()
 } // class BgImage
 
 /**
@@ -2264,7 +2263,7 @@ class Board extends BgImage {
         let sx1 = this.bx[0] + 3;
         let sx2 = sx1 + sw + 2;
 
-        let sy_offset = 20;
+        let sy_offset = 27;
         let sy1 = this.by[2] + sy_offset;
         let sy2 = this.by[7] - sy_offset - sh;
 
@@ -2571,8 +2570,9 @@ class Board extends BgImage {
      *       1 : player 1
      *   >=  2 : all on
      * @param {number} resign
+     * @param {boolean} sound - sound switch
      */
-    set_turn(turn, resign=-1) {
+    set_turn(turn, resign=-1, sound=true) {
         const prev_turn = this.turn;
         /*
         console.log(`Board.set_turn(`
@@ -2622,7 +2622,7 @@ class Board extends BgImage {
         }
             
         // turn == 0 or 1
-        if ( turn != prev_turn ) {
+        if ( turn != prev_turn && sound ) {
             let playpromise = board.sound_turn_change.play();
         }
 
@@ -3023,7 +3023,7 @@ class Board extends BgImage {
                 for (let c=0; c < 15; c++) {
                     const ch = this.checker[p][c];
                     if ( ch_point[p][c][1] == i ) {
-                        this.put_checker(ch, ch_point[p][c][0], sec);
+                        this.put_checker(ch, ch_point[p][c][0], sec, false);
                         ch.el.hidden = false;
                     }
                 } // for (c)
@@ -3047,7 +3047,7 @@ class Board extends BgImage {
 
         // turn
         // console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
-        this.set_turn(gameinfo.turn, this.resign);
+        this.set_turn(gameinfo.turn, this.resign, false);
 
         // score
         this.score[0].set(gameinfo.score[0]);
@@ -3114,7 +3114,7 @@ class Board extends BgImage {
      * @param {boolean} [sound=true]
      */
     put_checker(ch, p, sec=0, sound=true) {
-        console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
+        // console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
 
         const prev_p = ch.cur_point;
         // console.log(`Board.put_checker>prev_p=${prev_p})`);
@@ -3359,6 +3359,7 @@ class SoundBase {
                     + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
         */
         if ( this.board.sound && GlobalSoundSwitch != "off" ) {
+            console.log(`soundfile=${this.soundfile}`);
             return this.audio.play();
         } else {
             return false;
