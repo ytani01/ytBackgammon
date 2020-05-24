@@ -49,23 +49,23 @@ Chromeのバージョンが古い場合は、タイムラグが生じやすい�
 
 ## Usage
 
-### New game
+### 1. New game
 
 [![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
 
-### Doubling
+### 2. Doubling
 
-#### Double --> Take
+#### 2.1 Double --> Take
 
 [![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
 
 
-#### Double --> Resign
+#### 2.2 Double --> Resign
 
 [![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
 
-## Score
+## 3. Score
 
 スコアの計算は自動的に行われますが、
 リセットしたり、修正したい場合は、手動で行うことができます。
@@ -80,19 +80,19 @@ Chromeのバージョンが古い場合は、タイムラグが生じやすい�
 ## Install
 
 
-## References 
+## A. References 
 
-### Flask + Webscoket
+### A.1 Flask + Webscoket
 
 * [Flask-Socket-IO](https://github.com/miguelgrinberg/Flask-SocketIO)
   - [Flask-SocketIOでWebSocketアプリケーション](https://qiita.com/nanakenashi/items/6497caf1c56c36f47be9)
   
 
-### Javascript socket.io
+### A.2 Javascript socket.io
 
 * https://cdnjs.com/libraries/socket.io
 
 
-### CSS
+### A.3 CSS
 
 * [CSSだけで簡単！ハンバーガーメニューの作り方](https://saruwakakun.com/html-css/reference/nav-drawer)
