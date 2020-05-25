@@ -58,16 +58,18 @@ class ytBackgammonServer:
         """
         self._log.debug('')
 
-        score0 = self._bg._gameinfo['score'][0];
-        score1 = self._bg._gameinfo['score'][1];
+        score0 = self._bg._gameinfo['score'][0]
+        score1 = self._bg._gameinfo['score'][1]
         player0_name = self._bg._gameinfo['board']['playername'][0]
         player1_name = self._bg._gameinfo['board']['playername'][1]
+        clock_limit = self._bg._gameinfo['clock_limit']
 
         self._bg.init_gameinfo()
         self._bg._gameinfo['score'][0] = score0;
         self._bg._gameinfo['score'][1] = score1;
         self._bg._gameinfo['board']['playername'][0] = player0_name
         self._bg._gameinfo['board']['playername'][1] = player1_name
+        self._bg._gameinfo['board']['clock_limit'] = clock_limit
         
         self.add_history(self._bg._gameinfo)
 
@@ -199,11 +201,13 @@ class ytBackgammonServer:
         j_str += '      "score": %s,\n' % h['score']
         j_str += '      "turn": %d,\n' % h['turn']
         j_str += '      "resign": %s,\n' % h['resign']
+        j_str += '      "clock_limit": %s,\n' % h['clock_limit']
         j_str += '      "board": {\n'
         j_str += '        "playername": [\n'
         j_str += '          %s,\n' % json.dumps(h['board']['playername'][0])
         j_str += '          %s\n' % json.dumps(h['board']['playername'][1])
         j_str += '        ],\n'
+        j_str += '        "clock": %s,\n' % h['board']['clock']
         j_str += '        "cube": { "side": %d, ' % h['board']['cube']['side']
         j_str += '"value": %d, ' % h['board']['cube']['value']
         j_str += '"accepted": %s },\n' % json.dumps(
@@ -382,6 +386,26 @@ class ytBackgammonServer:
         if msg['type'] == 'resign':
             # data: {'player': int}
             self._bg.resign(msg['data'])
+
+        if msg['type'] == 'set_clock_limit':
+            # data: {'index': int, 'clock_limit': int}
+            self._bg.set_clock_limit(msg['data'])
+
+        if msg['type'] == 'set_player_clock':
+            # data: {'player': int, 'clock': [int(sec), int(sec)]}
+            self._bg.set_player_clock(msg['data'])
+
+        if msg['type'] == 'start_clcok':
+            # data: {}
+            pass
+
+        if msg['type'] == 'pause_clcok':
+            # data: {}
+            pass
+
+        if msg['type'] == 'reset_clcok':
+            # data: {}
+            pass
 
         """
         append history or not

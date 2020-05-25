@@ -34,12 +34,17 @@ class ytBackgammon:
             'game_num': 0,
             'match_score': 0,
             'score': [0, 0],
-            'turn': 2,  # <=-1:all off, 0:player0, 1:player1, >=2:all on
-            'resign': -1,  # < 0: none, 0|1: player
+            'turn': 2,       # <=-1:all off, 0:player0, 1:player1, >=2:all on
+            'resign': -1,    # < 0: none, 0|1: player
+            'clock_limit': [120, 12],
             'board': {
                 'playername': [
                     '',
                     ''
+                ],
+                'clock': [
+                    [120, 12],
+                    [120, 12]
                 ],
                 'cube': {
                     'side': -1,  # -1: center, 0|1: player
@@ -138,4 +143,18 @@ class ytBackgammon:
         self._log.debug('data=%s', data)
         self._gameinfo['resign'] = data['player']
         self._log.debug('gameinfo.resign=%s', self._gameinfo['resign'])
+
+    def set_clock_limit(self, data):
+        """
+        data = {'index': int, 'clock_limit': int}
+        """
+        self._log.debug('data=%s', data)
+        self._gameinfo['clock_limit'][data['index']] = data['clock_limit']
+
+    def set_player_clock(self, data):
+        """
+        data = {'player': int, 'clock': [int(sec), int(sec)]}
+        """
+        self._log.debug('data=%s', data)
+        self._gameinfo['board']['clock'][data['player']] = data['clock']
 ###

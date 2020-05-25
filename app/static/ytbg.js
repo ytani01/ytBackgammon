@@ -8,8 +8,11 @@
  *    |    |
  *    |    +- BoardText .. on board
  *    |         |
+ *    |         +- ClockLimit
+ *    |         |
  *    |         +- PlayerText .. owned by player
  *    |              |
+ *    |              +- PlayerClock
  *    |              +- PlayerName
  *    |              +- PlayerPipCount
  *    |              +- PlayerScore
@@ -61,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.84";
+const VERSION = "0.85";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -90,7 +93,7 @@ class BgBase {
         this.deg = deg;
         this.id = id;
         
-        if ( this.id.length > 0 ) {
+        if ( this.id !== undefined && this.id.length > 0 ) {
             this.el = document.getElementById(this.id);
         } else {
             this.el = undefined;
@@ -141,7 +144,7 @@ class BgBase {
             this.el.style.left = this.x + "px";
             this.el.style.top = this.y + "px";
         }
-    } // BgImage.move()
+    } // BgBase.move()
 
     /**
      * @param {number} z
@@ -149,13 +152,13 @@ class BgBase {
     set_z(z) {
         this.z = z;
         this.el.style.zIndex = this.z;
-    } // BgImage.set_z()
+    } // BgBase.set_z()
 
     /**
      * @param {number} deg
      */
     rotate(deg, center=false, sec=0) {
-        // console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
+        //console.log(`rotate(deg=${deg}, center=${center}, sec=${sec})`);
         this.deg = deg;
         if ( center ) {
             this.el.style.transformOrigin = "center center";
@@ -165,7 +168,7 @@ class BgBase {
         this.el.style.transitionTimingFunction = "liner";
         this.el.style.transitionDuration = sec + "s";
         this.el.style.transform = `rotate(${this.deg}deg)`;
-    } // BgImage.rotate()
+    } // BgBase.rotate()
 
     /**
      * @param {number} player
@@ -368,24 +371,26 @@ class BgText extends BgBase {
 
         // set text
         this.text = text;
-        this.el.innerHTML = this.text;
 
-        // set width
-        this.w = this.el.clientWidth;
-        this.h = this.el.clientHeight;
-
-        // move
-        this.el.style.left = this.x + "px";
-        this.el.style.top = this.y + "px";
-
-        // rotate
-        this.el.style.transform = `rotate(${this.deg}deg)`;
+        if ( this.el ) {
+            this.el.innerHTML = this.text;
+            this.w = this.el.clientWidth;
+            this.h = this.el.clientHeight;
+            this.el.style.left = this.x + "px";
+            this.el.style.top = this.y + "px";
+            this.el.style.transformOrigin = "top left";
+            this.el.style.transform = `rotate(${this.deg}deg)`;
+        }
     } // BgText.constructor()
 
     /**
      * @return {string} this.text
      */
     get() {
+        if ( this.el === undefined ) {
+            return "";
+        }
+
         this.text = this.el.innerHTML;
         return this.text;
     } // BgText.get()
@@ -394,6 +399,10 @@ class BgText extends BgBase {
      * @param {string} txt
      */
     set(txt) {
+        if ( this.el === undefined ) {
+            return;
+        }
+
         this.el.innerHTML = "";
         if ( txt.length > 0 ) {
             this.text = txt;
@@ -409,14 +418,18 @@ class BgText extends BgBase {
      * 
      */
     on() {
-        this.el.style.opacity = 1;
+        if ( this.el ) {
+            this.el.style.opacity = 1;
+        }
     } // BgText.on()
 
     /**
      * 
      */
     off() {
-        this.el.style.opacity = 0;
+        if ( this.el ) {
+            this.el.style.opacity = 0;
+        }
     } // BgText.off()
 } // class BgText
 
@@ -439,6 +452,50 @@ class BoardText extends BgText {
 } // class BoardText
 
 /**
+ *
+ */
+class ClockLimit extends BoardText {
+    /**
+     * @param {Board} board
+     */
+    constructor(id, board) {
+        super(undefined, board, undefined, undefined, undefined);
+
+        this.el_limit = [
+            document.getElementById("clock_limit0"),
+            document.getElementById("clock_limit1")
+        ];
+        this.limit = [this.el_limit[0].value * 60, this.el_limit[1].value];
+    } // ClockLimit.constructor
+
+    /**
+     * @param {number} index
+     * @param {number} limit - sec
+     */
+    set_limit(index, limit) {
+        console.log(`ClockLimit.set_limit(${index}, ${limit})`);
+        this.limit[index] = limit;
+
+        if ( index == 0 ) {
+            this.el_limit[index].value = `${this.limit[index] / 60}`;
+        } else {
+            this.el_limit[index].value = `${this.limit[index]}`;
+        }
+    } // ClockLimit.set_limit()
+
+    /**
+     * @param {number} index
+     * @param {number} limit - sec
+     * @param {boolean} [add_hist=true]
+     */
+    emit_set_clock_limit(index, limit, add_hist=true) {
+        emit_msg("set_clock_limit",
+                 { index: index, clock_limit: limit },
+                 add_hist);
+    } // ClockLimit.emit_set_clock_limit()
+} // class ClockLimit
+
+/**
  * <div id="${id}">${text}</div>
  */
 class PlayerText extends BoardText {
@@ -455,6 +512,82 @@ class PlayerText extends BoardText {
         this.player = player;
     } // PlayerText.constructor()
 } // class PlayerText
+
+/**
+ *
+ */
+class PlayerClock extends PlayerText {
+    /**
+     * @param {string} id
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     * @param {number} deg
+     */
+    constructor(id, board, player, x, y, deg) {
+        super(id, board, player, x, y, deg);
+
+        /*
+        this.el_clock = [
+            // TBD
+        ];
+        this.clock = [this.el_clock[0].value, this.el_clock[1].value];
+        */
+
+        this.active = false;
+
+    } // PlayerClock.constructor
+
+    /**
+     * @param {number[]} clock - sec
+     */
+    set_clock(clock) {
+        /*
+        console.log(`PlayerClock.set_clock(${JSON.stringify(clock)})`);
+        this.clock[0] = clock[0];
+        this.clock[1] = clock[1];
+
+        this.el_clock_clock0.value = `${this.clock[0]}`;
+        this.el_clock_clock1.value = `${this.clock[1]}`;
+        */
+    } // PlayerClock.set_clock()
+
+    get_str() {
+        const hh = ("0" + this.date.getHours()).slice(-2);
+        const mm = ("0" + this.date.getMinutes()).slice(-2);
+        const ss = ("0" + this.date.getSeconds()).slice(-2);
+
+        const text = `${hh}:${mm}:${ss}`;
+        return text;
+    } // PlayerClock.get_str()
+
+    update() {
+        this.date = new Date();
+        this.el.innerHTML = this.get_str();
+    } // PlayerClock.update()
+
+    /**
+     * @param {number} player
+     * @param {number[]} clock - [clock0, clock1]
+     * @param {boolean} [add_hist=true]
+     */
+    emit_set_player_clock(player, clock, add_hist=true) {
+        emit_msg("player_clock", { player: player, clock: clock }, add_hist);
+    } // PlayerClock.emit_player_clock()
+
+    emit_start(add_hist=false) {
+        emit_msg("start_clock", {}, add_hist);
+    } // PlayerClock.emit_start()
+
+    emit_pause(add_hist=false) {
+        emit_msg("pause_clock", {}, add_hist);
+    } // PlayerClock.emit_pause()
+
+    emit_reset(add_hist=false) {
+        emit_msg("pause_reset", {}, add_hist);
+    } // PlayerClock.emit_reset()
+} // class PlayerClock
 
 /**
  * <div id="${id}">${name}</div>
@@ -506,7 +639,7 @@ class PlayerName extends PlayerText {
      */
     set(name) {
         this.name = name.trim();
-        console.log(`name=${JSON.stringify(this.name)},length=${this.name.length}`);
+        //console.log(`name=${JSON.stringify(this.name)},length=${this.name.length}`);
         if ( this.name.length == 0 ) {
             this.name = this.def_name;
         }
@@ -2234,7 +2367,7 @@ class Board extends BgImage {
         this.by = [30, 83, 124, 208, 249, 302, 243, 425, 466, 520];
 
         this.resign = -1;
-        
+
         // server ID
         this.svr_id = document.getElementById("server-id").innerHTML;
         console.log(`Board> svr_id=${this.svr_id}`);
@@ -2341,6 +2474,25 @@ class Board extends BgImage {
             this.player_name[p].set("");
             this.player_name[p].on();
         }
+
+        // Clock
+        this.clock_limit = new ClockLimit(this.board);
+
+        this.player_clock = [];
+        this.player_clock.push(new PlayerClock("p0clock", this, 0,
+                                               this.w / 2 - 100,
+                                               this.by[9]+2,
+                                               0));
+        this.player_clock.push(new PlayerClock("p1clock", this, 1,
+                                               this.w / 2 + 100,
+                                               this.by[0]-2,
+                                               180));
+
+        const update_clock = () => {
+            this.player_clock[0].update();
+            this.player_clock[1].update();
+        };
+        setInterval(update_clock, 200);
 
         // Pip count XXX
         this.pip = [];
@@ -2546,6 +2698,20 @@ class Board extends BgImage {
 
         return this.disp_pip;
     } // Board.apply_disp_pip()
+
+    /**
+     *
+     */
+    apply_clock_limit(index) {
+        const id = `clock_limit${index}`;
+        let limit = document.getElementById(id).value;
+        if ( index == 0 ) {
+            limit *= 60;
+        }
+        console.log(`Board.apply_clock_limit(${index}):sec=${limit}`);
+
+        this.clock_limit.emit_set_clock_limit(index, limit, true);
+    } // Board.apply_clock_limit()
 
     /**
      * load player number from cookie
@@ -2967,9 +3133,11 @@ class Board extends BgImage {
             match_score: this.gameinfo.match_score,
             score: this.gameinfo.score,
             turn: this.turn,
-            text: [ "", "" ],
+            resign: this.resign,
+            clock_limit: this.gameinfo.clock_limit,
             board: {
                 playername: this.gameinfo.board.player_name,
+                clock: this.gameinfo.board.clock,
                 cube: {
                     side: cube_side,
                     value: this.cube.value,
@@ -3029,10 +3197,6 @@ class Board extends BgImage {
 
         this.gameinfo = gameinfo;
         
-        // player name
-        this.player_name[0].set(gameinfo.board.playername[0]);
-        this.player_name[1].set(gameinfo.board.playername[1]);
-
         // escape checkers
         // console.log(`Board.load_gameinfo> escape checkers`);
         for (let player=0; player < 2; player++) {
@@ -3068,32 +3232,46 @@ class Board extends BgImage {
             } // for (p)
         } // for(i)
 
-        // dice
-        let d = gameinfo.board.dice;
-        // console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
-        this.roll_btn[0].set(d[0], false);
-        this.roll_btn[1].set(d[1], false);
+        // score
+        this.score[0].set(gameinfo.score[0]);
+        this.score[1].set(gameinfo.score[1]);
+        console.log(`Board.load_gameinfo>score[]=[`
+                    + `${this.score[0].score},`
+                    + `${this.score[1].score}]`);
+
+        // resign
+        // console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
+        this.resign = gameinfo.resign;
+
+        // clock
+        this.clock_limit.set_limit(0, gameinfo.clock_limit[0]);
+        this.clock_limit.set_limit(1, gameinfo.clock_limit[1]);
+
+        this.player_clock[0].set_clock(gameinfo.board.clock[0]);
+        this.player_clock[1].set_clock(gameinfo.board.clock[1]);
+
+        // player name
+        this.player_name[0].set(gameinfo.board.playername[0]);
+        this.player_name[1].set(gameinfo.board.playername[1]);
 
         // cube
         let c = gameinfo.board.cube;
         // console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
         this.cube.set(c.value, c.side, c.accepted, false);
 
-        // resign
-        // console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
-        this.resign = gameinfo.resign;
+        // dice
+        let d = gameinfo.board.dice;
+        // console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
+        this.roll_btn[0].set(d[0], false);
+        this.roll_btn[1].set(d[1], false);
 
+        // 注：順番が重要
+        //
         // turn
-        // console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
+        console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
         this.set_turn(gameinfo.turn, this.resign, false);
 
-        // score
-        this.score[0].set(gameinfo.score[0]);
-        this.score[1].set(gameinfo.score[1]);
-       console.log(`Board.load_gameinfo>score[]=[`
-                    + `${this.score[0].score},`
-                    + `${this.score[1].score}]`);
-
+        // pip count
         this.pip_count(0);
         this.pip_count(1);
     } // Board.load_gameinfo()
@@ -3395,10 +3573,8 @@ class SoundBase {
      * 
      */
     play() {
-        /*
         console.log(`SoundBase.play>`
                     + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
-        */
         if ( this.board.sound && GlobalSoundSwitch != "off" ) {
             console.log(`soundfile=${this.soundfile}`);
             return this.audio.play();
@@ -3560,6 +3736,13 @@ const apply_disp_pip = () => {
 /**
  *
  */
+const apply_clock_limit = index => {
+    board.apply_clock_limit(index);
+};
+
+/**
+ *
+ */
 const on_key_down = (e, board) => {
     console.log(`on_key_down(board.svr_id=${board.svr_id}`);
     console.log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
@@ -3651,13 +3834,11 @@ window.onload = () => {
         console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
 
         if ( msg.type == "gameinfo" ) {
-            console.log(`ws.on(json)>msg.type=gameinfo`);
             board.load_gameinfo(msg.data.gameinfo, msg.data.sec);
             return;
         } // "gameinfo"
 
         if ( msg.type == "put_checker" ) {
-            console.log(`ws.on(json)>msg.type=put_checker,turn=${board.turn}`);
             if ( board.turn == -1 ) {
                 console.log(`ws.on(json)put_checker>`
                             + `turn=${board.turn}..ignored`);
@@ -3672,7 +3853,6 @@ window.onload = () => {
         } // "put_checker"
 
         if ( msg.type == "cube" ) {
-            console.log(`ws.on(json)>msg.type=cube`);
             board.cube.set(msg.data.value, msg.data.side, msg.data.accepted);
             return;
         } // "cube"
@@ -3696,25 +3876,30 @@ window.onload = () => {
         } // "dice"
 
         if ( msg.type == "set_turn" ) {
-            console.log(`ws.on(json)set_turn>turn=${msg.data.turn},`
-                        + `resign=${msg.data.resign}`);
             board.set_turn(msg.data.turn, msg.data.resign);
             return;
         } // set_turn
 
         if ( msg.type == "set_playername" ) {
-            console.log(`ws.on(json)>msg.type=set_playername,`
-                        + `player=${msg.data.player},name=${msg.data.name}`);
             board.player_name[msg.data.player].set(msg.data.name);
             return;
         } // set_playername
         
         if ( msg.type == "set_score" ) {
-            console.log(`ws.on(json)>msg.type=set_score,`
-                        + `player=${msg.data.player},score=${msg.data.score}`);
             board.score[msg.data.player].set(msg.data.score);
             return;
         } // set_score
+        
+        if ( msg.type == "set_clock_limit" ) {
+            board.clock_limit.set_limit(msg.data.index,
+                                            msg.data.clock_limit);
+            return;
+        } // set_clock_limit
+        
+        if ( msg.type == "set_player_clock" ) {
+            board.player_clock[msg.data.player].set_clock(msg.data.clock);
+            return;
+        } // set_player_clock
         
         console.log("ws.on(json)>msg.type=???");
     }); // ws.on(json)

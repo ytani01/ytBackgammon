@@ -17,14 +17,14 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.68'
+VERSION = '0.71'
 
 _log = get_logger(__name__, True)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 app.config['DEBUG'] = False
-app.config['JSON_AS_ASCII'] = False  # XXX 文字化け対策が効かない
+app.config['JSON_AS_ASCII'] = False  # XXX 文字化け対策が効かない TBD
 
 socketio = SocketIO(app)
 

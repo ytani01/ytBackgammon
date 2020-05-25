@@ -21,8 +21,9 @@ div, span {
     transform: scale(1.6);
 }
 
-.checkboxlabel {
+.headerinput {
     font-size: 22px;
+    font-weight: bold;
 }
 
 /*******/

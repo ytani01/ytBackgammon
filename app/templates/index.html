@@ -82,28 +82,47 @@
       <strong>{{ name }} Ver. {{ version }}</strong> /
       <strong id="version">Version Number</strong>
       &nbsp;
-      <!--
-      Name:
-      <input id="player-name" type="text" onChange="emit_playername();">
-      &nbsp;
-      -->
+      <label class="headerinput" for="sound-switch">Sound</label>
       <input class="checkbox" id="sound-switch" type="checkbox"
              onChange="apply_sound_switch();">
-      <label class="checkboxlabel" for="sound-switch">Sound</label>
       &nbsp;
+      &nbsp;
+      <label class="headerinput" for="free-move">Free</label>
       <input class="checkbox" id="free-move" type="checkbox"
              onChange="apply_free_move();">
-      <label class="checkboxlabel" for="free-move">Free</label>
       &nbsp;
+      &nbsp;
+      <label class="headerinput" for"disp-pip">Pip</label>
       <input class="checkbox" id="disp-pip" type="checkbox" checked
              onChange="apply_disp_pip();">
-      <label class="checkboxlabel" for"disp-pip">Pip count</label>
+      &nbsp;
+      &nbsp;
+      <label class="headerinput">Clock</label>
+
+      <input class="headerinput" id="clock_limit0" type="number" value="2"
+             step="0.5" style="width:55px"
+             onChange="apply_clock_limit(0);">
+      <label class="headerinput" for"clock_limit0">m +</label>
+
+      <input class="headerinput" id="clock_limit1" type="number" value="12"
+             style="width:55px"
+             onChange="apply_clock_limit(1);">
+      <label class="headerinput" for"clock_limit1">s</label>
+      &nbsp;
       &nbsp;
       <span id="dice-histogram" style="font-size:small"></span>
     </header>
 
     <div id="board">
       <image src="/static/images/board-base.png">
+        <div class="bordertext" id="p0clock"></div> <!-- for test -->
+        <div class="bordertext" id="p1clock"></div> <!-- for test -->
+
+        <div class="bordertext" id="p0clock0">120</div>
+        <div class="bordertext" id="p0clock1">12</div>
+        <div class="bordertext" id="p1clock0">120</div>
+        <div class="bordertext" id="p1clock1">12</div>
+
         <div class="bordertext" id="p0pip">167</div>
         <div class="bordertext" id="p1pip">167</div>
         
