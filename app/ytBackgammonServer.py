@@ -62,14 +62,17 @@ class ytBackgammonServer:
         score1 = self._bg._gameinfo['score'][1]
         player0_name = self._bg._gameinfo['board']['playername'][0]
         player1_name = self._bg._gameinfo['board']['playername'][1]
-        clock_limit = self._bg._gameinfo['clock_limit']
+        clock_limit0 = self._bg._gameinfo['clock_limit'][0]
+        clock_limit1 = self._bg._gameinfo['clock_limit'][1]
 
         self._bg.init_gameinfo()
+
         self._bg._gameinfo['score'][0] = score0;
         self._bg._gameinfo['score'][1] = score1;
+        self._bg._gameinfo['clock_limit'][0] = clock_limit0
+        self._bg._gameinfo['clock_limit'][1] = clock_limit1
         self._bg._gameinfo['board']['playername'][0] = player0_name
         self._bg._gameinfo['board']['playername'][1] = player1_name
-        self._bg._gameinfo['board']['clock_limit'] = clock_limit
         
         self.add_history(self._bg._gameinfo)
 
@@ -407,15 +410,11 @@ class ytBackgammonServer:
             # data: {}
             pass
 
-        """
-        append history or not
-        """
+        # append history or not
         if msg['history']:
             self.add_history(self._bg._gameinfo)
 
-        """
-        broadcast
-        """
+        # broadcast
         emit('json', msg, broadcast=True)
 
     def app_top(self):

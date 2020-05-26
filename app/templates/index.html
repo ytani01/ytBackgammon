@@ -97,8 +97,9 @@
              onChange="apply_disp_pip();">
       &nbsp;
       &nbsp;
-      <label class="headerinput">Clock</label>
-
+      <label class="headerinput" for "clock_sw">Clock</label>
+      <input class="checkbox" id="clock_sw" type="checkbox"
+             onChange="apply_clock_sw();">
       <input class="headerinput" id="clock_limit0" type="number" value="2"
              step="0.5" style="width:55px"
              onChange="apply_clock_limit(0);">
@@ -117,11 +118,6 @@
       <image src="/static/images/board-base.png">
         <div class="bordertext" id="p0clock"></div> <!-- for test -->
         <div class="bordertext" id="p1clock"></div> <!-- for test -->
-
-        <div class="bordertext" id="p0clock0">120</div>
-        <div class="bordertext" id="p0clock1">12</div>
-        <div class="bordertext" id="p1clock0">120</div>
-        <div class="bordertext" id="p1clock1">12</div>
 
         <div class="bordertext" id="p0pip">167</div>
         <div class="bordertext" id="p1pip">167</div>

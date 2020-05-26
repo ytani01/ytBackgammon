@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.85";
+const VERSION = "0.86";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -528,53 +528,76 @@ class PlayerClock extends PlayerText {
     constructor(id, board, player, x, y, deg) {
         super(id, board, player, x, y, deg);
 
-        /*
-        this.el_clock = [
-            // TBD
-        ];
-        this.clock = [this.el_clock[0].value, this.el_clock[1].value];
-        */
-
+        this.clock = [0, 0];
+        this.start_clock = [0, 0];
+        this.start_time = Date.now();
+        this.msec = 0;
         this.active = false;
-
     } // PlayerClock.constructor
 
     /**
      * @param {number[]} clock - sec
      */
     set_clock(clock) {
-        /*
-        console.log(`PlayerClock.set_clock(${JSON.stringify(clock)})`);
-        this.clock[0] = clock[0];
-        this.clock[1] = clock[1];
+        console.log(`PlayerClock.set_clock([${clock[0]},${clock[1]}])`);
+        this.clock = [clock[0], clock[1]];
+        this.update_start();
 
-        this.el_clock_clock0.value = `${this.clock[0]}`;
-        this.el_clock_clock1.value = `${this.clock[1]}`;
-        */
+        this.update();
     } // PlayerClock.set_clock()
 
     get_str() {
-        const hh = ("0" + this.date.getHours()).slice(-2);
-        const mm = ("0" + this.date.getMinutes()).slice(-2);
-        const ss = ("0" + this.date.getSeconds()).slice(-2);
-
-        const text = `${hh}:${mm}:${ss}`;
+        const clock0 = this.clock[0].toFixed(1);
+        const clock1 = this.clock[1].toFixed(1);
+        // const text = `(${this.msec}) ${clock0}/${clock1}`;
+        const text = `${clock0}/${clock1}`;
         return text;
     } // PlayerClock.get_str()
 
+    update_start() {
+        this.start_clock = [this.clock[0], this.clock[1]];
+        this.start_time = Date.now();
+    }
+
     update() {
-        this.date = new Date();
+        this.msec = Date.now() - this.start_time;
+
+        if ( this.active && this.board.clock_sw ) {
+            const limit = this.board.clock_limit.limit;
+        
+            this.clock[1] = (this.start_clock[1] * 1000 - this.msec) / 1000;
+
+            if ( this.clock[1] < 0 ) {
+                this.clock[0] = this.start_clock[0] + this.clock[1];
+                this.clock[1] = 0;
+            }
+        } else {
+            this.update_start();
+        }
         this.el.innerHTML = this.get_str();
     } // PlayerClock.update()
 
+    start() {
+        console.log(`PlayerClock.start():player=${this.player}`);
+        this.clock[1] = this.board.clock_limit.limit[1];
+        this.update_start();
+        this.active = true;
+    } // PlayerClock.start()
+
+    stop() {
+        console.log(`PlayerClock.stop():player=${this.player}`);
+        this.active = false;
+    } // PlayerClock.stop()
+    
     /**
      * @param {number} player
      * @param {number[]} clock - [clock0, clock1]
      * @param {boolean} [add_hist=true]
      */
-    emit_set_player_clock(player, clock, add_hist=true) {
-        emit_msg("player_clock", { player: player, clock: clock }, add_hist);
-    } // PlayerClock.emit_player_clock()
+    emit(add_hist=false) {
+        emit_msg("set_player_clock", { player: this.player,
+                                       clock: this.clock }, add_hist);
+    } // PlayerClock.emit()
 
     emit_start(add_hist=false) {
         emit_msg("start_clock", {}, add_hist);
@@ -2476,17 +2499,22 @@ class Board extends BgImage {
         }
 
         // Clock
+        this.clock_sw = false;
+        this.apply_clock_sw();
+
         this.clock_limit = new ClockLimit(this.board);
 
         this.player_clock = [];
         this.player_clock.push(new PlayerClock("p0clock", this, 0,
-                                               this.w / 2 - 100,
+                                               this.bx[2],
                                                this.by[9]+2,
                                                0));
         this.player_clock.push(new PlayerClock("p1clock", this, 1,
-                                               this.w / 2 + 100,
+                                               this.bx[5],
                                                this.by[0]-2,
                                                180));
+        this.player_clock[0].update();
+        this.player_clock[1].update();
 
         const update_clock = () => {
             this.player_clock[0].update();
@@ -2633,6 +2661,20 @@ class Board extends BgImage {
     } // Board.constructor()
 
     /**
+     * 
+     */
+    clock_on() {
+        this.clock_sw = true;
+    }
+
+    /**
+     * 
+     */
+    clock_off() {
+        this.clock_sw = false;
+    }
+
+    /**
      * @return {boolean} sound
      */
     load_sound_switch() {
@@ -2702,9 +2744,16 @@ class Board extends BgImage {
     /**
      *
      */
+    apply_clock_sw() {
+        this.clock_sw = document.getElementById("clock_sw").checked;
+    } // Board.apply_clock_sw()
+    
+    /**
+     *
+     */
     apply_clock_limit(index) {
         const id = `clock_limit${index}`;
-        let limit = document.getElementById(id).value;
+        let limit = parseInt(document.getElementById(id).value);
         if ( index == 0 ) {
             limit *= 60;
         }
@@ -2786,6 +2835,12 @@ class Board extends BgImage {
         this.turn = turn;
         this.resign = resign;
         
+        this.player_clock[0].stop();
+        this.player_clock[1].stop();
+
+        this.player_clock[0].emit();
+        this.player_clock[1].emit();
+
         for (let p=0; p < 2; p++) {
             this.roll_btn[p].off();
             this.pass_btn[p].off();
@@ -2836,6 +2891,7 @@ class Board extends BgImage {
             this.roll_btn[turn].update();
         }
         this.player_name[turn].on();
+        this.player_clock[turn].start();
     } // Board.set_turn()
 
     /**
@@ -3244,6 +3300,7 @@ class Board extends BgImage {
         this.resign = gameinfo.resign;
 
         // clock
+        console.log(`clock_limit=${JSON.stringify(gameinfo.clock_limit)}`);
         this.clock_limit.set_limit(0, gameinfo.clock_limit[0]);
         this.clock_limit.set_limit(1, gameinfo.clock_limit[1]);
 
@@ -3731,6 +3788,13 @@ const apply_free_move = () => {
  */
 const apply_disp_pip = () => {
     board.apply_disp_pip();
+};
+
+/**
+ *
+ */
+const apply_clock_sw = index => {
+    board.apply_clock_sw();
 };
 
 /**

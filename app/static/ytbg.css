@@ -15,6 +15,7 @@ div, span {
 .bordertext {
     font-size: 19px;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .checkbox {
