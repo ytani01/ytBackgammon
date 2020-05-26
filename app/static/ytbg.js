@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.86";
+const VERSION = "0.87";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -563,8 +563,6 @@ class PlayerClock extends PlayerText {
         this.msec = Date.now() - this.start_time;
 
         if ( this.active && this.board.clock_sw ) {
-            const limit = this.board.clock_limit.limit;
-        
             this.clock[1] = (this.start_clock[1] * 1000 - this.msec) / 1000;
 
             if ( this.clock[1] < 0 ) {
@@ -578,8 +576,8 @@ class PlayerClock extends PlayerText {
     } // PlayerClock.update()
 
     start() {
-        console.log(`PlayerClock.start():player=${this.player}`);
         this.clock[1] = this.board.clock_limit.limit[1];
+        console.log(`PlayerClock.start():player=${this.player},clock[1]=${this.clock[1]}`);
         this.update_start();
         this.active = true;
     } // PlayerClock.start()
@@ -2506,15 +2504,17 @@ class Board extends BgImage {
 
         this.player_clock = [];
         this.player_clock.push(new PlayerClock("p0clock", this, 0,
-                                               this.bx[2],
+                                               this.bx[2] + 20,
                                                this.by[9]+2,
                                                0));
         this.player_clock.push(new PlayerClock("p1clock", this, 1,
-                                               this.bx[5],
+                                               this.bx[5] - 20,
                                                this.by[0]-2,
                                                180));
+        /*
         this.player_clock[0].update();
         this.player_clock[1].update();
+        */
 
         const update_clock = () => {
             this.player_clock[0].update();
@@ -2835,12 +2835,6 @@ class Board extends BgImage {
         this.turn = turn;
         this.resign = resign;
         
-        this.player_clock[0].stop();
-        this.player_clock[1].stop();
-
-        this.player_clock[0].emit();
-        this.player_clock[1].emit();
-
         for (let p=0; p < 2; p++) {
             this.roll_btn[p].off();
             this.pass_btn[p].off();
@@ -2890,8 +2884,9 @@ class Board extends BgImage {
         } else {
             this.roll_btn[turn].update();
         }
+
         this.player_name[turn].on();
-        this.player_clock[turn].start();
+        console.log(`Board.set_turn():turn=${turn}`);
     } // Board.set_turn()
 
     /**
@@ -3304,8 +3299,10 @@ class Board extends BgImage {
         this.clock_limit.set_limit(0, gameinfo.clock_limit[0]);
         this.clock_limit.set_limit(1, gameinfo.clock_limit[1]);
 
+        /*
         this.player_clock[0].set_clock(gameinfo.board.clock[0]);
         this.player_clock[1].set_clock(gameinfo.board.clock[1]);
+        */
 
         // player name
         this.player_name[0].set(gameinfo.board.playername[0]);
