@@ -91,7 +91,7 @@ class ytBackgammonServer:
             self.save_data(self._datafile_path)
             self._log.debug('history=(%d)', len(self._history))
 
-    def emit_gameinfo(self, sec=0):
+    def emit_gameinfo(self, sec=0, history_flag=False):
         """
         send game information to all clients
 
@@ -107,7 +107,8 @@ class ytBackgammonServer:
                      'gameinfo': self._bg._gameinfo,
                      'sec': sec,
                      'hist_i': len(self._history),
-                     'hist_n': len(self._history) + len(self._fwd_hist)
+                     'hist_n': len(self._history) + len(self._fwd_hist),
+                     'history_flag': history_flag
                  }
              }, broadcast=True)
 
@@ -141,7 +142,7 @@ class ytBackgammonServer:
             self._log.debug('_history=(%d), _fwd_hist=(%d)',
                             len(self._history), len(self._fwd_hist))
 
-            self.emit_gameinfo(sec)
+            self.emit_gameinfo(sec, history_flag=True)
 
             count += 1
             if n > 0 and count >= n:
@@ -182,7 +183,8 @@ class ytBackgammonServer:
 
             self._log.debug('_history=(%d), _fwd_hist=(%d)',
                             len(self._history), len(self._fwd_hist))
-            self.emit_gameinfo(sec)
+
+            self.emit_gameinfo(sec, history_flag=True)
 
             count += 1
             if n > 0 and count >= n:
@@ -346,7 +348,7 @@ class ytBackgammonServer:
         if msg['type'] == 'new':
             # data: {}
             self.new_game()
-            self.emit_gameinfo(3)
+            self.emit_gameinfo(3, False)
             return
 
         if msg['type'] == 'set_gameinfo':
