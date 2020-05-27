@@ -72,7 +72,7 @@ let ws = undefined;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
-let GlobalSoundSwitch = "on";
+let GlobalSoundSwitch = true;
 const SOUND_ROLL = "/static/sounds/roll1.mp3";
 const SOUND_PUT = "/static/sounds/put1.mp3";
 const SOUND_HIT = "/static/sounds/hit1.mp3";
@@ -1492,15 +1492,20 @@ class RollButton extends BannerButton {
 
         this.dice = [];
         for (let i=0; i < 4; i++) {
-            let x2 = this.w / 8 * ( i * 2 + 1 );
-            x2 += this.x - this.w / 2;
+            /*
+            let xd = this.w / 4 * ( i * 2 + 1 );
+            xd += this.x - this.w / 2;
 
-            let y2 = this.h / 4 * ((i * 2 + 1) % 4);
-            y2 += this.y - this.h / 2;
+            let yd = this.h / 8 * ((i * 2 + 1) % 4);
+            yd += this.y - this.h / 2;
+            */
+            let xd = this.x1 + 60 * (i - 1.5);
+            console.log(`x1=${this.x1},xd=${xd}`);
+            let yd = this.y1 + 20 * (i % 2 - 0.5);
 
             this.dice.push(new Dice(dice_prefix + i,
                                     this.board, this.player,
-                                    x2, y2,
+                                    xd, yd,
                                     dice_prefix));
         } // for(i)
 
@@ -2070,6 +2075,10 @@ class Dice extends PlayerItem {
             roll_btn.clear(true, false);
             roll_btn1.clear(true, false);
             this.board.emit_turn(2, -1, true);
+            return false;
+        }
+
+        if ( roll_btn.get_active_dice().length > 0 ) {
             return false;
         }
 
@@ -2817,12 +2826,13 @@ class Board extends BgImage {
         const s = this.cookie.get(this.cookie_sound);
         // console.log(`Board.load_sound_switch>s=${s}`);
         if ( s === undefined ) {
-            this.sound = false;
+            this.sound = true;
         } else {
             this.sound = JSON.parse(s);
         }
         console.log(`Board.load_sound_switch>sound=${this.sound}`);
         this.el_sound.checked = this.sound;
+        this.apply_sound_switch();
 
         return this.sound;
     } // Board.load_sound_switch()
@@ -2833,8 +2843,12 @@ class Board extends BgImage {
     apply_sound_switch() {
         console.log("Board.apply_sound_switch>"
                     + `cookie_sound=${this.cookie_sound}`);
+        console.log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
 
         this.sound = document.getElementById("sound-switch").checked;
+        if ( ! GlobalSoundSwitch ) {
+            this.sound = false;
+        }
         console.log(`Board.apply_sound_switch>sound=${this.sound}`);
 
         this.cookie.set(this.cookie_sound, this.sound);
@@ -3790,7 +3804,7 @@ class SoundBase {
     play() {
         console.log(`SoundBase.play>`
                     + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
-        if ( this.board.sound && GlobalSoundSwitch != "off" ) {
+        if ( this.board.sound && GlobalSoundSwitch ) {
             console.log(`soundfile=${this.soundfile}`);
             return this.audio.play();
         } else {
@@ -4009,18 +4023,28 @@ document.body.onkeydown = e => {
  *
  */
 window.onload = () => {
-    console.log(`window.onload()>`);
+    console.log(`window.onload()>start`);
 
+    // sound switch
     const q_str = new QueryStringBase();
-    GlobalSoundSwitch = q_str.get("sound") || "on";
+    GlobalSoundSwitch = q_str.get("sound") || true;
+    // "on"/"off" used in old version .. deprecated
+    if ( GlobalSoundSwitch == "off" ) {
+        GlobalSoundSwitch = false;
+    }
+    if ( GlobalSoundSwitch == "on" ) {
+        GlobalSoundSwitch = true;
+    }
     console.log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
 
+    // menu
+    const nav_el = document.getElementById("nav-drawer");
+
+    // connect to server
     const url = "http://" + document.domain + ":" + location.port + "/";
     ws = io.connect(url);
 
-    console.log(`onload>location.pathname=${location.pathname}`);
-
-    const nav_el = document.getElementById("nav-drawer");
+    // initialize board
     board = new Board("board",
                       nav_el.offsetWidth  + 20,
                       nav_el.offsetHeight + 30,
