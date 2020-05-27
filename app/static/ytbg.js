@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.87";
+const VERSION = "0.88";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -77,6 +77,18 @@ const SOUND_ROLL = "/static/sounds/roll1.mp3";
 const SOUND_PUT = "/static/sounds/put1.mp3";
 const SOUND_HIT = "/static/sounds/hit1.mp3";
 const SOUND_TURN_CHANGE = "/static/sounds/turn_change1.mp3";
+
+/**
+ * Emit message to server
+ *
+ * @param {string} type
+ * @param {Object} data
+ * @param {boolean} [history=false]
+ */
+const emit_msg = (type, data, history=false) => {
+    console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
+    ws.emit("json", {src: "client", type: type, data: data, history: history});
+};
 
 /**
  * base class for ytBackgammon
@@ -135,7 +147,7 @@ class BgBase {
     move(x, y, center=false, sec=0) {
         [this.x, this.y] = [x, y];
 
-        this.el.style.transitionTimingFunction = "liner";
+        this.el.style.transitionTimingFunction = "linear";
         this.el.style.transitionDuration = sec + "s";
         if ( center ) {
             this.el.style.left = (this.x - this.w / 2) + "px";
@@ -165,7 +177,7 @@ class BgBase {
         } else {
             this.el.style.transformOrigin = "top left";
         }
-        this.el.style.transitionTimingFunction = "liner";
+        this.el.style.transitionTimingFunction = "linear";
         this.el.style.transitionDuration = sec + "s";
         this.el.style.transform = `rotate(${this.deg}deg)`;
     } // BgBase.rotate()
@@ -465,15 +477,17 @@ class ClockLimit extends BoardText {
             document.getElementById("clock_limit0"),
             document.getElementById("clock_limit1")
         ];
-        this.limit = [this.el_limit[0].value * 60, this.el_limit[1].value];
+        const value0 = parseFloat(this.el_limit[0].value) * 60;
+        const value1 = parseFloat(this.el_limit[1].value);
+        this.limit = [value0, value1];
     } // ClockLimit.constructor
 
     /**
      * @param {number} index
      * @param {number} limit - sec
      */
-    set_limit(index, limit) {
-        console.log(`ClockLimit.set_limit(${index}, ${limit})`);
+    set(index, limit) {
+        console.log(`ClockLimit.set(${index}, ${limit})`);
         this.limit[index] = limit;
 
         if ( index == 0 ) {
@@ -481,18 +495,18 @@ class ClockLimit extends BoardText {
         } else {
             this.el_limit[index].value = `${this.limit[index]}`;
         }
-    } // ClockLimit.set_limit()
+    } // ClockLimit.set()
 
     /**
      * @param {number} index
      * @param {number} limit - sec
      * @param {boolean} [add_hist=true]
      */
-    emit_set_clock_limit(index, limit, add_hist=true) {
+    emit_set(index, limit, add_hist=true) {
         emit_msg("set_clock_limit",
                  { index: index, clock_limit: limit },
                  add_hist);
-    } // ClockLimit.emit_set_clock_limit()
+    } // ClockLimit.emit_set()
 } // class ClockLimit
 
 /**
@@ -533,28 +547,66 @@ class PlayerClock extends PlayerText {
         this.start_time = Date.now();
         this.msec = 0;
         this.active = false;
+
+        this.bg_width0 = 130;
+        this.bg_width = this.bg_width0;
+
+        this.el_bg = document.getElementById(`${this.id}-bg`);
+        this.el_bg.style.left = this.x + "px";
+        this.el_bg.style.top = this.y + "px";
+        this.el_bg.style.width = this.bg_width + "px";
+        this.el_bg.style.height = "27px";
+        this.el_bg.style.backgroundColor = "#444";
+        this.el_bg.style.transformOrigin = "left top";
+        this.el_bg.style.transform = `rotate(${this.deg}deg)`;
     } // PlayerClock.constructor
+
+    on() {
+        super.on();
+        this.el_bg.style.opacity = 1;
+    }
+
+    off() {
+        super.off();
+        this.el_bg.style.opacity = 0;
+    }
+
+    set_color(color) {
+        this.el.style.color = "#000";
+        //this.el.style.backgroundColor = color;
+        this.el_bg.style.backgroundColor = color;
+    }
+
+    set_bg() {
+        const limit = this.board.clock_limit.limit;
+        this.bg_width = (this.clock[0] + this.clock[1]) /
+            (limit[0] + limit[1]) * this.bg_width0;
+        if ( this.bg_width < 1 ) {
+            this.bg_width = 1;
+        }
+        this.el_bg.style.width = this.bg_width + "px";
+    }
 
     /**
      * @param {number[]} clock - sec
      */
-    set_clock(clock) {
-        console.log(`PlayerClock.set_clock([${clock[0]},${clock[1]}])`);
+    set(clock) {
+        console.log(`PlayerClock.set([${clock[0]},${clock[1]}])`);
         this.clock = [clock[0], clock[1]];
-        this.update_start();
+        console.log(`PlayerClock.set():clock=${JSON.stringify(this.clock)}`);
+        this.update_start_clock();
 
         this.update();
-    } // PlayerClock.set_clock()
+    } // PlayerClock.set()
 
-    get_str() {
+    to_str() {
         const clock0 = this.clock[0].toFixed(1);
         const clock1 = this.clock[1].toFixed(1);
-        // const text = `(${this.msec}) ${clock0}/${clock1}`;
-        const text = `${clock0}/${clock1}`;
+        const text = `&nbsp;${clock0}/${clock1}&nbsp;`;
         return text;
-    } // PlayerClock.get_str()
+    } // PlayerClock.to_str()
 
-    update_start() {
+    update_start_clock() {
         this.start_clock = [this.clock[0], this.clock[1]];
         this.start_time = Date.now();
     }
@@ -569,23 +621,45 @@ class PlayerClock extends PlayerText {
                 this.clock[0] = this.start_clock[0] + this.clock[1];
                 this.clock[1] = 0;
             }
+
+            if ( this.clock[1] > 0 ) {
+                this.set_color("#0FF");
+            } else if ( this.clock[0] > 10 ) {
+                this.set_color("#FF0");
+            } else {
+                this.set_color("#F00");
+            }
         } else {
-            this.update_start();
+            this.update_start_clock();
+            this.set_color("#888");
         }
-        this.el.innerHTML = this.get_str();
+        this.el.innerHTML = this.to_str();
+
+        this.set_bg();
     } // PlayerClock.update()
+
+    resume() {
+        console.log(`PlayerClock.resume():player=${this.player},clock[1]=${this.clock[1]}`);
+        this.update_start_clock();
+        this.active = true;
+    } // PlayerClock.start()
 
     start() {
         this.clock[1] = this.board.clock_limit.limit[1];
-        console.log(`PlayerClock.start():player=${this.player},clock[1]=${this.clock[1]}`);
-        this.update_start();
-        this.active = true;
-    } // PlayerClock.start()
+        this.resume();
+    }
 
     stop() {
         console.log(`PlayerClock.stop():player=${this.player}`);
         this.active = false;
     } // PlayerClock.stop()
+
+    reset() {
+        const limit = this.board.clock_limit.limit;
+        console.log(`PlayerClock.reset():player=${this.player},limit=[${limit[0]},${limit[1]}]`);
+        this.set(limit);
+        this.stop();
+    }
     
     /**
      * @param {number} player
@@ -597,17 +671,41 @@ class PlayerClock extends PlayerText {
                                        clock: this.clock }, add_hist);
     } // PlayerClock.emit()
 
-    emit_start(add_hist=false) {
-        emit_msg("start_clock", {}, add_hist);
+    emit_resume(add_hist=false) {
+        emit_msg("resume_clock", { player: this.player }, add_hist);
     } // PlayerClock.emit_start()
 
-    emit_pause(add_hist=false) {
-        emit_msg("pause_clock", {}, add_hist);
+    emit_start(add_hist=false) {
+        emit_msg("start_clock", { player: this.player }, add_hist);
+    } // PlayerClock.emit_start()
+
+    emit_stop(add_hist=false) {
+        emit_msg("stop_clock", { player: this.player }, add_hist);
     } // PlayerClock.emit_pause()
 
     emit_reset(add_hist=false) {
-        emit_msg("pause_reset", {}, add_hist);
+        emit_msg("reset_clock", { player: this.player }, add_hist);
     } // PlayerClock.emit_reset()
+
+    change_turn() {
+        this.emit_stop();
+        this.emit();
+
+        this.board.player_clock[1-this.player].emit_start();
+    } // PlayerClock.change_turn()
+
+    pause_resume() {
+        if ( this.active ) {
+            this.emit_stop();
+        } else if ( this.board.clock_sw ) {
+            this.emit_resume();
+        }
+        this.emit();
+    } // PlayerClock.push()
+
+    on_mouse_down_xy(x, y) {
+        this.pause_resume();
+    } // PlayerClock.on_mouse_down_xy()
 } // class PlayerClock
 
 /**
@@ -1938,7 +2036,10 @@ class Dice extends PlayerItem {
         }
 
         roll_btn.clear(true, false);
+
+        this.board.player_clock[this.player].change_turn();
         this.board.emit_turn(1 - this.player, -1, true);
+
         return false;
     } // Dice.on_mouse_down_xy()
 } // class Dice
@@ -2471,11 +2572,9 @@ class Board extends BgImage {
         this.score_btn = [{}, {}];
 
         this.score_btn[1].up = new ScoreButton(
-            "score_up1",   this, 0, sx1, sy1, sw, sh,
-            this.score[1], +1);
+            "score_up1",   this, 0, sx1, sy1, sw, sh, this.score[1], +1);
         this.score_btn[1].down = new ScoreButton(
-            "score_down1", this, 0, sx2, sy1, sw, sh,
-            this.score[1], -1);
+            "score_down1", this, 0, sx2, sy1, sw, sh, this.score[1], -1);
 
         this.score_btn[0].up = new ScoreButton(
             "score_up0",   this, 0, sx1, sy2, sw, sh,
@@ -2487,9 +2586,9 @@ class Board extends BgImage {
         // PlayerName
         this.player_name = [];
         this.player_name.push(new PlayerName(
-            "p0name", this, 0, this.bx[4], this.by[9]+2, 0));
+            "p0name", this, 0, this.bx[3], this.by[9]+2,   0));
         this.player_name.push(new PlayerName(
-            "p1name", this, 1, this.bx[3], this.by[0]-2, 180));
+            "p1name", this, 1, this.bx[4], this.by[0]-2, 180));
 
         for (let p=0; p < 2; p++) {
             this.player_name[p].set("");
@@ -2497,20 +2596,16 @@ class Board extends BgImage {
         }
 
         // Clock
-        this.clock_sw = false;
-        this.apply_clock_sw();
-
         this.clock_limit = new ClockLimit(this.board);
 
         this.player_clock = [];
-        this.player_clock.push(new PlayerClock("p0clock", this, 0,
-                                               this.bx[2] + 20,
-                                               this.by[9]+2,
-                                               0));
-        this.player_clock.push(new PlayerClock("p1clock", this, 1,
-                                               this.bx[5] - 20,
-                                               this.by[0]-2,
-                                               180));
+        this.player_clock.push(new PlayerClock(
+            "p0clock", this, 0, this.bx[3] + 240, this.by[9]+1,   0));
+        this.player_clock.push(new PlayerClock(
+            "p1clock", this, 1, this.bx[4] - 240, this.by[0]-1, 180));
+
+        this.clock_sw = false;
+        this.apply_clock_sw();
         /*
         this.player_clock[0].update();
         this.player_clock[1].update();
@@ -2742,10 +2837,30 @@ class Board extends BgImage {
     } // Board.apply_disp_pip()
 
     /**
+     * @param {boolean} value
+     */
+    set_clock_switch(value) {
+        console.log(`Board.set_clock_switch(${value})`);
+        document.getElementById("clock_sw").checked = value;
+        this.clock_sw = value;
+
+        if ( this.clock_sw ) {
+            this.player_clock[0].on();
+            this.player_clock[1].on();
+        } else {
+            this.player_clock[0].off();
+            this.player_clock[1].off();
+        }
+    } // Board.set_clock_switch()
+
+    /**
      *
      */
     apply_clock_sw() {
         this.clock_sw = document.getElementById("clock_sw").checked;
+        emit_msg("set_clock_switch", { switch: this.clock_sw }, false);
+        this.player_clock[0].emit_stop();
+        this.player_clock[1].emit_stop();
     } // Board.apply_clock_sw()
     
     /**
@@ -2753,13 +2868,18 @@ class Board extends BgImage {
      */
     apply_clock_limit(index) {
         const id = `clock_limit${index}`;
-        let limit = parseInt(document.getElementById(id).value);
+        const value = document.getElementById(id).value;
+        console.log(`Board.apply_clock_limit(${index}):value=${value}`);
+        let limit = parseFloat(value);
         if ( index == 0 ) {
             limit *= 60;
         }
-        console.log(`Board.apply_clock_limit(${index}):sec=${limit}`);
+        console.log(`Board.apply_clock_limit(${index}):limit=${limit}`);
 
-        this.clock_limit.emit_set_clock_limit(index, limit, true);
+        this.player_clock[0].emit_stop();
+        this.player_clock[1].emit_stop();
+
+        this.clock_limit.emit_set(index, limit, true);
     } // Board.apply_clock_limit()
 
     /**
@@ -2846,6 +2966,7 @@ class Board extends BgImage {
         if ( turn < 0 ) {
             let score = 0;
             let winner = -1;
+
             if ( resign >= 0 ) {
                 winner = 1 - resign;
                 this.resign_banner_btn[resign].on();
@@ -2861,6 +2982,7 @@ class Board extends BgImage {
             if ( winner >= 0 ) {
                 console.log(`Board.set_turn>plyaer${winner} win ${score}!`);
                 this.win_btn[winner].on();
+                this.player_name[winner].on();
             }
             return;
         }
@@ -2885,7 +3007,9 @@ class Board extends BgImage {
             this.roll_btn[turn].update();
         }
 
+        // player name --> on
         this.player_name[turn].on();
+        
         console.log(`Board.set_turn():turn=${turn}`);
     } // Board.set_turn()
 
@@ -3243,19 +3367,19 @@ class Board extends BgImage {
      * @param {Object} gameinfo - game information object
      */
     load_gameinfo(gameinfo, sec=0) {
+        /*
         console.log(`Board.load_gameinfo(`
                     + `gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
-
+        */
         this.gameinfo = gameinfo;
         
         // escape checkers
-        // console.log(`Board.load_gameinfo> escape checkers`);
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
                 let ch = this.checker[player][i];
                 ch.el.hidden = true;
                 ch.cur_point = undefined;
-                ch.move(0, 0);
+                ch.move(0, 0, false, 0);
             }
         }
 
@@ -3291,30 +3415,27 @@ class Board extends BgImage {
                     + `${this.score[1].score}]`);
 
         // resign
-        // console.log(`Board.load_gameinfo>resign=${gameinfo.resign}`);
         this.resign = gameinfo.resign;
 
         // clock
         console.log(`clock_limit=${JSON.stringify(gameinfo.clock_limit)}`);
-        this.clock_limit.set_limit(0, gameinfo.clock_limit[0]);
-        this.clock_limit.set_limit(1, gameinfo.clock_limit[1]);
+        this.clock_limit.set(0, gameinfo.clock_limit[0]);
+        this.clock_limit.set(1, gameinfo.clock_limit[1]);
 
-        /*
-        this.player_clock[0].set_clock(gameinfo.board.clock[0]);
-        this.player_clock[1].set_clock(gameinfo.board.clock[1]);
-        */
+        this.player_clock[0].set(gameinfo.board.clock[0]);
+        this.player_clock[1].set(gameinfo.board.clock[1]);
 
         // player name
         this.player_name[0].set(gameinfo.board.playername[0]);
         this.player_name[1].set(gameinfo.board.playername[1]);
 
         // cube
-        let c = gameinfo.board.cube;
+        const c = gameinfo.board.cube;
         // console.log(`Board.load_gameinfo> cube=${JSON.stringify(c)}`);
         this.cube.set(c.value, c.side, c.accepted, false);
 
         // dice
-        let d = gameinfo.board.dice;
+        const d = gameinfo.board.dice;
         // console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
         this.roll_btn[0].set(d[0], false);
         this.roll_btn[1].set(d[1], false);
@@ -3387,10 +3508,7 @@ class Board extends BgImage {
      * @param {boolean} [sound=true]
      */
     put_checker(ch, p, sec=0, sound=true) {
-        // console.log(`Board.put_checker(ch.id=${ch.id},p=${p},sec=${sec})`);
-
         const prev_p = ch.cur_point;
-        // console.log(`Board.put_checker>prev_p=${prev_p})`);
 
         if (prev_p !== undefined ) {
             //
@@ -3405,11 +3523,7 @@ class Board extends BgImage {
 
         // 移動先ポイントに chを加える
         const idx = this.point[p].add(ch, sec);
-        // console.log(`Board.put_checker>idx=${idx}`);
         ch.cur_point = p;
-
-        // pip count
-        this.pip_count(ch.player);
 
         // move sound
         if ( sound ) {
@@ -3419,6 +3533,9 @@ class Board extends BgImage {
                 this.sound_put.play();
             }
         }
+
+        // pip count
+        this.pip_count(ch.player);
 
         // check closeout
         if ( this.closeout(1 - this.turn) ) {
@@ -3502,6 +3619,7 @@ class BoardPoint extends BoardArea {
         ch.set_z(n);
         ch.cur_point = this.idx;
         this.checkers.push(ch);
+
         return n;
     } // BoardPoint.add()
 } // class BoardPoint
@@ -3637,18 +3755,6 @@ class SoundBase {
         }
     } // SoundBase.play()
 } // class SoundBase
-
-/**
- * Emit message to server
- *
- * @param {string} type
- * @param {Object} data
- * @param {boolean} [history=false]
- */
-const emit_msg = (type, data, history=false) => {
-    console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
-    ws.emit("json", {src: "client", type: type, data: data, history: history});
-};
 
 /**
  * New game
@@ -3951,14 +4057,41 @@ window.onload = () => {
             return;
         } // set_score
         
+        if ( msg.type == "set_clock_switch" ) {
+            board.set_clock_switch(msg.data.switch);
+            console.log(`clock_sw=${board.clock_sw}`);
+            return;
+        } // set_clock_switch
+
         if ( msg.type == "set_clock_limit" ) {
-            board.clock_limit.set_limit(msg.data.index,
-                                            msg.data.clock_limit);
+            board.clock_limit.set(msg.data.index, msg.data.clock_limit);
+            board.player_clock[0].reset();
+            board.player_clock[1].reset();
             return;
         } // set_clock_limit
         
         if ( msg.type == "set_player_clock" ) {
-            board.player_clock[msg.data.player].set_clock(msg.data.clock);
+            board.player_clock[msg.data.player].set(msg.data.clock);
+            return;
+        } // set_player_clock
+        
+        if ( msg.type == "resume_clock" ) {
+            board.player_clock[msg.data.player].resume();
+            return;
+        } // set_player_clock
+        
+        if ( msg.type == "start_clock" ) {
+            board.player_clock[msg.data.player].start();
+            return;
+        } // set_player_clock
+        
+        if ( msg.type == "stop_clock" ) {
+            board.player_clock[msg.data.player].stop();
+            return;
+        } // set_player_clock
+        
+        if ( msg.type == "reset_clock" ) {
+            board.player_clock[msg.data.player].reset();
             return;
         } // set_player_clock
         
