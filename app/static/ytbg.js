@@ -1082,6 +1082,8 @@ class ResignButton extends OnBoardButton {
             score = this.board.cube.value * 3;
         }
         console.log(`ResignButton.on_mouse_down_xy>score=${score}`);
+        this.board.player_clock[0].emit_stop();
+        this.board.player_clock[1].emit_stop();
         this.board.emit_turn(-1, this.board.player, false);
         this.board.score[1 - this.board.player].up(score);
     } // ResignButton.on_mouse_down_xy()
@@ -1294,7 +1296,7 @@ class Cube extends OnBoardImage {
             val = 64;
         }
 
-        this.board.player_clock[1-player].emit_stop();
+        this.board.player_clock[1-player].change_turn();
         this.emit(val, player, false);
     } // Cube.double()
 
@@ -1304,7 +1306,7 @@ class Cube extends OnBoardImage {
     accept_double() {
         console.log("Cube.accept_double()");
 
-        this.board.player_clock[1-this.player].emit_resume();
+        this.board.player_clock[this.player].change_turn();
         this.emit(this.value, this.player, true);
     } // Cube.accept_double()
 
@@ -1319,7 +1321,7 @@ class Cube extends OnBoardImage {
         if ( val == 1 ) {
             player = undefined;
         }
-        this.board.player_clock[player].emit_resume();
+        this.board.player_clock[1-player].change_turn();
         this.emit(val, player, true);
     } // Cube.cancel_double()
 
