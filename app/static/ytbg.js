@@ -2014,7 +2014,8 @@ class Dice extends PlayerItem {
     } // Dice.set()
 
     /**
-     * @param {MouseEvent} e
+     * @param {number} x
+     * @param {number} y
      */
     on_mouse_down_xy(x, y) {
         console.log(`Dice.on_mouse_down_xy(${x},${y})`);
