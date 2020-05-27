@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.88";
+const VERSION = "0.89";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1294,10 +1294,8 @@ class Cube extends OnBoardImage {
             val = 64;
         }
 
-        const accepted = false;
-
-        this.board.player_clock[player].emit_stop();
-        this.emit(val, player, accepted);
+        this.board.player_clock[1-player].emit_stop();
+        this.emit(val, player, false);
     } // Cube.double()
 
     /**
