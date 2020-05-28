@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.89";
+const VERSION = "0.90";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -2001,8 +2001,11 @@ class Dice extends PlayerItem {
      * @param {number} sec
      */
     move1(deg, sec) {
-        this.set_z(0);
+        this.set_z(10);
         super.move(this.x1, this.y1, true, sec);
+        if ( this.player == 1 ) {
+            deg += 180;
+        }
         this.rotate(deg, true, sec);
     } // Dice.move1()
 
