@@ -17,7 +17,7 @@ import click
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 MY_NAME = 'ytBackgammon Server'
-VERSION = '0.74'
+VERSION = '0.76'
 
 _log = get_logger(__name__, True)
 
@@ -75,15 +75,19 @@ def handle_json(msg):
 @click.argument('server_id', type=str)
 @click.option('--port', '-p', 'port', type=int, default=5001,
               help='port number')
+@click.option('--image_dir', '-i', 'image_dir', type=str,
+              default="images1",
+              help="Images directory under '/static/'")
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag')
-def main(server_id, port, debug):
+def main(server_id, port, image_dir, debug):
     global svr_id, svr
     _log = get_logger(__name__, debug)
-    _log.info('server_id=%s, port=%s', server_id, port)
+    _log.info('server_id=%s, port=%s, image_dir=%s',
+              server_id, port, image_dir)
 
     svr_id = server_id
-    svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, True)
+    svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, image_dir, debug=True)
 
     try:
         socketio.run(app, host='0.0.0.0', port=int(port), debug=debug)

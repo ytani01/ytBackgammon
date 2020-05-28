@@ -25,15 +25,16 @@ class ytBackgammonServer:
 
     _log = get_logger(__name__, False)
 
-    def __init__(self, svr_name, svr_ver, svr_id, debug=False):
+    def __init__(self, svr_name, svr_ver, svr_id, image_dir, debug=False):
         self._dbg = debug
         __class__._log = get_logger(__class__.__name__, self._dbg)
-        self._log.debug('svr_name=%s, svr_ver=%s, svr_id=%s',
-                        svr_name, svr_ver, svr_id)
+        self._log.debug('svr_name=%s, svr_ver=%s, svr_id=%s, image_dir=%s',
+                        svr_name, svr_ver, svr_id, image_dir)
 
         self._svr_name = svr_name
         self._svr_ver = svr_ver
         self._svr_id = svr_id
+        self._image_dir = image_dir
 
         self._datafile_path = '%s/%s-%s.json' % (
             self.DATAFILE_DIR, self.DATAFILE_NAME, self._svr_id)
@@ -431,10 +432,14 @@ class ytBackgammonServer:
         self._log.debug('')
         return render_template('top.html',
                                name=self._svr_name,
-                               version=self._svr_ver)
+                               version=self._svr_ver,
+                               image_dir=self._image_dir)
 
     def app_index(self):
         self._log.debug('')
-        return render_template('index.html', server_id=self._svr_id,
-                               name=self._svr_name, version=self._svr_ver)
+        return render_template('index.html',
+                               name=self._svr_name,
+                               version=self._svr_ver,
+                               server_id=self._svr_id,
+                               image_dir=self._image_dir)
 ##

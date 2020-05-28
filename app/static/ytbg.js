@@ -974,10 +974,11 @@ class BgImage extends BgBase {
     constructor(id, x, y, deg=0, w=undefined, h=undefined) {
         super(id, x, y, deg, w, h);
 
-        this.image_dir = "/static/images/";
-        this.file_suffix = ".png";
+        this.image_parent_dir = "/static";
+        this.image_suffix = ".png";
 
         this.image_el = this.el.children[0];
+        this.image_dir = this.get_image_dir();
 
         if ( w === undefined ) {
             this.w = this.image_el.width;
@@ -997,6 +998,25 @@ class BgImage extends BgBase {
 
         this.e = undefined; // MouseEvent
     } // BgImage.constructor()
+
+    /**
+     * 
+     */
+    get_image_dir() {
+        const image_src = this.image_el.src;
+        console.log(`image_src=${image_src}`);
+        const index1 = image_src.indexOf(this.image_parent_dir);
+        console.log(`index1=${index1}`);
+        const index2 = image_src.indexOf("/", index1+1);
+        console.log(`index2=${index2}`);
+        const index3 = image_src.indexOf("/", index2+1);
+        console.log(`index3=${index3}`);
+
+        const image_dir = image_src.slice(index1, index3+1);
+        console.log(`image_dir=${image_dir}`);
+
+        return image_dir;
+    } // BgImage.get_image_dir()
 
     /**
      * @param {number} w
@@ -1249,7 +1269,7 @@ class Cube extends OnBoardImage {
         }
         let filename = this.file_prefix;
         filename += ("0" + file_val).slice(-2);
-        filename += this.file_suffix;
+        filename += this.image_suffix;
 
         this.el.children[0].src = filename;
 
@@ -1362,7 +1382,9 @@ class Cube extends OnBoardImage {
 
         // this.accepted == true
         if (this.player === undefined || this.player == this.board.player) {
-            this.double(this.board.player);
+            if ( this.value < 64 ) {
+                this.double(this.board.player);
+            }
         }
         return false;
     } // Cube.on_mouse_down_xy()
@@ -1955,7 +1977,7 @@ class Dice extends PlayerItem {
      */
     get_filename(val) {
         val %= 10;
-        return this.image_dir + this.file_prefix + val + this.file_suffix;
+        return this.image_dir + this.file_prefix + val + this.image_suffix;
     } // Dice.get_filename()
 
     /**
@@ -2549,7 +2571,7 @@ class Board extends BgImage {
 
         // sound setup
         this.el_sound = document.getElementById("sound-switch");
-        this.sound = false;
+        this.sound = true;
         this.load_sound_switch();
         this.sound_turn_change = new SoundBase(this, SOUND_TURN_CHANGE);
         this.sound_roll = new SoundBase(this, SOUND_ROLL);
