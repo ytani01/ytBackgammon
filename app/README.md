@@ -80,6 +80,14 @@ http://www.ytani.net:8080/ytbackgammon/
 * Client: javascript, socket.io
 
 
+## Design
+
+オリジナルのデザインを作ることができます。
+以下のファイルをダウンロードして、参考にして下さい。
+
+[Design Template](images0.zip)
+
+
 ## Install
 
 
