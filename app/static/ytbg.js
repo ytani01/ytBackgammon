@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.90";
+const VERSION = "0.91";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1213,14 +1213,18 @@ class Cube extends OnBoardImage {
         this.accepted = false;
 
         this.move_sec = 0.3;
+        this.moving = false;
         
         this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
-        this.x1 = (this.board.bx[2] + this.board.bx[3]) / 2;
+        this.x1 = [(this.board.bx[4] + this.board.bx[5]) / 2,
+                   (this.board.bx[2] + this.board.bx[3]) / 2];
         this.y0 = this.board.h / 2;
         this.y2 = [this.board.by[9] - this.h / 2,
                    this.board.by[0] + this.h / 2];
         this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
                    (this.y2[1] + this.board.h / 2) / 2];
+
+        [this.src_x, this.src_y] = [undefined, undefined];
         
         this.file_prefix = this.image_dir + "cube";
 
@@ -1292,7 +1296,8 @@ class Cube extends OnBoardImage {
             } else {
                 this.rotate(-90, true);
             }
-            this.move(this.x1, this.y1[this.player], true, this.move_sec);
+            this.move(this.x1[this.player], this.y1[this.player],
+                      true, this.move_sec);
         }
     } // Cube.set()
 
@@ -1303,21 +1308,19 @@ class Cube extends OnBoardImage {
         console.log(`Cube.double(player=${player})`);
 
         if ( player === undefined ) {
-            if ( this.player !== undefined ) {
-                player = 1 - this.player;
-            }
-        } else {
-            player = 1 - player;
+            return;
         }
-        console.log("Cube.double> player=" + player);
+
+        this.player = 1 - player;
+        console.log("Cube.double> this.player=" + this.player);
 
         let val = this.value * 2;
         if ( val > 64 ) {
             val = 64;
         }
 
-        this.board.player_clock[1-player].change_turn();
-        this.emit(val, player, false);
+        this.board.player_clock[player].change_turn();
+        this.emit(val, this.player, false);
     } // Cube.double()
 
     /**
@@ -1326,7 +1329,7 @@ class Cube extends OnBoardImage {
     accept_double() {
         console.log("Cube.accept_double()");
 
-        this.board.player_clock[this.player].change_turn();
+        this.board.player_clock[1-this.board.turn].change_turn();
         this.emit(this.value, this.player, true);
     } // Cube.accept_double()
 
@@ -1341,7 +1344,7 @@ class Cube extends OnBoardImage {
         if ( val == 1 ) {
             player = undefined;
         }
-        this.board.player_clock[1-player].change_turn();
+        this.board.player_clock[this.player].change_turn();
         this.emit(val, player, true);
     } // Cube.cancel_double()
 
@@ -1349,18 +1352,29 @@ class Cube extends OnBoardImage {
      * @param {number} x
      * @param {number} y
      */
-    on_mouse_up_xy(x, y) {
-        console.log(`Cube.on_mouse_down_xy>this.player=${this.player},`
-                    + `this.board.player=${this.board.player}`);
-
+    on_mouse_down_xy(x, y) {
+        console.log(`Cube.on_mouse_down_xy():this.plyaer=${this.player}`);
+        console.log(`Cube.on_mouse_down_xy():this.board.plyaer=${this.board.player}`);
+        console.log(`Cube.on_mouse_down_xy():this.board.turn=${this.board.turn}`);
         if ( this.board.turn >= 2 || this.board.turn < 0 ) {
-            // ゲーム開始時、修了時は、振れられない
+            // ゲーム開始時、終了時は、触れられない
             return false;
         }
 
-        if ( this.accepted && this.board.turn != this.board.player ) {
-            // 自分の番にしかダブルを掛けられない
+        if ( this.player !== undefined && this.player != this.board.player ) {
+            // 相手側にあるキューブは、触れられない
             return false;
+        }
+        
+        if ( this.accepted ) {
+            if ( this.board.turn != this.board.player ) {
+                // 自分の番にしかダブルを掛けられない
+                return false;
+            }
+            if ( this.player && this.player != this.board.player ) {
+                // 相手側にあるキューブは、触れられない
+                return false;
+            }
         }
 
         for (let rb of this.board.roll_btn) {
@@ -1370,10 +1384,56 @@ class Cube extends OnBoardImage {
             }
         }
 
+        this.moving = true;
+        [this.src_x, this.src_y] = [this.x, this.y];
+        this.move(x, y, true);
+        return false;
+    }
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_move_xy(x, y) {
+        if ( this.moving ) {
+            this.move(x, y, true);
+        }
+    }
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     */
+    on_mouse_up_xy(x, y) {
+        console.log(`Cube.on_mouse_down_xy>this.player=${this.player},`
+                    + `this.board.player=${this.board.player}`);
+
+        if ( this.moving ) {
+            this.moving = false;
+        } else {
+            return false;
+        }
+
         if ( ! this.accepted ) {
             // ダブルが掛けられた状態
             if ( this.player == this.board.player ) {
-                this.accept_double();
+                if ( this.src_y == this.y1[0] ) {
+                    if ( this.y >= this.y1[0] ) {
+                        this.accept_double();
+                    } else {
+                        // redouble
+                        this.double(0);
+                    }
+                }
+                if ( this.src_y == this.y1[1] ) {
+                    if ( this.y <= this.y1[1] ) {
+                        this.accept_double();
+                    } else {
+                        // redouble
+                        this.double(1);
+                    }
+                }
+                
                 return false;
             }
             this.cancel_double();
@@ -3633,11 +3693,12 @@ class Board extends BgImage {
      * @param {number} y
      */
     on_mouse_move_xy(x, y) {
-        if ( this.moving_checker === undefined ) {
-            return;
+        if ( this.moving_checker !== undefined ) {
+            this.moving_checker.move(x, y, true);
         }
-
-        this.moving_checker.move(x, y, true);
+        if ( this.cube.moving ) {
+            this.cube.move(x, y, true);
+        }
     } // Board.on_mouse_move_xy()
 } // class Board
 

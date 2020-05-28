@@ -85,7 +85,7 @@ http://www.ytani.net:8080/ytbackgammon/
 オリジナルのデザインを作ることができます。
 以下のファイルをダウンロードして、参考にして下さい。
 
-* [デザイン テンプレート ファイル](docs/images0.zip)
+* [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
 
 
 ## Install
