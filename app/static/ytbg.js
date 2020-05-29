@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.91";
+const VERSION = "0.92";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -758,7 +758,7 @@ class PlayerName extends PlayerText {
         super(id, board, player, x, y, deg);
 
         // this.def_name = `Player ${this.player}`;
-        this.def_name = "[Click and input name]";
+        this.def_name = "[Input name]";
         this.name = this.def_name;
 
         this.el_input = document.getElementById(`${id}-input`);
@@ -2618,8 +2618,10 @@ class Board extends BgImage {
         this.free_move = false;
         this.disp_pip = false;
         
-        this.bx = [27, 81, 108, 432, 495, 819, 846, 900];
-        this.by = [30, 83, 124, 208, 249, 302, 243, 425, 466, 520];
+        //this.bx = [27, 81, 108, 432, 495, 819, 846, 900];
+        this.bx = [20, 70, 90, 390, 440, 740, 760, 810];
+        //this.by = [30, 83, 124, 208, 249, 302, 243, 425, 466, 520];
+        this.by = [30, 80, 100, 235, 255, 305, 325, 460, 480, 530];
 
         this.resign = -1;
 
@@ -2655,17 +2657,17 @@ class Board extends BgImage {
         // Title
         const name_el = document.getElementById("name");
         const ver_el = document.getElementById("version");
-        ver_el.innerHTML = `<strong>Client</strong> Ver. ${VERSION}`;
+        ver_el.innerHTML = `<strong>Client</strong> v. ${VERSION}`;
 
         // Buttons
         const bx0 = this.x + this.w + 30;
 
         this.button_resign = new ResignButton(
-            "button-resign", this, bx0, 10);
+            "button-resign", this, bx0, 5);
 
         this.button_back = new BackButton(
             "button-back", this, bx0, this.h);
-        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 50);
+        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 55);
 
         this.button_fwd = new FwdButton(
             "button-fwd",
@@ -2675,18 +2677,18 @@ class Board extends BgImage {
         this.button_inverse = new InverseButton(
             "button-inverse", this, bx0, 0);
         this.button_inverse.move(
-            bx0, this.y + this.h / 2 - this.button_inverse.h);
+            bx0, this.h / 2 - this.button_inverse.h / 2);
         
         // <body>
         let body_el = document.body;
         body_el.style.width = (this.button_back.x
-                               + this.button_back.w + 50) + "px";
-        body_el.style.height = (this.y + this.h + 10) + "px";
+                               + this.button_back.w + 150) + "px";
+        body_el.style.height = (this.y + this.h + 5) + "px";
 
         // PlayerScore
-        let [sw, sh] = [23, 53];
+        let [sw, sh] = [22, 53];
 
-        let sx1 = this.bx[0] + 3;
+        let sx1 = this.bx[0] + 2;
         let sx2 = sx1 + sw + 2;
 
         let sy_offset = 27;
@@ -2733,9 +2735,9 @@ class Board extends BgImage {
 
         this.player_clock = [];
         this.player_clock.push(new PlayerClock(
-            "p0clock", this, 0, this.bx[3] + 240, this.by[9]+3,   0));
+            "p0clock", this, 0, this.bx[3] + 200, this.by[9]+3,   0));
         this.player_clock.push(new PlayerClock(
-            "p1clock", this, 1, this.bx[4] - 240, this.by[0]-3, 180));
+            "p1clock", this, 1, this.bx[4] - 200, this.by[0]-3, 180));
 
         this.clock_sw = false;
         this.apply_clock_sw();
@@ -2754,11 +2756,11 @@ class Board extends BgImage {
         this.pip = [];
         let py_offset = 14;
         this.pip.push(new PlayerPipCount("p0pip", this, 0,
-                                         (this.bx[6] + this.bx[7]) / 2,
+                                         (this.bx[6] + this.bx[7]) / 2 - 5,
                                          this.h - py_offset,
                                          0));
         this.pip.push(new PlayerPipCount("p1pip", this, 1,
-                                         (this.bx[6] + this.bx[7]) / 2,
+                                         (this.bx[6] + this.bx[7]) / 2 - 5,
                                          py_offset,
                                          180));
 
@@ -4133,7 +4135,7 @@ window.onload = () => {
 
     // initialize board
     board = new Board("board",
-                      nav_el.offsetWidth  + 20,
+                      nav_el.offsetWidth  + 30,
                       nav_el.offsetHeight + 30,
                       ws);
 
