@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.92";
+const VERSION = "0.93";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1824,6 +1824,7 @@ class RollButton extends BannerButton {
         const value1 = Math.floor(Math.random() * 6) + 1;
         const value2 = Math.floor(Math.random() * 6) + 1;
 
+        /*
         // Dice histogram
         const histo = this.board.dice_histogram;
         histo[this.player][value1 - 1]++;
@@ -1840,6 +1841,7 @@ class RollButton extends BannerButton {
         } // for(p)
         // console.log(`histogram_str=${histogram_str}`);
         document.getElementById("dice-histogram").innerHTML = histogram_str;
+        */
 
         let dice = [0, 0, 0, 0];
 
@@ -2663,11 +2665,11 @@ class Board extends BgImage {
         const bx0 = this.x + this.w + 30;
 
         this.button_resign = new ResignButton(
-            "button-resign", this, bx0, 5);
+            "button-resign", this, bx0, 20);
 
         this.button_back = new BackButton(
             "button-back", this, bx0, this.h);
-        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 55);
+        this.button_back.move(bx0, this.y + this.h - this.button_back.h - 60);
 
         this.button_fwd = new FwdButton(
             "button-fwd",
@@ -2682,8 +2684,8 @@ class Board extends BgImage {
         // <body>
         let body_el = document.body;
         body_el.style.width = (this.button_back.x
-                               + this.button_back.w + 150) + "px";
-        body_el.style.height = (this.y + this.h + 5) + "px";
+                               + this.button_back.w) + 30 + "px";
+        body_el.style.height = (this.y + this.h + 15) + "px";
 
         // PlayerScore
         let [sw, sh] = [22, 53];
@@ -2879,10 +2881,12 @@ class Board extends BgImage {
         this.win_btn.push(new WinButton(
             "winbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1));
 
+        /*
         // Dice histogram
         this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
         console.log("Board.constructor>"
                     + `dice_histogram=${JSON.stringify(this.dice_histogram)}`);
+        */
 
         if ( this.player == 1 ) {
             this.player = 0;
@@ -4135,8 +4139,8 @@ window.onload = () => {
 
     // initialize board
     board = new Board("board",
-                      nav_el.offsetWidth  + 30,
-                      nav_el.offsetHeight + 30,
+                      nav_el.offsetWidth  + 20,
+                      nav_el.offsetHeight + 40,
                       ws);
 
     ws.on("connect", function() {
