@@ -113,7 +113,7 @@ if [ ! -d ${VENVDIR} ]; then
 fi
 shift
 
-APPSUBDIR="ytBackgammon/app"
+APPSUBDIR="ytBackgammon"
 CMD="ytbg.py"
 ARGS="$*"
 
