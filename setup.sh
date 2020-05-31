@@ -106,12 +106,16 @@ tsecho ${MYNAME} "VENVDIR=${VENVDIR}"
 
 activatevenv ${VENVDIR}
 
-BINDIR=${VIRTUAL_ENV}/bin
-tsecho ${MYNAME} "BINDIR=${BINDIR}"
-
 #
 # install CMDS
 #
+BINDIR=${HOME}/bin
+tsecho ${MYNAME} "BINDIR=${BINDIR}"
+
+if [ -d ${BINDIR} ]; then
+    mkdir -pv ${BINDIR}
+fi
+
 tsechoeval ${MYNAME} cd ${BINDIR}
 tsecho ${MYNAME} "pwd -->" `pwd`
 for f in ${CMDS}; do
