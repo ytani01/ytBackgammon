@@ -1,0 +1,119 @@
+<!DOCTYPE HTML>
+<html lang="jp">
+  <head>
+    <meta charset="utf-8">
+    <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"> -->
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=0.4, minimum-scale=0.05, maximum-scale=3">
+    <title>ytBackgammon: network shared backgammon board (alpha)</title>
+
+    <script>
+      const set_main = id => {
+          console.log(`set_main>id=${id}`);
+          const url = document.getElementById(id).src + "?sound=off";
+          console.log(`set_main>url=${url}`);
+
+          document.cookie = `main_viewer=${encodeURIComponent(id)};`;
+          document.getElementById("main_board_id").innerHTML = id;
+          document.getElementById("main_viewer").src = url;
+      };
+
+      window.onload = () => {
+          let id = undefined;
+          for (let ent of document.cookie.split("; ")) {
+              console.log(`window.onload>ent=${ent}`);
+              const [key, val] = ent.split("=");
+              if ( key == "main_viewer" ) {
+                  id = val;
+                  break;
+              }
+          }
+          console.log(`window.onload>id=${id}`);
+          if ( id === undefined ) {
+              return;
+          }
+          set_main(decodeURIComponent(id));
+      };
+    </script>
+  </head>
+  <body style="background-image:url(./bg.png);width:1200px;">
+    <h1 style="color:#222;">【ytBackgammon】</h1>
+    <h2 style="color:#222;">ネットワーク共有型バックギャモンボード</h2>
+    <h2 style="color:#222;">(network shared backgammon board)</h2>
+    <hr />
+
+    <h1 style="color:#222;">[Main viewer] <span id="main_board_id"></span></h1>
+    <h3 style="color:#222;">SoundのON/OFFは、このボードではなく、下段のボードで設定して下さい。</h3>
+
+    <div style="float:left;">
+      <div style="width:880px;height:560px">
+        <iframe id="main_viewer"
+                name="main"
+                src=""
+                width="1030px" height="650px"
+                style="transform:scale(0.835);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5001/?board=1&sound=off"
+         target="main" style="color:#222;"
+         onClick="set_main('Board_1');">[ Board_1 ]</a>
+
+      <div style="width:450px;height:270px">
+        <iframe id="Board_1"
+                src="http://www.ytani.net:5001/"
+                width="1030px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5002/?board=2&sound=off"
+         target="main" style="color:#222;"
+         onClick="set_main('Board_2');">[ Board_2 ]</a>
+
+      <div style="width:450px;height:270px">
+        <iframe id="Board_2"
+                src="http://www.ytani.net:5002/"
+                width="1030px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5003/?board=3&sound=off"
+         target="main" style="color:#222;"
+         onClick="set_main('Board_3');">[ Board_3 ]</a>
+
+      <div style="width:450px;height:270px">
+        <iframe id="Board_3"
+                src="http://www.ytani.net:5003/"
+                width="1030px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+    <div style="float:left;">
+      <a href="http://www.ytani.net:5004/?board=4&sound=off"
+         target="main" style="color:#222;"
+         onClick="set_main('Board_4')">[ Board_4 ]</a>
+
+      <div style="width:450px;height:270px">
+        <iframe id="Board_4"
+                src="http://www.ytani.net:5004/"
+                width="1030px" height="650px"
+                style="transform:scale(0.4);transform-origin:left top;">
+        </iframe>
+      </div>
+    </div>
+
+  </body>
+</html>

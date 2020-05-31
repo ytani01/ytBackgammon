@@ -1,46 +1,119 @@
-# ytBackGammon
+[![a](docs/ytBackgammon-demo-4boards.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-demo-4boards.mp4)
 
-## 実装
+# ytBackgammon -- ネットワーク共有型バックギャモンボード (Network Shared Backgammon Board)
 
-* [ネットワーク共有型バックギャモンボード: テストサイト](http://www.ytani.net:8080/ytbackgammon/)
+http://www.ytani.net:8080/ytbackgammon/
+
+## 特徴
+
+通常の、ネット対戦やアプリとは違い...
+
+カフェなどで、バックギャモンの会をやるような雰囲気を
+ネット上で再現することを目指してます。
+
+既存の対戦サイトやアプリでも、
+3D表示できたり、
+観戦したり、
+チャットしたり
+できますが、
+どうしても密室でこもってやってる感じがしてしまい、
+みんなで楽しくプレーする雰囲気がなかなか得られません。
+(個人的な感想)
+
+そこで、
+近くで
+「他の人がプレーしているのを感じられるようにできないか」
+考えました。
+
+同時にビデオチャット/音声チャットでつないで、
+おしゃべりしながらお楽しみ下さい。
+
+* 複数のボードで、複数の対戦を同時進行できます。
+* 全てのボードを同時に見渡ることができますし、操作もできます。
+* 操作性に関しては、厳密なルールチェックや効率より、
+実際のボードの使い勝手の再現を重視しているつもりです。
+* ボードを回転させて、どちらのプレーヤーの目線でも見ることができます。
+* ルールを無視して、自由に動かせるモードがあります。(教育・検討用)
+* いくらでも「戻して」、「やり直し」ができます。
+* ボードのデザインを変えることができます。
+
+
+## 動作環境
+
+* スマホ、PCの Chromeブラウザ
+(なるべく最新版をお使い下さい)
+
+* ネットワークはなるべく高速で安定した回線をお使い下さい。
+(ビデオ会議がストレスなくできるぐらい)
+
+### 注意事項
+
+* 以下のような要因で、タイムラグが生じることがあります。
+  - 回線品質
+  - PC、スマホの性能
+  - Chromeのバージョン
   
-  詳しくは[こちら](app/)
-
-### Deprecated (旧試作)
-
-* [単なるバックギャモンボード](https://ytani01.github.io/ytBackgammon/)
+* 表示が崩れたときは、ブラウザの再読込(リロード)をしてみて下さい。
 
 
-## Memo
+## Usage
 
-### install browserMqtt.js
+### 1. New game
 
-`結局、使ってません`
+[![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
-```
-### make package.json
-$ mkdir work
-$ cd work
-$ npm init -y
-### install mqtt
-$ npm install mqtt -save
-### install browserify
-$ (sudo) npm install -g browserify
-### make browserMqtt.js
-$ cd node_modules/mqtt
-$ npm install .
-$ browserify mqtt.js -s mqtt > browserMqtt.js
-$ cp browserMqtt.js ${jsdir}
-```
 
-## References
+### 2. Doubling
 
-* [GNU Backgammon](https://www.gnu.org/software/gnubg/)
-* [GNU Backgammon Manual  V0.16](https://www.gnu.org/software/gnubg/manual/html_node/)
-* [11 Technical Notes](https://www.gnu.org/software/gnubg/manual/html_node/Technical-Notes.html#Technical-Notes)
-* [11.3 Python scripting](https://www.gnu.org/software/gnubg/manual/html_node/Python-scripting.html#Python-scripting)
+#### 2.1 Double --> Take
 
-### MQTT.js
+[![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-accept.mp4)
 
-* [MQTT.js](https://github.com/mqttjs/MQTT.js)
-  - [Browserify](https://github.com/mqttjs/MQTT.js#browserify)
+
+#### 2.2 Double --> Resign
+
+[![a](docs/ytBackgammon-double.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-double-resign.mp4)
+
+
+## 3. Score
+
+スコアの計算は自動的に行われますが、
+リセットしたり、修正したい場合は、手動で行うことができます。
+![score](docs/ytbg-score1.png)
+
+
+## Board Design
+
+オリジナルのデザインを作ることができます。
+以下のファイルをダウンロードして、参考にして下さい。
+
+* [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
+
+
+## Implementation
+
+* Server: Python3, flask, flask_socketio (on FreeBSD and Linux)
+* Client: javascript, socket.io
+
+
+## Install
+
+T.B.D.
+
+
+## A. References 
+
+### A.1 Flask + Webscoket
+
+* [Flask-Socket-IO](https://github.com/miguelgrinberg/Flask-SocketIO)
+  - [Flask-SocketIOでWebSocketアプリケーション](https://qiita.com/nanakenashi/items/6497caf1c56c36f47be9)
+  
+
+### A.2 Javascript socket.io
+
+* https://cdnjs.com/libraries/socket.io
+
+
+### A.3 CSS
+
+* [CSSだけで簡単！ハンバーガーメニューの作り方](https://saruwakakun.com/html-css/reference/nav-drawer)

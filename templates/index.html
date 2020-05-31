@@ -1,0 +1,231 @@
+<!DOCTYPE HTML>
+<html lang="jp">
+  <head>
+    <meta charset="utf-8">
+    <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"> -->
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=0.4, minimum-scale=0.05, maximum-scale=3">
+    <title>ytBackgammon (alpha)</title>
+    <script
+      type="text/javascript"
+      src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js">
+    </script>
+    <link
+      href="https://use.fontawesome.com/releases/v5.0.6/css/all.css"
+      rel="stylesheet">
+    <script>
+      const ts = new Date().getTime();
+      const head_el = document.getElementsByTagName("head")[0];
+
+      const js_url = "/static/ytbg.js?ts=" + ts;
+      // const js_url = "/static/ytbg.js"; // for debug
+      const script_el = document.createElement("script");
+      console.log(`js_url=${js_url}`);
+      script_el.setAttribute("type", "text/javascript");
+      script_el.setAttribute("src", js_url);
+      head_el.appendChild(script_el);
+
+      const css_url = "/static/ytbg.css?ts=" + ts;
+      const css_el = document.createElement("link");
+      console.log(`css_url=${css_url}`);
+      css_el.setAttribute("rel", "stylesheet");
+      css_el.setAttribute("type", "text/css");
+      css_el.setAttribute("href", css_url);
+      css_el.setAttribute("charset", "utf-8");
+      head_el.appendChild(css_el);
+    </script>
+  </head>
+  <body style="background-image:url(/static/{{image_dir}}/bg.png);">
+    <header>
+      <div id="server-id" style="display:none;">{{server_id}}</div>
+      <div id="nav-drawer" style="display:inline-block;">
+        <input id="nav-input" type="checkbox" class="nav-unshown">
+        <label id="nav-open" for="nav-input"><span></span></label>
+        <label class="nav-unshown" id="nav-close" for="nav-input">
+          <span></span></label>
+        <div id="nav-content">
+          <div id="nav-title">メニュー</div>
+          <ul id="nav">
+            <li><a href="#" onClick="board_inverse();">ボード回転</a>
+          </ul>
+          <ul id="nav">
+            <li><a href="#" onClick="backward_hist();">1つ戻す</a>
+            <li><a href="#" onClick="back2();">連続で戻す</a>
+            <li><a href="#" onClick="back_all();">連続で戻す(高速)</a>
+          </ul>
+          <ul id="nav">
+            <li><a href="#" onClick="forward_hist();">1つ進める</a>
+            <li><a href="#" onClick="fwd2();">連続で進める</a>
+            <li><a href="#" onClick="fwd_all();">連続で進める(高速)</a>
+          </ul>
+          <!--
+          <ul id="nav">
+            <li><a id="write_gameinfo" href="#"
+                   download="gameinfo.json"
+                   onClick="write_gameinfo();">保存</a>
+            <li><label for="read_gameinfo">読み込み
+                <input id="read_gameinfo" type="file"
+                       accept="application/json"
+                       onClick="clear_filename();"
+                       onChange="read_gameinfo();"></label>
+          </ul>
+          -->
+          <ul id="nav">
+            <li><a href="#" onClick="new_game();">New Game</a>
+          </ul>
+        </div>
+      </div>
+      &nbsp;
+      <strong>{{ name }} v. {{ version }}</strong>/<strong id="version">Version Number</strong>
+      &nbsp;
+      <label class="headerinput" for="sound-switch">Sound</label>
+      <input class="checkbox" id="sound-switch" type="checkbox" checked
+             onChange="apply_sound_switch();">
+      &nbsp;
+      <label class="headerinput" for="free-move">Free</label>
+      <input class="checkbox" id="free-move" type="checkbox"
+             onChange="apply_free_move();">
+      &nbsp;
+      <label class="headerinput" for"disp-pip">Pip</label>
+      <input class="checkbox" id="disp-pip" type="checkbox"
+             onChange="apply_disp_pip();">
+      &nbsp;
+      <label class="headerinput" for "clock_sw">Clock</label>
+      <input class="checkbox" id="clock_sw" type="checkbox" checked
+             onChange="apply_clock_sw();">
+      <input class="headerinput" id="clock_limit0" type="number" value="2"
+             step="0.5" style="width:55px"
+             onChange="apply_clock_limit(0);">
+      <label class="headerinput" for"clock_limit0">m +</label>
+
+      <input class="headerinput" id="clock_limit1" type="number" value="12"
+             style="width:55px"
+             onChange="apply_clock_limit(1);">
+      <label class="headerinput" for"clock_limit1">s</label>
+    </header>
+
+    <div id="board">
+      <image src="/static/{{image_dir}}/board-base.png">
+        <div id="p0clock-bg"></div>
+        <div class="bordertext" id="p0clock"></div>
+        <div id="p1clock-bg"></div>
+        <div class="bordertext" id="p1clock"></div>
+
+        <div class="bordertext" id="p0pip">167</div>
+        <div class="bordertext" id="p1pip">167</div>
+        
+        <div class="bordertext" id="p0name">
+          <image src="/static/{{image_dir}}/checker0.png"></div>
+        <div class="bordertext" id="p1name">
+          <image src="/static/{{image_dir}}/checker1.png"></div>
+
+        <div id="score_up0"><image src="/static/{{image_dir}}/cube01.png"></div>
+        <div id="score_down0"><image src="/static/{{image_dir}}/cube01.png"></div>
+        <div id="score_up1"><image src="/static/{{image_dir}}/cube01.png"></div>
+        <div id="score_down1"><image src="/static/{{image_dir}}/cube01.png"></div>
+
+        <div id="p0score" style="font-weight:bold;color:#333;">
+          <image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p1score" style="font-weight:bold;color:#333;">
+          <image src="/static/{{image_dir}}/checker1.png"></div>
+
+        <div id="p000"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p001"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p002"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p003"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p004"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p005"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p006"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p007"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p008"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p009"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p010"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p011"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p012"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p013"><image src="/static/{{image_dir}}/checker0.png"></div>
+        <div id="p014"><image src="/static/{{image_dir}}/checker0.png"></div>
+
+        <div id="p100"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p101"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p102"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p103"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p104"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p105"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p106"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p107"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p108"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p109"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p110"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p111"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p112"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p113"><image src="/static/{{image_dir}}/checker1.png"></div>
+        <div id="p114"><image src="/static/{{image_dir}}/checker1.png"></div>
+
+        <div id="cube"><image src="/static/{{image_dir}}/cube01.png"></div>
+
+        <div id="dice00"><image src="/static/{{image_dir}}/dice01.png"></div>
+        <div id="dice01"><image src="/static/{{image_dir}}/dice01.png"></div>
+        <div id="dice02"><image src="/static/{{image_dir}}/dice01.png"></div>
+        <div id="dice03"><image src="/static/{{image_dir}}/dice01.png"></div>
+
+        <div id="dice10"><image src="/static/{{image_dir}}/dice11.png"></div>
+        <div id="dice11"><image src="/static/{{image_dir}}/dice11.png"></div>
+        <div id="dice12"><image src="/static/{{image_dir}}/dice11.png"></div>
+        <div id="dice13"><image src="/static/{{image_dir}}/dice11.png"></div>
+
+        <div id="rollbutton0">
+          <image src="/static/{{image_dir}}/dicecup.png" width="120px"
+                 style="transform:rotate(-10deg);"></div>
+        <div id="rollbutton1">
+          <image src="/static/{{image_dir}}/dicecup.png" width="120px"
+                 style="transform:rotate(170deg);"></div>
+
+        <div id="passbutton0">
+          <image src="/static/{{image_dir}}/pass.png" width="180px"
+                 style="transform:rotate(0deg);"></div>
+        <div id="passbutton1">
+          <image src="/static/{{image_dir}}/pass.png" width="180px"
+                 style="transform:rotate(180deg);"></div>
+
+        <div id="winbutton0">
+          <image src="/static/{{image_dir}}/win.png" width="180px"
+                 style="transform:rotate(0deg);"></div>
+        <div id="winbutton1">
+          <image src="/static/{{image_dir}}/win.png" width="180px"
+                 style="transform:rotate(180deg);"></div>
+
+        <div id="resignbutton0">
+          <image src="/static/{{image_dir}}/button-resign.png" width="100px"
+                 style="transform:rotate(0deg);"></div>
+        <div id="resignbutton1">
+          <image src="/static/{{image_dir}}/button-resign.png" width="100px"
+                 style="transform:rotate(180deg);"></div>
+    </div>
+
+    <input id="p0name-input" class="bordertext" type="text"
+           style="position:absolute;border:none;"
+           onFocusOut="emit_playername(0);"
+           onChange="emit_playername(0);">
+    <input id="p1name-input" class="bordertext" type="text"
+           style="position:absolute;border:none;"
+           onFocusOut="emit_playername(1);"
+           onChange="emit_playername(1);">
+
+    <div id="buttons">
+      <div id="button-resign">
+        <image src="/static/{{image_dir}}/button-resign.png" width="70px"></div>
+    
+      <div id="button-inverse">
+        <image src="/static/{{image_dir}}/button-inverse.png" width="70px"></div>
+    
+      <div id="button-fwd">
+        <image src="/static/{{image_dir}}/button-fwd.png" width="70px"></div>
+    
+      <div id="button-back">
+        <image src="/static/{{image_dir}}/button-bak.png" width="70px"></div>
+    </div>
+  </body>
+</html>
