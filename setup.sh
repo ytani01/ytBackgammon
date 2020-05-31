@@ -113,7 +113,7 @@ tsecho ${MYNAME} "BINDIR=${BINDIR}"
 # install CMDS
 #
 tsechoeval ${MYNAME} cd ${BINDIR}
-tsecho ${MYNAME} `pwd`
+tsecho ${MYNAME} "pwd -->" `pwd`
 for f in ${CMDS}; do
     ln -sfv ${MYDIR}/${f} .
 done
@@ -122,4 +122,5 @@ done
 # pip install
 #
 tsechoeval ${MYNAME} cd ${MYDIR}
+tsecho ${MYNAME} "pwd -->" `pwd`
 tsechoeval ${MYNAME} pip install -r requirements.txt
