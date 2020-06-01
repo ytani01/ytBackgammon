@@ -98,15 +98,15 @@ http://www.ytani.net:8080/ytbackgammon/
 ```bash
 ホームディレクトリ直下に Python3 venv を作成
 $ cd ~
-$ python3 -m venv env1
+~$ python3 -m venv env1
 
 env1に gitクローンを作成
-$ cd env1
-$ git clone https://www.github.com/ytani01/ytBackgammon.git
+~$ cd env1
+~/env1$ git clone https://www.github.com/ytani01/ytBackgammon.git
 
 インストールスクリプトを実行
-$ cd ytBackgammon
-$ ./setup.sh
+~/env1$ cd ytBackgammon
+~/env1/ytBackgammon$ ./setup.sh
 ```
 
 ### 2. ytBackgammon server usage
