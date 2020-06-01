@@ -95,16 +95,20 @@ http://www.ytani.net:8080/ytbackgammon/
 
 以下の操作で、${HOME}/binに、「ytbg.sh」がコピーされます。
 
+1. ホームディレクトリ直下に Python3 venv を作成
 ```bash
-ホームディレクトリ直下に Python3 venv を作成
 user@host:....$ cd ~
 user@host:~$ python3 -m venv env1
+```
 
-env1に gitクローンを作成
+2. env1に gitクローンを作成
+```bash
 user@host:~$ cd env1
 user@host:~/env1$ git clone https://www.github.com/ytani01/ytBackgammon.git
+````
 
-インストールスクリプトを実行
+3. インストールスクリプトを実行
+```bash
 user@host:~/env1$ cd ytBackgammon
 user@host:~/env1/ytBackgammon$ ./setup.sh
 ```
