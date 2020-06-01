@@ -40,13 +40,15 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## 動作環境
 
+### クライアント: Webアプリ
+
 * スマホ、PCの Chromeブラウザ
 (なるべく最新版をお使い下さい)
 
 * ネットワークはなるべく高速で安定した回線をお使い下さい。
 (ビデオ会議がストレスなくできるぐらい)
 
-### 注意事項
+#### 注意事項
 
 * 以下のような要因で、タイムラグが生じることがあります。
   - 回線品質
@@ -55,10 +57,15 @@ http://www.ytani.net:8080/ytbackgammon/
   
 * 表示が崩れたときは、ブラウザの再読込(リロード)をしてみて下さい。
 
+### サーバ
+
+* OS: FreeBSD, Linux
+* Python3, flask, flask_socketio
+
 
 ## Usage
 
-### 1 New game
+### 1. New game
 
 [![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
@@ -80,12 +87,6 @@ http://www.ytani.net:8080/ytbackgammon/
 スコアの計算は自動的に行われますが、
 リセットしたり、修正したい場合は、手動で行うことができます。
 ![score](docs/ytbg-score1.png)
-
-
-## Implementation
-
-* Server: Python3, flask, flask_socketio (on FreeBSD and Linux)
-* Client: javascript, socket.io
 
 
 ## ytBackgammon server
