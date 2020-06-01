@@ -105,7 +105,7 @@ user@host:~$ python3 -m venv env1
 ```bash
 user@host:~$ cd env1
 user@host:~/env1$ git clone https://www.github.com/ytani01/ytBackgammon.git
-````
+```
 
 3. インストールスクリプトを実行
 ```bash
