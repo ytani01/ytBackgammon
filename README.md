@@ -98,8 +98,32 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## Install
 
-T.B.D.
+1. Python3 venv を作成
+2. gitクローン を作成
+3. ``setup.sh``を実行
 
+↓
+
+${HOME}/binに、「ytbg.sh」がコピーされる
+
+```bash
+$ cd ~
+$ python3 -m venv env1
+$ cd env1
+$ git clone https://www.github.com/ytani01/ytBackgammon.git
+$ cd ytBackgammon
+$ ./setup.sh
+```
+
+## ytBackgammon server usage
+
+```bash
+ytbg.sh ~/env1 -p {ポート番号} -i {画像ディレクトリ名} {サーバID}
+```
+
+ポート番号: デフォルトは 5000
+画像ディレクトリ名: ``static`` からの相対パス名
+サーバID: 複数のサーバを立ち上げたときに、区別するための文字列
 
 ## A. References 
 
