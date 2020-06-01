@@ -58,7 +58,7 @@ http://www.ytani.net:8080/ytbackgammon/
 
 ## Usage
 
-### 1. New game
+### 1 New game
 
 [![a](docs/ytBackgammon-opening.png)](https://www.ytani.net/ytbackgammon/movies/ytBackgammon-opening.mp4)
 
@@ -82,40 +82,33 @@ http://www.ytani.net:8080/ytbackgammon/
 ![score](docs/ytbg-score1.png)
 
 
-## Board Design
-
-オリジナルのデザインを作ることができます。
-以下のファイルをダウンロードして、参考にして下さい。
-
-* [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
-
-
 ## Implementation
 
 * Server: Python3, flask, flask_socketio (on FreeBSD and Linux)
 * Client: javascript, socket.io
 
 
-## Install
+## ytBackgammon server
 
-1. Python3 venv を作成
-2. gitクローン を作成
-3. ``setup.sh``を実行
+### 1. Install
 
-↓
-
-${HOME}/binに、「ytbg.sh」がコピーされる
+以下の操作で、${HOME}/binに、「ytbg.sh」がコピーされます。
 
 ```bash
+ホームディレクトリ直下に Python3 venv を作成
 $ cd ~
 $ python3 -m venv env1
+
+env1に gitクローンを作成
 $ cd env1
 $ git clone https://www.github.com/ytani01/ytBackgammon.git
+
+インストールスクリプトを実行
 $ cd ytBackgammon
 $ ./setup.sh
 ```
 
-## ytBackgammon server usage
+### 2. ytBackgammon server usage
 
 ```bash
 ytbg.sh ~/env1 -p {ポート番号} -i {画像ディレクトリ名} {サーバID}
@@ -124,6 +117,17 @@ ytbg.sh ~/env1 -p {ポート番号} -i {画像ディレクトリ名} {サーバI
 ポート番号: デフォルトは 5000
 画像ディレクトリ名: ``static`` からの相対パス名
 サーバID: 複数のサーバを立ち上げたときに、区別するための文字列
+
+
+### 3. Board Design
+
+オリジナルのデザインを作ることができます。
+以下のファイルをダウンロードして、参考にして下さい。
+
+* [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
+
+画像ファイルの保存先: ``~/env1/ytBackgammon/static/``ディレクトリ直下
+
 
 ## A. References 
 
