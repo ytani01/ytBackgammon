@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 MYNAME=`basename $0`
-images="images1a images0a images2 images3"
+images="images2 images0a images1a images3"
 
 for i in 1 2 3 4; do
     _port=`expr 5000 + $i`

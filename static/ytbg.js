@@ -4133,7 +4133,14 @@ window.onload = () => {
     const nav_el = document.getElementById("nav-drawer");
 
     // connect to server
-    const url = "http://" + document.domain + ":" + location.port + "/";
+    let url = `${document.location.protocol}//${document.domain}`;
+    console.log(`location.port=${location.port}`);
+    if ( location.port != "" ) {
+        url += ":" + location.port;
+    }
+    url += "/";
+    console.log(`url=${url}`);
+
     ws = io.connect(url);
 
     // initialize board

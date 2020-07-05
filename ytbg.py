@@ -26,7 +26,7 @@ app.config['SECRET_KEY'] = 'secret!'
 app.config['DEBUG'] = False
 app.config['JSON_AS_ASCII'] = False  # XXX 文字化け対策が効かない TBD
 
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins='*')
 
 svr_id = "0"
 svr = None
