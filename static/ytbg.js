@@ -2125,6 +2125,11 @@ class Dice extends PlayerItem {
                 val = 1;
             }
             this.set(val);
+
+            // if ( this.baord.is_double() ) {
+            //   
+            // }
+            
             roll_btn.emit_dice(roll_btn.get(), false, true);
             return false;
         }
