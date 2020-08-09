@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.94";
+const VERSION = "0.95";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -1418,7 +1418,7 @@ class Cube extends OnBoardImage {
             // ダブルが掛けられた状態
             if ( this.player == this.board.player ) {
                 if ( this.src_y == this.y1[0] ) {
-                    if ( this.y >= this.y1[0] ) {
+                    if ( this.y >= this.y0 ) {
                         this.accept_double();
                     } else {
                         // redouble
@@ -1426,7 +1426,7 @@ class Cube extends OnBoardImage {
                     }
                 }
                 if ( this.src_y == this.y1[1] ) {
-                    if ( this.y <= this.y1[1] ) {
+                    if ( this.y <= this.y0 ) {
                         this.accept_double();
                     } else {
                         // redouble
