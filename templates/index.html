@@ -97,12 +97,12 @@
       <input class="checkbox" id="clock_sw" type="checkbox" checked
              onChange="apply_clock_sw();">
       <input class="headerinput" id="clock_limit0" type="number" value="2"
-             step="0.5" style="width:55px"
+             min="0.5"  step="0.5" style="width:55px"
              onChange="apply_clock_limit(0);">
       <label class="headerinput" for"clock_limit0">m +</label>
 
       <input class="headerinput" id="clock_limit1" type="number" value="12"
-             style="width:55px"
+             min="1" step="1" style="width:55px"
              onChange="apply_clock_limit(1);">
       <label class="headerinput" for"clock_limit1">s</label>
     </header>

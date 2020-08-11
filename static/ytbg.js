@@ -579,11 +579,14 @@ class PlayerClock extends PlayerText {
 
     set_bg() {
         const limit = this.board.clock_limit.limit;
+        console.log(`limit=${limit}`)
+        console.log(`clock=${this.clock}`)
         this.bg_width = (this.clock[0] + this.clock[1]) /
             (limit[0] + limit[1]) * this.bg_width0;
         if ( this.bg_width < 1 ) {
             this.bg_width = 1;
         }
+        console.log(`bg_width=${this.bg_width}`);
         this.el_bg.style.width = this.bg_width + "px";
     }
 
@@ -618,7 +621,7 @@ class PlayerClock extends PlayerText {
         this.msec = Date.now() - this.start_time;
 
         if ( this.active && this.board.clock_sw ) {
-            this.clock[1] = (this.start_clock[1] * 1000 - this.msec) / 1000;
+            this.clock[1] = (this.start_clock[1] * 1000.0 - this.msec) / 1000;
 
             if ( this.clock[1] < 0 ) {
                 this.clock[0] = this.start_clock[0] + this.clock[1];
