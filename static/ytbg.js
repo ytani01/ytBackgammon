@@ -64,7 +64,7 @@
  *=====================================================
  */
 const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.95";
+const VERSION = "0.96";
 
 const GAMEINFO_FILE = "gameinfo.json";
 
@@ -591,7 +591,7 @@ class PlayerClock extends PlayerText {
      * @param {number[]} clock - sec
      */
     set(clock) {
-        console.log(`PlayerClock.set([${clock[0]},${clock[1]}])`);
+        //console.log(`PlayerClock.set([${clock[0]},${clock[1]}])`);
         this.clock = [clock[0], clock[1]];
         console.log(`PlayerClock.set():clock=${JSON.stringify(this.clock)}`);
         this.update_start_clock();
@@ -606,6 +606,9 @@ class PlayerClock extends PlayerText {
         return text;
     } // PlayerClock.to_str()
 
+    /**
+     *
+     */
     update_start_clock() {
         this.start_clock = [this.clock[0], this.clock[1]];
         this.start_time = Date.now();
@@ -1357,12 +1360,12 @@ class Cube extends OnBoardImage {
         console.log(`Cube.on_mouse_down_xy():this.board.plyaer=${this.board.player}`);
         console.log(`Cube.on_mouse_down_xy():this.board.turn=${this.board.turn}`);
         if ( this.board.turn >= 2 || this.board.turn < 0 ) {
-            // ゲーム開始時、終了時は、触れられない
+            // ゲーム開始時、終了時は、触れない
             return false;
         }
 
         if ( this.player !== undefined && this.player != this.board.player ) {
-            // 相手側にあるキューブは、触れられない
+            // 相手側にあるキューブは、触れない
             return false;
         }
         
@@ -1372,13 +1375,13 @@ class Cube extends OnBoardImage {
                 return false;
             }
             if ( this.player && this.player != this.board.player ) {
-                // 相手側にあるキューブは、触れられない
+                // 相手側にあるキューブは、触れない
                 return false;
             }
         }
 
         for (let rb of this.board.roll_btn) {
-            // ダイスがアクティブのときは、キューブに触れられない
+            // ダイスがアクティブのときは、キューブに触れない
             if ( rb.dice_active ) {
                 return false;
             }
