@@ -642,7 +642,7 @@ class PlayerClock extends PlayerText {
     } // PlayerClock.update()
 
     /**
-     * 
+     * クロックの動作を再開して、アクティブにする
      */
     resume() {
         console.log(`PlayerClock.resume():player=${this.player},clock[1]=${this.clock[1]}`);
@@ -651,7 +651,7 @@ class PlayerClock extends PlayerText {
     } // PlayerClock.start()
 
     /**
-     * 
+     * 猶予時間をリセットして、クロックをリジューム
      */
     start() {
         this.clock[1] = this.board.clock_limit.limit[1];
