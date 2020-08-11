@@ -1322,7 +1322,8 @@ class Cube extends OnBoardImage {
             val = 64;
         }
 
-        this.board.player_clock[player].change_turn();
+        //this.board.player_clock[player].change_turn();
+        this.board.player_clock[player].stop();
         this.emit(val, this.player, false);
     } // Cube.double()
 
