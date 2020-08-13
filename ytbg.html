@@ -44,7 +44,36 @@
     <h2 style="color:#222;">ネットワーク共有型バックギャモンボード</h2>
     <h2 style="color:#222;">(network shared backgammon board)</h2>
     <hr />
-
+    ビデオチャット(Jitsi、ジッツィ)との統合を実験中！
+    (アプリ不要、アカウント不要、完全無料、人数無制限)
+    <br/>
+    <strong>[お知らせ]</strong>
+    <ul>
+      <li> スマホの場合
+        「…モバイルアプリが必要です。…」と表示されますが、
+        <strong>[Webで起動する]</strong>を選択して下さい。
+      <li> スマホを縦にすると、相手側で画像が乱れることがあります。
+        <strong>なるべく横向きで</strong>ご利用下さい。
+      <li> 重く<strong>不安定になったら</strong>、
+        <strong>カメラを切って</strong>下さい。
+      <li> <strong>再入室</strong>する場合は、
+        ブラウザでこのページを<strong>リロード(再読込)</strong>して下さい。
+    </ul>
+    <div id="meet">
+      
+    </div>
+    <script src='https://meet.jit.si/external_api.js'></script>
+    <script>
+      const domain = 'meet.jit.si'; // Jitsi用に使用しているドメイン名
+      const options = {
+          roomName: 'ytani01', // チャットルーム名
+          width: 800, // ビデオチャット表示部分の幅
+          height: 550, // ビデオチャット表示部分の高さ
+          parentNode: document.querySelector('#meet') // ビデオチャットを表示する要素のID
+      };
+      const api = new JitsiMeetExternalAPI(domain, options);
+    </script>
+    <hr />
     <h1 style="color:#222;">[Main viewer] <span id="main_board_id"></span></h1>
     <h3 style="color:#222;">下段のボードから、ここに表示するボードを選んで下さい。</h3>
 
