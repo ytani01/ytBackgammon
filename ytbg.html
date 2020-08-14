@@ -38,14 +38,17 @@
           set_main(decodeURIComponent(id));
       };
     </script>
+    <script src='https://meet.jit.si/external_api.js'></script>
   </head>
-  <body style="background-image:url(./bg.png);width:1200px;">
+  <body style="background-image:url(./bg.png);width:900px;">
     <h1 style="color:#222;">【ytBackgammon】</h1>
     <h2 style="color:#222;">ネットワーク共有型バックギャモンボード</h2>
     <h2 style="color:#222;">(network shared backgammon board)</h2>
     <hr />
-    ビデオチャット(Jitsi、ジッツィ)との統合を実験中！
-    (アプリ不要、アカウント不要、完全無料、人数無制限)
+    <h3>ビデオチャット(Jitsi、ジッツィ)との統合を実験中！</h3>
+    <p>
+      (アプリ不要、アカウント不要、完全無料、人数無制限)
+    </p>
     <br/>
     <strong>[お知らせ]</strong>
     <ul>
@@ -59,25 +62,13 @@
       <li> <strong>再入室</strong>する場合は、
         ブラウザでこのページを<strong>リロード(再読込)</strong>して下さい。
     </ul>
-    <div id="meet">
-      
-    </div>
-    <script src='https://meet.jit.si/external_api.js'></script>
-    <script>
-      const domain = 'meet.jit.si'; // Jitsi用に使用しているドメイン名
-      const options = {
-          roomName: 'ytani01', // チャットルーム名
-          width: 800, // ビデオチャット表示部分の幅
-          height: 550, // ビデオチャット表示部分の高さ
-          parentNode: document.querySelector('#meet') // ビデオチャットを表示する要素のID
-      };
-      const api = new JitsiMeetExternalAPI(domain, options);
-    </script>
+    <br />
     <hr />
     <h1 style="color:#222;">[Main viewer] <span id="main_board_id"></span></h1>
     <h3 style="color:#222;">下段のボードから、ここに表示するボードを選んで下さい。</h3>
-
-    <div style="float:left;">
+    
+    <!--    <div style="float:left;"> -->
+    <div>
       <div style="width:880px;height:560px">
         <iframe id="main_viewer"
                 name="main"
@@ -87,7 +78,10 @@
         </iframe>
       </div>
     </div>
-
+    [チャット画面] …別のタブで開く場合は
+    <a href="https://meet.jit.si/ytani01" target="_blank">【こちら】</a>
+    <div id="meet">
+    </div>
     <div style="float:left;">
       <a href="https://ytbg1.ytani.net/?board=1&sound=off"
          target="main" style="color:#222;"
@@ -144,5 +138,15 @@
       </div>
     </div>
 
+    <script>
+      const domain = 'meet.jit.si'; // Jitsi用に使用しているドメイン名
+      const options = {
+          roomName: 'ytani01', // チャットルーム名
+          width: 860, // ビデオチャット表示部分の幅
+          height: 550, // ビデオチャット表示部分の高さ
+          parentNode: document.querySelector('#meet') // ビデオチャットを表示する要素のID
+      };
+      const api = new JitsiMeetExternalAPI(domain, options);
+    </script>
   </body>
 </html>
