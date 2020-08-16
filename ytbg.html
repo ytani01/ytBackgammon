@@ -85,9 +85,11 @@
         </iframe>
       </div>
     </div>
-    [チャット画面] …別のタブで開く場合は
-    <a href="https://meet.jit.si/ytani01" target="_blank">【こちら】</a>
-    <div id="meet">
+    <div style="width:450px;float:left;">
+      [チャット画面] …別のタブで開く場合は
+      <a href="https://meet.jit.si/ytani01" target="_blank">【こちら】</a>
+      <div id="meet">
+      </div>
     </div>
     <div style="float:left;">
       <a href="https://ytbg1.ytani.net/?board=1&sound=off"
@@ -149,11 +151,12 @@
       const domain = 'meet.jit.si'; // Jitsi用に使用しているドメイン名
       const options = {
           roomName: 'ytani01', // チャットルーム名
-          width: 860, // ビデオチャット表示部分の幅
-          height: 550, // ビデオチャット表示部分の高さ
+          width: 415, // ビデオチャット表示部分の幅
+          height: 260, // ビデオチャット表示部分の高さ
           parentNode: document.querySelector('#meet') // ビデオチャットを表示する要素のID
       };
       const api = new JitsiMeetExternalAPI(domain, options);
+      api.executeCommand('toggleLobby', true);
     </script>
   </body>
 </html>
