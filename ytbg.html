@@ -71,7 +71,7 @@
     </ul>
     <br />
     <hr />
-    <h1 style="color:#222;">[Main viewer] <span id="main_board_id"></span></h1>
+    <h1 style="color:#222;">[Main viewer] = <span id="main_board_id"></span></h1>
     <h3 style="color:#222;">下段のボードから、ここに表示するボードを選んで下さい。</h3>
     
     <!--    <div style="float:left;"> -->
@@ -85,8 +85,8 @@
         </iframe>
       </div>
     </div>
-    <div style="width:450px;float:left;">
-      [チャット画面] …別のタブで開く場合は
+    <div style="width:890px;float:left;">
+      <strong>[チャット画面]</strong> …別のタブで開く場合は
       <a href="https://meet.jit.si/ytani01" target="_blank">【こちら】</a>
       <div id="meet">
       </div>
@@ -94,8 +94,7 @@
     <div style="float:left;">
       <a href="https://ytbg1.ytani.net/?board=1&sound=off"
          target="main" style="color:#222;"
-         onClick="set_main('Board_1');">[ Board_1 ]</a>
-
+         onClick="set_main('Board_1');"><h3>[ Board_1 ]</h3></a>
       <div style="width:450px;height:270px">
         <iframe id="Board_1"
                 src="https://ytbg1.ytani.net/"
@@ -108,8 +107,7 @@
     <div style="float:left;">
       <a href="https://ytbg2.ytani.net/?board=2&sound=off"
          target="main" style="color:#222;"
-         onClick="set_main('Board_2');">[ Board_2 ]</a>
-
+         onClick="set_main('Board_2');"><h3>[ Board_2 ]</h3></a>
       <div style="width:450px;height:270px">
         <iframe id="Board_2"
                 src="https://ytbg2.ytani.net/"
@@ -122,8 +120,7 @@
     <div style="float:left;">
       <a href="https://ytbg3.ytani.net/?board=3&sound=off"
          target="main" style="color:#222;"
-         onClick="set_main('Board_3');">[ Board_3 ]</a>
-
+         onClick="set_main('Board_3');"><h3>[ Board_3 ]</h3></a>
       <div style="width:450px;height:270px">
         <iframe id="Board_3"
                 src="https://ytbg3.ytani.net/"
@@ -136,8 +133,7 @@
     <div style="float:left;">
       <a href="https://ytbg4.ytani.net/?board=4&sound=off"
          target="main" style="color:#222;"
-         onClick="set_main('Board_4')">[ Board_4 ]</a>
-
+         onClick="set_main('Board_4')"><h3>[ Board_4 ]</h3></a>
       <div style="width:450px;height:270px">
         <iframe id="Board_4"
                 src="https://ytbg4.ytani.net/"
@@ -151,8 +147,8 @@
       const domain = 'meet.jit.si'; // Jitsi用に使用しているドメイン名
       const options = {
           roomName: 'ytani01', // チャットルーム名
-          width: 415, // ビデオチャット表示部分の幅
-          height: 260, // ビデオチャット表示部分の高さ
+          width: 880, // ビデオチャット表示部分の幅
+          height: 500, // ビデオチャット表示部分の高さ
           parentNode: document.querySelector('#meet') // ビデオチャットを表示する要素のID
       };
       const api = new JitsiMeetExternalAPI(domain, options);
