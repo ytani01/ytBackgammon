@@ -1,11 +1,11 @@
 wheel
 click
 Flask
-Flask-SocketIO
+Flask-SocketIO==4.3.2
 itsdangerous
 Jinja2
 MarkupSafe
 python-engineio
-python-socketio
+python-socketio==3.1.2
 six
 Werkzeug
