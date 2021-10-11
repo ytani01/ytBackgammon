@@ -2,7 +2,7 @@
 
 # ytBackgammon -- ネットワーク共有型バックギャモンボード (Network Shared Backgammon Board)
 
-http://www.ytani.net:8080/ytbackgammon/
+--> [Play!!](https://www.ytani.net/ytbackgammon/)
 
 ## 特徴
 
