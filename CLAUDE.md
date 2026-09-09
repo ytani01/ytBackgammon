@@ -46,10 +46,10 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   イベント登録だけを行い、処理は `svr` に委譲する。`svr` はグローバルで、
   `main()` の中で生成される。`template_folder` / `static_folder` は
   `__file__` から組み立てた `webroot/` の絶対パスなので、どこから起動しても解決する
-- `src/ytbg/ytBackgammonServer.py` — サーバ側の中心。クライアントからの `json`
+- `src/ytbg/yt_backgammon_server.py` — サーバ側の中心。クライアントからの `json`
   メッセージの分岐、履歴の管理、`~/ytbg-{server_id}.json` への保存・読み込み、
   全クライアントへの broadcast
-- `src/ytbg/ytBackgammon.py` — `gameinfo`（盤面の状態そのもの）を保持し、
+- `src/ytbg/yt_backgammon.py` — `gameinfo`（盤面の状態そのもの）を保持し、
   更新するだけのクラス。ルール判定は持たない
 - `src/ytbg/webroot/static/ytbg.js`（4000 行超）— クライアントのほぼ全て。
   ファイル先頭のコメントにクラス階層図がある

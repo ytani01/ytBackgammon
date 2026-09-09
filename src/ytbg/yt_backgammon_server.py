@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
 #
 # (c) Yoichi Tanibayashi
 #
 """
-ytBackgammon.py
+yt_backgammon_server.py
 """
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
@@ -12,12 +11,13 @@ import copy
 import json
 import os
 import time
+from pathlib import Path
 
 from flask import render_template
 from flask_socketio import emit
 
-from .MyLogger import get_logger
-from .ytBackgammon import ytBackgammon
+from .my_logger import get_logger
+from .yt_backgammon import ytBackgammon
 
 
 class ytBackgammonServer:
@@ -38,8 +38,8 @@ class ytBackgammonServer:
         self._svr_id = svr_id
         self._image_dir = image_dir
 
-        self._datafile_path = '%s/%s-%s.json' % (
-            self.DATAFILE_DIR, self.DATAFILE_NAME, self._svr_id)
+        self._datafile_path = (
+            f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.json')
         self._log.debug('_datafile_path=%s', self._datafile_path)
 
         self._client_sid = []
@@ -50,7 +50,7 @@ class ytBackgammonServer:
         self._bg = ytBackgammon(self._svr_ver, debug=self._dbg)
         self._repeat_flag = False
 
-        [hist_len, fwd_hist_len] = self.load_data(self._datafile_path)
+        [hist_len, _fwd_hist_len] = self.load_data(self._datafile_path)
         if hist_len < 1:
             self._log.warning('load_data(%s): error', self._datafile_path)
             self.add_history(self._bg._gameinfo)
@@ -155,7 +155,6 @@ class ytBackgammonServer:
 
         self._repeat_flag = False
         self.save_data(self._datafile_path)
-        return
 
     def forward_hist(self, n=1, sleep_sec=0.1):
         """
@@ -197,7 +196,6 @@ class ytBackgammonServer:
 
         self._repeat_flag = False
         self.save_data(self._datafile_path)
-        return
 
     def hist_ent2str(self, h):
         j_str = ''
@@ -256,7 +254,7 @@ class ytBackgammonServer:
         j_str += '}\n'
 
         try:
-            with open(path_name, "w") as f:
+            with Path(path_name).open("w") as f:
                 f.write(j_str)
         except Exception as e:
             self._log.warning('%s:%s.', type(e).__name__, e)
@@ -278,7 +276,7 @@ class ytBackgammonServer:
         self._log.debug('path_name=%s', path_name)
 
         try:
-            with open(path_name) as f:
+            with Path(path_name).open() as f:
                 data = json.load(f)
         except Exception as e:
             self._log.warning('%s:%s.', type(e).__name__, e)
@@ -361,9 +359,7 @@ class ytBackgammonServer:
             self.emit_gameinfo(0)
             return
 
-        #
-        #
-        #
+        # ここから下は return せず、末尾の add_history と broadcast まで落ちる
         if msg['type'] == 'put_checker':
             # data: {'ch': int, 'p': int, 'idx': int}
             self._bg.put_checker(msg['data']['ch'],

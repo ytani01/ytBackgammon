@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 #
 # (c) 2019 Yoichi Tanibayashi
 #
 """
-MyLogger.py
+my_logger.py
 
 Usage:
 --
-from .MyLogger import get_logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
+from .my_logger import get_logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 class A:
     _log = get_logger(__name__, False)
@@ -35,8 +34,17 @@ def main(debug):
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/03/31'
 
-from logging import getLogger, StreamHandler, Formatter
-from logging import NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL
+from logging import (
+    CRITICAL,
+    DEBUG,
+    ERROR,
+    INFO,
+    NOTSET,
+    WARNING,
+    Formatter,
+    StreamHandler,
+    getLogger,
+)
 
 
 class MyLogger:
@@ -57,9 +65,11 @@ class MyLogger:
 
     def get_logger(self, name, debug):
         logger = self.logger.getChild(name)
-        if debug in (NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL):
-            logger.setLevel(debug)
-        elif type(debug) == int:
+        # 後半は 1 や 55 のような生の int を拾うために要る（前半だけでは
+        # 足りない）。isinstance にはしないこと。bool が int 扱いになり、
+        # debug=True が setLevel(True) (= レベル 1) になってしまう
+        if (debug in (NOTSET, DEBUG, INFO, WARNING, ERROR, CRITICAL)
+                or type(debug) == int):
             logger.setLevel(debug)
         elif debug:
             logger.setLevel(DEBUG)

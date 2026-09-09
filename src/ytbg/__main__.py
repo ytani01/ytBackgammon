@@ -16,10 +16,10 @@ from flask import Flask, request
 from flask_socketio import SocketIO
 
 from . import __prog_name__, __version__
-from .MyLogger import get_logger
-from .ytBackgammonServer import ytBackgammonServer
+from .my_logger import get_logger
+from .yt_backgammon_server import ytBackgammonServer
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+CONTEXT_SETTINGS = {'help_option_names': ['-h', '--help']}
 
 MY_NAME = __prog_name__
 VERSION = __version__

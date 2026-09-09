@@ -2,14 +2,17 @@
 # (c) Yoichi Tanibayashi
 #
 """
-ytBackgammon.py
+yt_backgammon.py
 """
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
 import copy
-from .MyLogger import get_logger
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+from typing import Any
+
+from .my_logger import get_logger
+
+CONTEXT_SETTINGS = {'help_option_names': ['-h', '--help']}
 
 
 class ytBackgammon:
@@ -22,7 +25,7 @@ class ytBackgammon:
 
         self.svr_ver = svr_ver
 
-        self._gameinfo = None
+        self._gameinfo: dict[str, Any] = {}
         self.init_gameinfo()
 
         self.player = None
