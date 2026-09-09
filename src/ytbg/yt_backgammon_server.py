@@ -404,10 +404,6 @@ class ytBackgammonServer:
             # data: {'player': int}
             self._bg.resign(msg['data'])
 
-        if msg['type'] == 'set_clock_swith':
-            # data: {'clock_switch': bool}
-            pass
-
         if msg['type'] == 'set_clock_limit':
             # data: {'index': int, 'clock_limit': int}
             self._bg.set_clock_limit(msg['data'])
@@ -415,22 +411,6 @@ class ytBackgammonServer:
         if msg['type'] == 'set_player_clock':
             # data: {'player': int, 'clock': [int(sec), int(sec)]}
             self._bg.set_player_clock(msg['data'])
-
-        if msg['type'] == 'resume_clcok':
-            # data: {'player': int}
-            pass
-
-        if msg['type'] == 'start_clcok':
-            # data: {'player': int}
-            pass
-
-        if msg['type'] == 'stop_clcok':
-            # data: {'player': int}
-            pass
-
-        if msg['type'] == 'reset_clcok':
-            # data: {'player': int}}
-            pass
 
         # append history or not
         if msg['history']:

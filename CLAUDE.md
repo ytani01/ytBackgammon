@@ -112,9 +112,10 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **両方に同じ名前で書かれている**ので、`type` を足すときは両方直す。
 `history: true` を付けたメッセージだけが履歴に 1 手として積まれる。
 
-なお、`ytBackgammonServer.on_json()` の `set_clock_swith`、`resume_clcok`、
-`start_clcok` などは綴りが誤っているうえ中身も `pass` で、クロック関係は
-クライアント側だけで完結している。
+なお、クロックの進行はクライアント側だけで動いている。サーバの `on_json()`
+にあるのは `set_clock_limit` と `set_player_clock` の 2 つだけで、`gameinfo` を
+更新する。`start_clock` / `stop_clock` などは分岐を持たず、末尾の
+`add_history` と broadcast へ落ちる（TODO-012）。
 
 ### 履歴（戻す・進める）
 

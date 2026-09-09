@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-009、TODO-010、TODO-012、TODO-013。**
-これまでに 8 件を決着させた。
+**残っている項目: TODO-004、TODO-009、TODO-010、TODO-013。**
+これまでに 9 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-014` から。**
 
 ---
@@ -145,40 +145,6 @@ asyncio へ移せば待ちが `await` として見え、通信層も薄くなる
 
 ---
 
-## TODO-012. on_json のクロック系の分岐を消す
-
-- [ ] `set_clock_swith` / `resume_clcok` / `start_clcok` / `stop_clcok` /
-      `reset_clcok` の 5 つの分岐を消す
-- [ ] `CLAUDE.md` の該当記述を直す
-- [ ] ブラウザでクロックが今までどおり動くことを確かめる
-
-`on_json()` のこの 5 つは中身が `pass` で、しかも綴りが誤っている。
-
-| サーバ（`on_json`） | クライアント（`ytbg.js`） |
-|---|---|
-| `set_clock_swith` | `set_clock_switch` |
-| `resume_clcok` | `resume_clock` |
-| `start_clcok` | `start_clock` |
-| `stop_clcok` | `stop_clock` |
-| `reset_clcok` | `reset_clock` |
-
-名前が一致しなくても末尾の `add_history` と broadcast へ落ちるので、いまも
-正しく動いている（クロックはクライアント側で完結している）。消しても
-経路は変わらない。
-
-TODO-009 で「`type` はサーバとクライアントの両方に同じ名前で書く」を
-写すときに、誤った綴りごと運ばないよう先に消す。サーバ側でクロックを
-持つことにしたら、そのときに改めて足す。
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | verifier |
-
-- `pass` を消すだけで挙動は変わらないのでレビューの担当は置かない
-- ブラウザでクロックが動くことの確認は verifier
-
----
-
 ## TODO-013. on_json の分岐ごとのテストを足す
 
 **TODO-012 が済んでから着手する。** 消すものを消した最終形に
@@ -218,6 +184,7 @@ TODO-009 で通信層を入れ替えたときに壊れるとしたら `on_json()
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-012.** on_json のクロック系の分岐を消す](archives/todo/TODO-012.%20on_json%20のクロック系の分岐を消す.md)
 - [**TODO-007.** board.roll が使われていない](archives/todo/TODO-007.%20board.roll%20が使われていない.md)
 - [**TODO-011.** ruff の指摘を解消する](archives/todo/TODO-011.%20ruff%20の指摘を解消する.md)
 - [**TODO-008.** app_top() と top.html を消す](archives/todo/TODO-008.%20app_top()%20と%20top.html%20を消す.md)
