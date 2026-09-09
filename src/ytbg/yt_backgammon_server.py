@@ -425,13 +425,6 @@ class ytBackgammonServer:
         # broadcast
         emit('json', msg, broadcast=True)
 
-    def app_top(self):
-        self.__log.debug('')
-        return render_template('top.html',
-                               name=self._svr_name,
-                               version=self._svr_ver,
-                               image_dir=self._image_dir)
-
     def app_index(self):
         self.__log.debug('')
         return render_template('index.html',

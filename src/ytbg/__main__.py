@@ -50,7 +50,7 @@ svr = None
 
 
 @app.route('/')
-def top():
+def index_top():
     _log.debug('')
     return svr.app_index()
 
