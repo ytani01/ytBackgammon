@@ -25,6 +25,7 @@ uv run ytbg --help                     # ytbg.sh は uv run ytbg を呼ぶだけ
 ./ytbg-boot.sh   # ポート 5001〜5004 で 4 サーバを同時起動
 ./ytbg-stop.sh   # ps + grep で kill
 
+uv run pytest
 uv run ruff check .
 uv run mypy src
 ```
@@ -41,8 +42,24 @@ websocket を扱えず、クライアントが切断するたびにログへエ�
 渡すと対話デバッガが `0.0.0.0` に出てしまうため（TODO-001）。アクセスログだけは
 `pywsgi` が stderr へ直接書くので、`MyLogger` の書式とは揃わない。
 
-テストの仕組みは無い。動作確認はブラウザで実際に触って行う。
+テストは `tests/` にあり、`uv run pytest` で走る（TODO-006）。まだ骨格で、
+`gameinfo` の更新、履歴、保存・読み込みだけを見ている。**ブラウザ側の動作確認は
+今までどおり実際に触って行う**（クライアントの JS はテストしていない）。
+
+テストを足すときの注意:
+
+- **`gevent.monkey.patch_all()` を呼ばない。** `backward_hist()` /
+  `forward_hist()` には `sleep_sec=0` を渡す
+- `ytBackgammonServer` はコンストラクタの中で `load_data()` を呼び、
+  保存先を `DATAFILE_DIR`（`$HOME`）から組み立てる。`conftest.py` の
+  `bg_server` フィクスチャが `DATAFILE_DIR` を `tmp_path` に差し替えている
+  ので、利用者の `~/ytbg-*.json` は読み書きされない
+- `flask_socketio.emit` はリクエストコンテキストの外では使えない。
+  同じフィクスチャが `yt_backgammon_server.emit` を差し替え、呼び出し引数を
+  `emitted` フィクスチャへ積んでいる
+
 ruff と mypy は入っているが、既存コードの指摘はまだ残っている（TODO-002）。
+`mypy src` は `tests/` を見ていない。
 
 ## 構成
 

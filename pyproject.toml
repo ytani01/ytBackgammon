@@ -25,6 +25,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "mypy>=2.3.1",
+    "pytest>=9.1.1",
     "ruff>=0.16.3",
 ]
 
@@ -36,6 +37,9 @@ exclude = ["*.xcf", "*.pptx"]
 [tool.hatch.build.targets.sdist]
 # docs にはデモ動画 (数十 MB) がある。archives は TODO の記録
 exclude = ["/docs", "/archives", "*.xcf", "*.pptx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 78

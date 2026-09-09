@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-005、TODO-006。** これまでに 3 件を決着させた。
+**残っている項目: TODO-004、TODO-005。** これまでに 4 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-007` から。**
 
 ---
@@ -70,44 +70,12 @@ loguru の `MM/DD HH:mm:ss アイコン LEVEL file:line function()>` へ）。
 
 ---
 
-## TODO-006. tests/ を作って `uv run pytest` でテストする
-
-- [ ] `pytest` を dev 依存に足し、`pyproject.toml` に `[tool.pytest.ini_options]` を書く
-- [ ] `tests/conftest.py` — `ytBackgammon` と `ytBackgammonServer` のフィクスチャ
-- [ ] `tests/test_yt_backgammon.py` — `init_gameinfo()` の構造、`put_checker()` の
-      ID からプレーヤーを求める計算、`cube` / `dice` / `set_turn`
-- [ ] `tests/test_history.py` — `add_history` / `backward_hist` / `forward_hist` /
-      `hist_ent2str`
-- [ ] `tests/test_save_load.py` — `tmp_path` に保存して読み込み、`gameinfo` が戻ること
-- [ ] `CLAUDE.md` の「テストの仕組みは無い」を実態に合わせて直す
-
-これまでテストの仕組みが無く、動作確認はブラウザで実際に触るだけだった。
-まずは骨格を作り、今後必要に応じて足していく。
-
-- **各ファイル 2〜4 本ずつ。** 網羅は狙わない。今後テストを足す場所を
-  決めるのが目的
-- `ytBackgammonServer.__init__` は SocketIO インスタンスを取る。
-  `monkey.patch_all()` を呼ばずに生成できる形をフィクスチャで確かめる。
-  `emit` は差し替える
-- `save_data()` / `load_data()` はパスを引数で受け取るので、
-  `~/ytbg-{server_id}.json` ではなく `tmp_path` を渡す
-- **既存コードは変えない。** テストを書く途中で不具合が見つかったら、
-  直さずに報告し、別項目にする
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier |
-
-- 挙動は変えないのでレビューの担当は入れない
-- 複数のファイルにまたがり、設定・テスト・文書がまとまって要るので実装も分ける
-
----
-
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-006.** tests ディレクトリを作って pytest でテストする](archives/todo/TODO-006.%20tests%20ディレクトリを作って%20pytest%20でテストする.md)
 - [**TODO-003.** 切断のたびにログへ ConnectionError と 500 が出る](archives/todo/TODO-003.%20切断のたびにログへ%20ConnectionError%20と%20500%20が出る.md)
 - [**TODO-002.** ruff と mypy の指摘を解消する](archives/todo/TODO-002.%20ruff%20と%20mypy%20の指摘を解消する.md)
 - [**TODO-001.** uv への移行](archives/todo/TODO-001.%20uv%20への移行.md)
