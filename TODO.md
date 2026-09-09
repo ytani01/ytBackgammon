@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004。** これまでに 3 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-005` から。**
+**残っている項目: TODO-004、TODO-005。** これまでに 3 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-006` から。**
 
 ---
 
@@ -28,6 +28,45 @@ GIL が解放され、他のスレッドが進めた。**振る舞いが変わ�
 |      | main | 担当 |
 |------|------|------|
 | 見込み | Opus 5 / effort high | verifier + reviewer |
+
+---
+
+## TODO-005. ログを my_logger.py から mylog.py（loguru）へ移す
+
+- [ ] `src/ytbg/mylog.py` を tmr から持ってくる
+- [ ] ログ呼び出し 47 箇所を書き換える（うち 32 箇所は `%s` 書式）
+- [ ] `my_logger.py` を消す
+- [ ] `CLAUDE.md` の「書き方の慣習」を直す
+
+`~/work/tmr/src/tmr/mylog.py` を使う。loguru のグローバル logger に名前を
+付けて、名前ごとに水準を変えられるようにしたもの。
+
+着手前に相談して決めたこと:
+
+- **`src/ytbg/mylog.py` にコピーする。** 依存に増えるのは loguru だけ。
+  tmr とは別々に持つので、片方を直してももう片方には反映されない
+- **`%s` 書式は loguru の `{}` に書き換える。** f-string にすると、
+  出力しない水準でも毎回文字列を作ることになる（`gameinfo` 全体を出す
+  箇所があるので効いてくる）
+- **クラスの `debug` 引数は落とす。** クラス本体に
+  `__log = getLogger(__qualname__)` を置き、`main()` の先頭で
+  `loggerInit(debug)` を 1 回だけ呼ぶ。TODO-003 で見送った
+  「`ytBackgammonServer(..., debug=True)` が固定」も、これで消える
+
+書き換えの量:
+
+| ファイル | ログ呼び出し |
+|---|---|
+| `yt_backgammon_server.py` | 26 |
+| `yt_backgammon.py` | 15 |
+| `__main__.py` | 6 |
+
+ログの書式も変わる（`HH:MM:SS LEVEL filename.name.funcName:lineno>` から
+loguru の `MM/DD HH:mm:ss アイコン LEVEL file:line function()>` へ）。
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
 
 ---
 
