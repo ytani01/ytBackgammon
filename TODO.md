@@ -14,10 +14,10 @@
   `templates/` と `static/` は ytsched に倣って `src/ytbg/webroot/` へ）
 - [ ] 依存を最新へ（Flask 3 / Flask-SocketIO 5.x）。`emit(broadcast=True)` と
   `JSON_AS_ASCII` の扱いを直す
-- [ ] クライアント側の socket.io を 1.3.5 → 4.x へ（`templates/index.html`）
+- [ ] クライアント側の socket.io を 1.3.5 → 4.x へ上げる（`templates/index.html`）
 - [ ] `setup.sh` を廃止し、`ytbg.sh` / `ytbg-boot.sh` / `ytbg-stop.sh` を
   `uv run` ベースに書き換える
-- [ ] `requirements.txt` を削除、`.gitignore` を uv 向けに直す
+- [ ] `requirements.txt` を削除し、`.gitignore` を uv 向けに直す
 - [ ] `README.md` と `CLAUDE.md` の実行手順を更新する
 
 他のプロジェクト（ytsched）と同じく uv に揃える。以下は決まっているので
@@ -78,7 +78,7 @@ TODO-001 の確認中に見つかった。クライアントが切断したタ�
   WSGI のレベルで 500 を返しているだけ。**機能は壊れていない**
 - **Werkzeug の開発サーバを使っていることが原因かもしれない。**
   そうであれば、本番向けの WSGI サーバに替えるかどうかという話になる
-  （TODO-001 では「別の判断」として保留した）
+  （TODO-001 では別の判断として保留した）
 - ブラウザでタブを閉じたときにも同じことが起きるかは未確認
 
 |      | main | 担当 |
