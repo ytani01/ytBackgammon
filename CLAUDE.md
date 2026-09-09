@@ -35,12 +35,15 @@ websocket を扱えず、クライアントが切断するたびにログへエ�
 `__main__.py` は先頭で `monkey.patch_all()` を呼んでいるので、**import の順番を
 変えない**（履歴の連続再生が `time.sleep()` を使っており、置き換えないと
 再生中にサーバ全体が止まる）。同じ理由で、**`__init__.py` に `socket` や `ssl` を
-使う import を足さない**（patch より前に読まれてしまう）。
+使う import を足さない**（patch より前に読まれてしまう）。`mylog.py`（loguru）も
+`socket` / `ssl` / `asyncio` を引き込むので、`__init__.py` には置かない
+（TODO-005）。
 
-`-d` / `--debug` はログレベルを DEBUG にし、gevent のアクセスログ
-（`socketio.run()` の `log_output`）を出す。Flask の debug モードには渡していない。
+`-d` / `--debug` は `main()` の先頭の `loggerInit(debug)` に渡してログの水準を
+DEBUG にし、gevent のアクセスログ（`socketio.run()` の `log_output`）を出す。
+Flask の debug モードには渡していない。
 渡すと対話デバッガが `0.0.0.0` に出てしまうため（TODO-001）。アクセスログだけは
-`pywsgi` が stderr へ直接書くので、`MyLogger` の書式とは揃わない。
+`pywsgi` が stderr へ直接書くので、loguru の書式とは揃わない。
 
 テストは `tests/` にあり、`uv run pytest` で走る（TODO-006）。まだ骨格で、
 `gameinfo` の更新、履歴、保存・読み込みだけを見ている。**ブラウザ側の動作確認は
@@ -132,7 +135,20 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 
 ## 書き方の慣習
 
-- ログは `MyLogger.get_logger()` を使い、クラスでは `__class__._log` に入れる
+- ログは `mylog.py`（loguru）を使う（TODO-005）。クラス本体に
+  `__log = getLogger(__qualname__)` を置き、`self.__log.debug(...)` で呼ぶ。
+  クラスの無いモジュールは先頭に `_log = getLogger("main")` を置く。
+  `loggerInit(debug)` は `main()` の先頭で 1 度だけ呼ぶ。
+  `main()` 以外の入口（`tests/conftest.py` など）でも呼ぶこと。
+  呼ばないと loguru の既定ハンドラが残り、DEBUG が全部 stderr に出る
+- **ログのメッセージは f-string にせず、`{}` と引数で渡す**
+  （`self.__log.debug('data={}', data)`）。loguru の書き方に合わせ、
+  値を引数のまま残すため。**速さのためではない**（TODO-005）。
+  この `mylog.py` はハンドラを `level=0` で足してフィルタで水準を見るので、
+  loguru はフィルタより先に書式を組み立てる。つまり
+  **水準で抑制されるログでも文字列は作られる**。f-string にしても速さは変わらない。
+  代わりに、メッセージにリテラルの `{` `}` を書いたり、`{}` の数と引数の数が
+  合わなかったりすると、抑制される水準でも実行時に例外になる
 - コード内のコメント・docstring は日本語と英語が混在している。周りに合わせる
 - クライアント側の座標は `Board` の `this.bx` / `this.by` の配列を基準に
   組み立てられている。位置を直すときはこの配列を見る

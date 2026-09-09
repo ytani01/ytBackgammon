@@ -16,7 +16,7 @@ from pathlib import Path
 from flask import render_template
 from flask_socketio import emit
 
-from .my_logger import get_logger
+from .mylog import getLogger
 from .yt_backgammon import ytBackgammon
 
 
@@ -25,13 +25,12 @@ class ytBackgammonServer:
     DATAFILE_NAME = 'ytbg'
     SEC_CHECKER_MOVE = 0.2
 
-    _log = get_logger(__name__, False)
+    __log = getLogger(__qualname__)
 
-    def __init__(self, svr_name, svr_ver, svr_id, image_dir, debug=False):
-        self._dbg = debug
-        __class__._log = get_logger(__class__.__name__, self._dbg)
-        self._log.debug('svr_name=%s, svr_ver=%s, svr_id=%s, image_dir=%s',
-                        svr_name, svr_ver, svr_id, image_dir)
+    def __init__(self, svr_name, svr_ver, svr_id, image_dir):
+        self.__log.debug(
+            'svr_name={}, svr_ver={}, svr_id={}, image_dir={}',
+            svr_name, svr_ver, svr_id, image_dir)
 
         self._svr_name = svr_name
         self._svr_ver = svr_ver
@@ -40,26 +39,26 @@ class ytBackgammonServer:
 
         self._datafile_path = (
             f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.json')
-        self._log.debug('_datafile_path=%s', self._datafile_path)
+        self.__log.debug('_datafile_path={}', self._datafile_path)
 
         self._client_sid = []
         self._history = []
         self._fwd_hist = []
         self._cur_sn = 0
 
-        self._bg = ytBackgammon(self._svr_ver, debug=self._dbg)
+        self._bg = ytBackgammon(self._svr_ver)
         self._repeat_flag = False
 
         [hist_len, _fwd_hist_len] = self.load_data(self._datafile_path)
         if hist_len < 1:
-            self._log.warning('load_data(%s): error', self._datafile_path)
+            self.__log.warning('load_data({}): error', self._datafile_path)
             self.add_history(self._bg._gameinfo)
 
     def new_game(self):
         """
         New game
         """
-        self._log.debug('')
+        self.__log.debug('')
 
         score0 = self._bg._gameinfo['score'][0]
         score1 = self._bg._gameinfo['score'][1]
@@ -80,7 +79,7 @@ class ytBackgammonServer:
         self.add_history(self._bg._gameinfo)
 
     def add_history(self, gameinfo=None):
-        self._log.debug('gameinfo=%s', gameinfo)
+        self.__log.debug('gameinfo={}', gameinfo)
 
         if gameinfo is not None:
             self._fwd_hist = []
@@ -92,7 +91,7 @@ class ytBackgammonServer:
             gameinfo['sn'] = self._cur_sn
             self._history.append(copy.deepcopy(gameinfo))
             self.save_data(self._datafile_path)
-            self._log.debug('history=(%d)', len(self._history))
+            self.__log.debug('history=({})', len(self._history))
 
     def emit_gameinfo(self, sec=0, history_flag=False):
         """
@@ -126,7 +125,7 @@ class ytBackgammonServer:
         sleep_sec : float
             sleep seconds
         """
-        self._log.debug('n=%d, sleep_sec=%s', n, sleep_sec)
+        self.__log.debug('n={}, sleep_sec={}', n, sleep_sec)
 
         count = 0
         sec = self.SEC_CHECKER_MOVE
@@ -142,8 +141,8 @@ class ytBackgammonServer:
             self._fwd_hist.append(self._history.pop())
             self._bg._gameinfo = copy.deepcopy(self._history[-1])
 
-            self._log.debug('_history=(%d), _fwd_hist=(%d)',
-                            len(self._history), len(self._fwd_hist))
+            self.__log.debug('_history=({}), _fwd_hist=({})',
+                             len(self._history), len(self._fwd_hist))
 
             self.emit_gameinfo(sec, history_flag=True)
 
@@ -167,7 +166,7 @@ class ytBackgammonServer:
         sleep_sec : float
             sleep seconds
         """
-        self._log.debug('n=%s, sleep_sec=%s', n, sleep_sec)
+        self.__log.debug('n={}, sleep_sec={}', n, sleep_sec)
 
         count = 0
         sec = self.SEC_CHECKER_MOVE
@@ -183,8 +182,8 @@ class ytBackgammonServer:
             self._history.append(self._fwd_hist.pop())
             self._bg._gameinfo = copy.deepcopy(self._history[-1])
 
-            self._log.debug('_history=(%d), _fwd_hist=(%d)',
-                            len(self._history), len(self._fwd_hist))
+            self.__log.debug('_history=({}), _fwd_hist=({})',
+                             len(self._history), len(self._fwd_hist))
 
             self.emit_gameinfo(sec, history_flag=True)
 
@@ -234,7 +233,7 @@ class ytBackgammonServer:
         path_name: str
             full path name of json data file
         """
-        self._log.debug('path_name=%s', path_name)
+        self.__log.debug('path_name={}', path_name)
 
         j_str = '{\n'
         j_str += '  "history": [\n'
@@ -257,7 +256,7 @@ class ytBackgammonServer:
             with Path(path_name).open("w") as f:
                 f.write(j_str)
         except Exception as e:
-            self._log.warning('%s:%s.', type(e).__name__, e)
+            self.__log.warning('{}:{}.', type(e).__name__, e)
 
     def load_data(self, path_name):
         """
@@ -273,48 +272,48 @@ class ytBackgammonServer:
         fwd_hist_length: int
             len(self._fwd_hist)
         """
-        self._log.debug('path_name=%s', path_name)
+        self.__log.debug('path_name={}', path_name)
 
         try:
             with Path(path_name).open() as f:
                 data = json.load(f)
         except Exception as e:
-            self._log.warning('%s:%s.', type(e).__name__, e)
+            self.__log.warning('{}:{}.', type(e).__name__, e)
             return 0, 0
 
         self._history = data['history']
         self._fwd_hist = data['fwd_hist']
-        self._log.debug('_history=(%d), _fwd_hist=(%d)',
-                        len(self._history), len(self._fwd_hist))
+        self.__log.debug('_history=({}), _fwd_hist=({})',
+                         len(self._history), len(self._fwd_hist))
         if len(self._history) > 0:
             self._bg._gameinfo = copy.deepcopy(self._history[-1])
         return len(self._history), len(self._fwd_hist)
 
     def on_connect(self, request):
-        self._log.info('request.sid=%a', request.sid)
-        self._log.info('from %s:%s',
-                       request.event['args'][0]['REMOTE_ADDR'],
-                       request.event['args'][0]['REMOTE_PORT'])
+        self.__log.info('request.sid={!a}', request.sid)
+        self.__log.info('from {}:{}',
+                        request.event['args'][0]['REMOTE_ADDR'],
+                        request.event['args'][0]['REMOTE_PORT'])
 
         self._client_sid.append(copy.deepcopy(request.sid))
 
         self.emit_gameinfo(0)
 
     def on_disconnect(self, request):
-        self._log.info('request.sid=%a', request.sid)
+        self.__log.info('request.sid={!a}', request.sid)
         self._client_sid.remove(request.sid)
 
     def on_error(self, request, e):
-        self._log.error('e=%a:%a', type(e).__name__, e)
-        self._log.error('event[message]=%a', request.event["message"])
-        self._log.error('event[args]=%a', request.event["args"])
+        self.__log.error('e={!a}:{!a}', type(e).__name__, e)
+        self.__log.error('event[message]={!a}', request.event["message"])
+        self.__log.error('event[args]={!a}', request.event["args"])
 
     def on_json(self, request, msg):
         """
         msg := {'type': str, 'data': object}
         """
-        self._log.info('request.sid=%s', request.sid)
-        self._log.info('msg=%s', msg)
+        self.__log.info('request.sid={}', request.sid)
+        self.__log.info('msg={}', msg)
 
         if msg['type'] == 'back':
             # data: {n: n}
@@ -365,7 +364,7 @@ class ytBackgammonServer:
             self._bg.put_checker(msg['data']['ch'],
                                  msg['data']['p'], msg['data']['idx'])
             if msg['data']['p'] >= 26:
-                self._log.debug('hit')
+                self.__log.debug('hit')
 
         if msg['type'] == 'cube':
             # data: {'side': int, 'value': int, 'accepted': bool}
@@ -427,14 +426,14 @@ class ytBackgammonServer:
         emit('json', msg, broadcast=True)
 
     def app_top(self):
-        self._log.debug('')
+        self.__log.debug('')
         return render_template('top.html',
                                name=self._svr_name,
                                version=self._svr_ver,
                                image_dir=self._image_dir)
 
     def app_index(self):
-        self._log.debug('')
+        self.__log.debug('')
         return render_template('index.html',
                                name=self._svr_name,
                                version=self._svr_ver,

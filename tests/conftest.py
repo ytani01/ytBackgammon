@@ -9,8 +9,13 @@ conftest.py
 import pytest
 
 from ytbg import yt_backgammon_server
+from ytbg.mylog import loggerInit
 from ytbg.yt_backgammon import ytBackgammon
 from ytbg.yt_backgammon_server import ytBackgammonServer
+
+# テストでも loggerInit() を 1 度だけ呼ぶ (TODO-005)。呼ばないと loguru の
+# 既定ハンドラ (DEBUG) が残り、テスト中の DEBUG がすべて stderr に出る
+loggerInit(False)
 
 
 @pytest.fixture

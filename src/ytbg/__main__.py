@@ -23,7 +23,7 @@ from flask import Flask, request
 from flask_socketio import SocketIO
 
 from . import __prog_name__, __version__
-from .my_logger import get_logger
+from .mylog import getLogger, loggerInit
 from .yt_backgammon_server import ytBackgammonServer
 
 CONTEXT_SETTINGS = {'help_option_names': ['-h', '--help']}
@@ -34,7 +34,7 @@ VERSION = __version__
 # パッケージに同梱した webroot (templates/, static/)
 WEBROOT = Path(__file__).absolute().parent / 'webroot'
 
-_log = get_logger(__name__, True)
+_log = getLogger('main')
 
 app = Flask(__name__,
             template_folder=str(WEBROOT / 'templates'),
@@ -85,7 +85,7 @@ def default_error_handler(e):
 
 @socketio.on('json')
 def handle_json(msg):
-    _log.debug('msg=%s', json.dumps(msg, ensure_ascii=False))
+    _log.debug('msg={}', json.dumps(msg, ensure_ascii=False))
     svr.on_json(request, msg)
 
 
@@ -100,12 +100,12 @@ def handle_json(msg):
               help='debug flag')
 def main(server_id, port, image_dir, debug):
     global svr_id, svr
-    _log = get_logger(__name__, debug)
-    _log.info('server_id=%s, port=%s, image_dir=%s',
+    loggerInit(debug)
+    _log.info('server_id={}, port={}, image_dir={}',
               server_id, port, image_dir)
 
     svr_id = server_id
-    svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, image_dir, debug=True)
+    svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, image_dir)
 
     try:
         # gevent の WSGI サーバで動かす (TODO-003)。Werkzeug の開発サーバは
