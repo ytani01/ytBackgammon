@@ -1,8 +1,8 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-007、TODO-009、TODO-010、TODO-011。**
+**残っている項目: TODO-004、TODO-007、TODO-009、TODO-010、TODO-011、TODO-012。**
 これまでに 6 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-012` から。**
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-013` から。**
 
 ---
 
@@ -203,6 +203,40 @@ TODO-002 で ruff を入れたが、`yt_backgammon_server.py` の指摘が 19 �
 
 - 例外の扱いが変わるのでレビューの担当を入れる
 - 機械的な置換が主なので実装は main
+
+---
+
+## TODO-012. on_json のクロック系の分岐を消す
+
+- [ ] `set_clock_swith` / `resume_clcok` / `start_clcok` / `stop_clcok` /
+      `reset_clcok` の 5 つの分岐を消す
+- [ ] `CLAUDE.md` の該当記述を直す
+- [ ] ブラウザでクロックが今までどおり動くことを確かめる
+
+`on_json()` のこの 5 つは中身が `pass` で、しかも綴りが誤っている。
+
+| サーバ（`on_json`） | クライアント（`ytbg.js`） |
+|---|---|
+| `set_clock_swith` | `set_clock_switch` |
+| `resume_clcok` | `resume_clock` |
+| `start_clcok` | `start_clock` |
+| `stop_clcok` | `stop_clock` |
+| `reset_clcok` | `reset_clock` |
+
+名前が一致しなくても末尾の `add_history` と broadcast へ落ちるので、いまも
+正しく動いている（クロックはクライアント側で完結している）。消しても
+経路は変わらない。
+
+TODO-009 で「`type` はサーバとクライアントの両方に同じ名前で書く」を
+写すときに、誤った綴りごと運ばないよう先に消す。サーバ側でクロックを
+持つことにしたら、そのときに改めて足す。
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | verifier |
+
+- `pass` を消すだけで挙動は変わらないのでレビューの担当は置かない
+- ブラウザでクロックが動くことの確認は verifier
 
 ---
 
