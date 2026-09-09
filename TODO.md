@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-007、TODO-009、TODO-010、TODO-011、TODO-012、
-TODO-013。** これまでに 6 件を決着させた。
+**残っている項目: TODO-004、TODO-007、TODO-009、TODO-010、TODO-012、
+TODO-013。** これまでに 7 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-014` から。**
 
 ---
@@ -180,36 +180,6 @@ asyncio へ移せば待ちが `await` として見え、通信層も薄くなる
 
 ---
 
-## TODO-011. ruff の指摘を解消する
-
-- [ ] `hist_ent2str()` の `%` 書式を直す（UP031、17 件）
-- [ ] 直す前後で保存ファイルの中身が変わらないことを確かめる
-- [ ] `save_data()` / `load_data()` の `except Exception` をどうするか
-      決めて直す（BLE001、2 件）
-
-TODO-002 で ruff を入れたが、`yt_backgammon_server.py` の指摘が 19 件
-残っている。TODO-009 で Starlette へ移すときは「保存の形式と `save_data()` の
-呼び方は同期のまま移す」と決めているので、`hist_ent2str()` は移行では
-触らない部分。整形の差分と設計の差分が混ざらないよう、先に片付ける。
-
-- UP031 は `'      "sn": %d,\n' % h['sn']` の形が 17 個
-  （`yt_backgammon_server.py:202-223`）。書式を置き換えても
-  **保存ファイルの中身が 1 バイトも変わらないこと**が条件
-- BLE001 は `save_data()`（258 行）と `load_data()`（280 行）の
-  `except Exception`。絞るなら `save_data()` は `OSError`、`load_data()` は
-  それに加えて `json.JSONDecodeError` と、`data['history']` が無いときの
-  `KeyError` が要る。**何を拾って何を落とすかを決める。** 絞らずに `noqa` で
-  抑えるのも選択肢
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | verifier + reviewer |
-
-- 例外の扱いが変わるのでレビューの担当を入れる
-- 機械的な置換が主なので実装は main
-
----
-
 ## TODO-012. on_json のクロック系の分岐を消す
 
 - [ ] `set_clock_swith` / `resume_clcok` / `start_clcok` / `stop_clcok` /
@@ -283,6 +253,7 @@ TODO-009 で通信層を入れ替えたときに壊れるとしたら `on_json()
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-011.** ruff の指摘を解消する](archives/todo/TODO-011.%20ruff%20の指摘を解消する.md)
 - [**TODO-008.** app_top() と top.html を消す](archives/todo/TODO-008.%20app_top()%20と%20top.html%20を消す.md)
 - [**TODO-005.** ログを my_logger.py から mylog.py（loguru）へ移す](archives/todo/TODO-005.%20ログを%20my_logger.py%20から%20mylog.py（loguru）へ移す.md)
 - [**TODO-006.** tests ディレクトリを作って pytest でテストする](archives/todo/TODO-006.%20tests%20ディレクトリを作って%20pytest%20でテストする.md)

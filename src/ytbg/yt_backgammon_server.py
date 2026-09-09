@@ -197,30 +197,35 @@ class ytBackgammonServer:
         self.save_data(self._datafile_path)
 
     def hist_ent2str(self, h):
+        board = h['board']
+        cube = board['cube']
+        name0 = json.dumps(board['playername'][0])
+        name1 = json.dumps(board['playername'][1])
+        accepted = json.dumps(cube['accepted'])
+
         j_str = ''
         j_str += '    {\n'
-        j_str += '      "sn": %d,\n' % h['sn']
-        j_str += '      "server_version": "%s",\n' % h['server_version']
-        j_str += '      "game_num": %d,\n' % h['game_num']
-        j_str += '      "match_score": %d,\n' % h['match_score']
-        j_str += '      "score": %s,\n' % h['score']
-        j_str += '      "turn": %d,\n' % h['turn']
-        j_str += '      "resign": %s,\n' % h['resign']
-        j_str += '      "clock_limit": %s,\n' % h['clock_limit']
+        j_str += f'      "sn": {h["sn"]:d},\n'
+        j_str += f'      "server_version": "{h["server_version"]}",\n'
+        j_str += f'      "game_num": {h["game_num"]:d},\n'
+        j_str += f'      "match_score": {h["match_score"]:d},\n'
+        j_str += f'      "score": {h["score"]},\n'
+        j_str += f'      "turn": {h["turn"]:d},\n'
+        j_str += f'      "resign": {h["resign"]},\n'
+        j_str += f'      "clock_limit": {h["clock_limit"]},\n'
         j_str += '      "board": {\n'
         j_str += '        "playername": [\n'
-        j_str += '          %s,\n' % json.dumps(h['board']['playername'][0])
-        j_str += '          %s\n' % json.dumps(h['board']['playername'][1])
+        j_str += f'          {name0},\n'
+        j_str += f'          {name1}\n'
         j_str += '        ],\n'
-        j_str += '        "clock": %s,\n' % h['board']['clock']
-        j_str += '        "cube": { "side": %d, ' % h['board']['cube']['side']
-        j_str += '"value": %d, ' % h['board']['cube']['value']
-        j_str += '"accepted": %s },\n' % json.dumps(
-            h['board']['cube']['accepted'])
-        j_str += '        "dice": %s,\n' % h['board']['dice']
+        j_str += f'        "clock": {board["clock"]},\n'
+        j_str += f'        "cube": {{ "side": {cube["side"]:d}, '
+        j_str += f'"value": {cube["value"]:d}, '
+        j_str += f'"accepted": {accepted} }},\n'
+        j_str += f'        "dice": {board["dice"]},\n'
         j_str += '        "checker": [\n'
-        j_str += '          %s,\n' % h['board']['checker'][0]
-        j_str += '          %s \n' % h['board']['checker'][1]
+        j_str += f'          {board["checker"][0]},\n'
+        j_str += f'          {board["checker"][1]} \n'
         j_str += '        ]\n'
         j_str += '      }\n'
         j_str += '    },\n'
@@ -255,7 +260,9 @@ class ytBackgammonServer:
         try:
             with Path(path_name).open("w") as f:
                 f.write(j_str)
-        except Exception as e:
+        except OSError as e:
+            # 書き込みの失敗だけを拾う (TODO-011)。hist_ent2str() は try の
+            # 外で呼んでいるので、その例外はここには来ない
             self.__log.warning('{}:{}.', type(e).__name__, e)
 
     def load_data(self, path_name):
@@ -277,12 +284,19 @@ class ytBackgammonServer:
         try:
             with Path(path_name).open() as f:
                 data = json.load(f)
-        except Exception as e:
+            history = data['history']
+            fwd_hist = data['fwd_hist']
+        except (OSError, UnicodeDecodeError,
+                json.JSONDecodeError, KeyError) as e:
+            # 読めない・壊れている・キーが足りないファイルは、空の履歴として
+            # 始める (TODO-011)。初回起動もここを通る (FileNotFoundError)。
+            # 局所変数へ受けてから代入するので、途中で失敗しても
+            # _history だけ書き換わった状態にはならない
             self.__log.warning('{}:{}.', type(e).__name__, e)
             return 0, 0
 
-        self._history = data['history']
-        self._fwd_hist = data['fwd_hist']
+        self._history = history
+        self._fwd_hist = fwd_hist
         self.__log.debug('_history=({}), _fwd_hist=({})',
                          len(self._history), len(self._fwd_hist))
         if len(self._history) > 0:
