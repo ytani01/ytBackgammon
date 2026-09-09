@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-007、TODO-009、TODO-010、TODO-012、
-TODO-013。** これまでに 7 件を決着させた。
+**残っている項目: TODO-004、TODO-009、TODO-010、TODO-012、TODO-013。**
+これまでに 8 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-014` から。**
 
 ---
@@ -33,41 +33,6 @@ TODO-003 で gevent へ移行したときに、reviewer が見つけた。
 |      | main | 担当 |
 |------|------|------|
 | 見込み | Opus 5 / effort high | verifier + reviewer |
-
----
-
-## TODO-007. board.roll が使われていない
-
-- [ ] `init_gameinfo()` から `board.roll` を消す
-- [ ] クライアントが `gameinfo.board.roll` を読んでいないことを確かめる
-- [ ] `tests/test_save_load.py` の往復テストから `roll` を除く処理を消す
-
-TODO-006 でテストを書いたときに見つかった。`init_gameinfo()`
-（`yt_backgammon.py:59`）は `board.roll` を持つが、`hist_ent2str()`
-（`yt_backgammon_server.py:200-228`）が出力しないので、**保存 → 読み込みの
-往復で `board.roll` が失われる**。実際に保存した JSON に `roll` キーが
-無いことを確かめてある。
-
-調べたところ、`board.roll` は `init_gameinfo()` で `False` を置くだけで、
-サーバもクライアントも読み書きしていない。クライアントが使う `roll` は
-`dice` メッセージの `data.roll`（`ytbg.js:1886, 4217`）で、`gameinfo` の
-`board.roll` とは別物。
-
-**保存する側に足すのではなく、`gameinfo` から消す**（利用者と決めた）。
-保存ファイルには元から `roll` キーが無いので、既存のデータをそのまま
-読み込める。
-
-- 今の `tests/test_save_load.py::test_save_and_load_roundtrip` は、
-  この差異を吸収するため比較前に両辺から `roll` を除いている。
-  消したらその処理も要らなくなる
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | verifier |
-
-- キーを 1 つ消すのとテストの除外処理を消すだけなので、実装は main
-- `gameinfo` の構造が変わるが分岐は変わらないので、レビューの担当は置かない
-- クライアントが読んでいないことの確認は verifier
 
 ---
 
@@ -216,7 +181,7 @@ TODO-009 で「`type` はサーバとクライアントの両方に同じ名前�
 
 ## TODO-013. on_json の分岐ごとのテストを足す
 
-**TODO-007 と TODO-012 が済んでから着手する。** 消すものを消した最終形に
+**TODO-012 が済んでから着手する。** 消すものを消した最終形に
 対して書く（逆順だとテストを二度直すことになる）。
 
 - [ ] `on_json()` の `type` ごとに、`gameinfo` の変化と送られるメッセージを
@@ -253,6 +218,7 @@ TODO-009 で通信層を入れ替えたときに壊れるとしたら `on_json()
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-007.** board.roll が使われていない](archives/todo/TODO-007.%20board.roll%20が使われていない.md)
 - [**TODO-011.** ruff の指摘を解消する](archives/todo/TODO-011.%20ruff%20の指摘を解消する.md)
 - [**TODO-008.** app_top() と top.html を消す](archives/todo/TODO-008.%20app_top()%20と%20top.html%20を消す.md)
 - [**TODO-005.** ログを my_logger.py から mylog.py（loguru）へ移す](archives/todo/TODO-005.%20ログを%20my_logger.py%20から%20mylog.py（loguru）へ移す.md)

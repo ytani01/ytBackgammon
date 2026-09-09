@@ -11,20 +11,12 @@ import pytest
 
 
 def test_save_and_load_roundtrip(bg_server, tmp_path):
-    """
-    save_data() で書いた内容を load_data() で読み戻せる。
-
-    hist_ent2str() は 'board.roll' を出力しないので、
-    保存前後でそのキーだけは失われる（既知の差異。報告済み）。
-    それ以外のキーが一致することを見る。
-    """
+    """save_data() で書いた内容を load_data() で読み戻せる"""
     bg_server.add_history(bg_server._bg._gameinfo)
     path = str(tmp_path / 'roundtrip.json')
     bg_server.save_data(path)
 
     saved_history = copy.deepcopy(bg_server._history)
-    for h in saved_history:
-        h['board'].pop('roll', None)
 
     bg_server._history = []
     bg_server._fwd_hist = []
