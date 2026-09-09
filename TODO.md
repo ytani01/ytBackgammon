@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-009、TODO-010、TODO-014。**
-これまでに 10 件を決着させた。
+**残っている項目: TODO-004、TODO-009、TODO-010。**
+これまでに 11 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-015` から。**
 
 ---
@@ -145,57 +145,12 @@ asyncio へ移せば待ちが `await` として見え、通信層も薄くなる
 
 ---
 
-## TODO-014. バージョンを git tag に連動させる
-
-- [ ] `pyproject.toml` の `version` を hatch-vcs で git tag から取る
-- [ ] `[tool.uv] cache-keys` に git のコミットとタグを入れる
-- [ ] `ytbg.js` の `VERSION` 定数と「Client v.」の表示を消す
-- [ ] `index.html` のバージョン表示を 1 つにまとめる
-- [ ] `tests/test_save_load.py` の `'0.80'` 直書きを直す
-- [ ] 既存の `~/ytbg-*.json` が読めることを確かめる
-
-`pyproject.toml` の `version = "0.80"` は手書きで、git tag（今は `1.0.0`）と
-ずれている。`ytbg.js` の `VERSION = "0.96"` も別に手書きされていて、画面には
-「Server v. 0.80 / Client v. 0.96」と 2 つ並ぶ。タグを打つたびに 3 箇所を手で
-揃えることになるので、タグ 1 つに集約する。
-
-`src/ytbg/__init__.py` は `importlib.metadata.version()` で読んでいるので、
-`pyproject.toml` 側を動的にすれば変更は要らない。
-
-利用者と相談して決めたこと。
-
-- **`hatch-vcs` を使う。** build-backend が hatchling なので素直に入る。
-  `dynamic = ["version"]` にして `[tool.hatch.version] source = "vcs"`
-- **ハッシュは付けない。** `local_scheme = "no-local-version"` にして、
-  タグ上は `1.0.0`、そこから 3 コミット進んだら `1.0.1.dev3` とする
-- **クライアントもタグに連動させ、表示は 1 つにまとめる。** サーバの
-  バージョンは `index.html` へ `version` として既に渡っている
-  （`yt_backgammon_server.py:426`）ので、JS 側の定数と `#version` への
-  書き込みを消せばよい
-
-### 引っかかる点
-
-- **`[tool.uv] cache-keys` が要る。** uv は editable インストールをキャッシュ
-  するので、入れないとタグを打ってもバージョンが古いまま残る。
-  `cache-keys = [{ git = { commit = true, tags = true } }]`
-- **バージョンが `0.80` から `1.0.0` に上がる。** 保存ファイルの
-  `server_version` も変わるので、既存の `~/ytbg-*.json` が読めるかを確かめる
-- git の無い環境ではタグを引けないが、sdist と wheel には hatch-vcs が
-  ビルド時に埋め込むので、配布物では問題にならない
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- 表示とバージョン文字列が変わるので、確認とは別にレビューの担当も入れる
-
----
-
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-014.** バージョンを git tag に連動させる](archives/todo/TODO-014.%20バージョンを%20git%20tag%20に連動させる.md)
 - [**TODO-013.** on_json の分岐ごとのテストを足す](archives/todo/TODO-013.%20on_json%20の分岐ごとのテストを足す.md)
 - [**TODO-012.** on_json のクロック系の分岐を消す](archives/todo/TODO-012.%20on_json%20のクロック系の分岐を消す.md)
 - [**TODO-007.** board.roll が使われていない](archives/todo/TODO-007.%20board.roll%20が使われていない.md)

@@ -63,9 +63,6 @@
  *
  *=====================================================
  */
-const MY_NAME = "ytBackgammon Client";
-const VERSION = "0.96";
-
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
@@ -2667,11 +2664,6 @@ class Board extends BgImage {
         this.turn = -1;
 
         this.gameinfo = undefined;
-
-        // Title
-        const name_el = document.getElementById("name");
-        const ver_el = document.getElementById("version");
-        ver_el.innerHTML = `<strong>Client</strong> v. ${VERSION}`;
 
         // Buttons
         const bx0 = this.x + this.w + 30;

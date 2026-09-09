@@ -1,6 +1,6 @@
 [project]
 name = "ytbg"
-version = "0.80"
+dynamic = ["version"]
 description = "ytBackgammon: network shared backgammon board"
 readme = "README.md"
 license = "MIT"
@@ -20,7 +20,7 @@ dependencies = [
 ytbg = "ytbg.__main__:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
@@ -38,6 +38,24 @@ exclude = ["*.xcf", "*.pptx"]
 [tool.hatch.build.targets.sdist]
 # docs にはデモ動画 (数十 MB) がある。archives は TODO の記録
 exclude = ["/docs", "/archives", "*.xcf", "*.pptx"]
+
+[tool.hatch.version]
+# バージョンを git tag に集約する（TODO-014）
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# タグ上は 1.0.0、進んだコミットでは 1.0.1.dev3 とし、+g<hash> は付けない
+local_scheme = "no-local-version"
+
+[tool.uv]
+# editable インストールのキャッシュが tag の変化を検知できるようにする
+# （無いとタグを打っても再ビルドされずバージョンが古いまま残る）。
+# cache-keys を書くと uv の既定のキー（pyproject.toml の変更）が
+# 置き換わって消えるため、file の分も明示して残す
+cache-keys = [
+    { file = "pyproject.toml" },
+    { git = { commit = true, tags = true } },
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -15,6 +15,13 @@ uv を使う（TODO-001 で移行した）。**リポジトリのディレクト
 `~/bin` にシンボリックリンクを張る運用はやめた（`uv run` が
 `pyproject.toml` を見つけられないため）。
 
+バージョンは `pyproject.toml` に手書きせず、git tag から hatch-vcs で取る
+（TODO-014）。タグを打ったあとは `uv sync` を実行すること。
+`[tool.uv] cache-keys` に git のタグとコミットを入れてあるので、それで
+editable インストールが再ビルドされる。`git clone --no-tags` や
+`--depth 1` のようにタグを持たない clone では、エラーにならず
+`0.1.devN` という誤ったバージョンになるので、タグごと clone すること。
+
 ```bash
 uv sync          # .venv を作って依存を入れる
 

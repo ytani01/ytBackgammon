@@ -616,7 +616,6 @@ wheels = [
 
 [[package]]
 name = "ytbg"
-version = "0.80"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
