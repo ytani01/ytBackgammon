@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-005。** これまでに 4 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-007` から。**
+**残っている項目: TODO-004、TODO-005、TODO-007。** これまでに 4 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-008` から。**
 
 ---
 
@@ -67,6 +67,37 @@ loguru の `MM/DD HH:mm:ss アイコン LEVEL file:line function()>` へ）。
 |      | main | 担当 |
 |------|------|------|
 | 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+---
+
+## TODO-007. save_data() が board.roll を保存しない
+
+- [ ] `board.roll` が何に使われているかを確かめる（クライアント側を含む）
+- [ ] 直すか、対応しないかを決める
+- [ ] 直すなら `hist_ent2str()` に `roll` を足し、
+      `tests/test_save_load.py` の往復テストから `roll` を除く処理を消す
+
+TODO-006 でテストを書いたときに見つかった。`init_gameinfo()`
+（`yt_backgammon.py:61`）は `board.roll` を持つが、`hist_ent2str()`
+（`yt_backgammon_server.py:200-228`）が出力しないので、**保存 → 読み込みの
+往復で `board.roll` が失われる**。実際に保存した JSON に `roll` キーが
+無いことを確かめてある。
+
+`CLAUDE.md` の「`gameinfo` にキーを足したときは `hist_ent2str()` も直さないと
+保存されずに落ちる」に、まさに当てはまる。
+
+- **まず `roll` の役割を確かめる。** 失われても実害が無いなら、
+  その理由を書いて対応しないという結論もありうる
+- 今の `tests/test_save_load.py::test_save_and_load_roundtrip` は、
+  この差異を吸収するため比較前に両辺から `roll` を除いている。
+  直したらその処理も消す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | verifier + reviewer |
+
+- 保存する内容が変わるのでレビューの担当を入れる
+- 変更は `hist_ent2str()` の数行の見込みなので、実装は main が行う
 
 ---
 
