@@ -8,14 +8,16 @@ ytBackgammon.py
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
-from ytBackgammon import ytBackgammon
+import copy
+import json
+import os
+import time
+
 from flask import render_template
 from flask_socketio import emit
-import os
-import copy
-import time
-import json
-from MyLogger import get_logger
+
+from .MyLogger import get_logger
+from .ytBackgammon import ytBackgammon
 
 
 class ytBackgammonServer:

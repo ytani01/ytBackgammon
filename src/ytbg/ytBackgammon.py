@@ -8,7 +8,7 @@ __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
 import copy
-from MyLogger import get_logger
+from .MyLogger import get_logger
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 

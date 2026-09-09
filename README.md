@@ -60,7 +60,9 @@
 ### サーバ
 
 * OS: FreeBSD, Linux
-* Python3, flask, flask_socketio
+* Python 3.14 以上
+* [uv](https://docs.astral.sh/uv/)
+* flask, flask-socketio (``uv sync`` が入れます)
 
 
 ## Usage
@@ -93,35 +95,48 @@
 
 ### 1. Install
 
-以下の操作で、${HOME}/binに、「ytbg.sh」がコピーされます。
+[uv](https://docs.astral.sh/uv/) を使います。
 
-1. ホームディレクトリ直下に Python3 venv を作成
+1. git クローンを作成
 ```bash
-user@host:....$ cd ~
-user@host:~$ python3 -m venv env1
+user@host:~$ git clone https://www.github.com/ytani01/ytBackgammon.git
 ```
 
-2. env1に gitクローンを作成
+2. 依存パッケージをインストール
 ```bash
-user@host:~$ cd env1
-user@host:~/env1$ git clone https://www.github.com/ytani01/ytBackgammon.git
+user@host:~$ cd ytBackgammon
+user@host:~/ytBackgammon$ uv sync
 ```
 
-3. インストールスクリプトを実行
-```bash
-user@host:~/env1$ cd ytBackgammon
-user@host:~/env1/ytBackgammon$ ./setup.sh
-```
+`uv sync` が Python 3.14 の仮想環境 (``.venv``) を作り、必要なパッケージを
+入れます。
 
 ### 2. ytBackgammon server usage
 
+リポジトリのディレクトリの中で実行します。
+
 ```bash
-ytbg.sh ~/env1 -p {ポート番号} -i {画像ディレクトリ名} {サーバID}
+user@host:~/ytBackgammon$ ./ytbg.sh -p {ポート番号} -i {画像ディレクトリ名} {サーバID}
 ```
 
-ポート番号: デフォルトは 5000
+ポート番号: デフォルトは 5001
 画像ディレクトリ名: ``static`` からの相対パス名
 サーバID: 複数のサーバを立ち上げたときに、区別するための文字列
+
+``-d`` を付けるとログが DEBUG レベルになります。
+
+``uv run ytbg`` でも同じように起動できます。
+
+```bash
+user@host:~/ytBackgammon$ uv run ytbg --help
+```
+
+4 面を同時に立ち上げるスクリプトもあります (ポート 5001〜5004)。
+
+```bash
+user@host:~/ytBackgammon$ ./ytbg-boot.sh   # 起動
+user@host:~/ytBackgammon$ ./ytbg-stop.sh   # 停止
+```
 
 
 ### 3. Board Design
@@ -131,7 +146,7 @@ ytbg.sh ~/env1 -p {ポート番号} -i {画像ディレクトリ名} {サーバI
 
 * [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
 
-画像ファイルの保存先: ``~/env1/ytBackgammon/static/``ディレクトリ直下
+画像ファイルの保存先: ``src/ytbg/webroot/static/`` ディレクトリ直下
 
 
 ## A. References 

@@ -1,0 +1,55 @@
+[project]
+name = "ytbg"
+version = "0.80"
+description = "ytBackgammon: network shared backgammon board"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "ytani01", email = "yoichi@tanibayashi.jp" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.3.1",
+    "flask>=3.1.2",
+    "flask-socketio>=5.5.1",
+]
+
+[project.scripts]
+ytbg = "ytbg.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "ruff>=0.16.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ytbg"]
+# デザインの元データは配布物に要らない
+exclude = ["*.xcf", "*.pptx"]
+
+[tool.hatch.build.targets.sdist]
+# docs にはデモ動画 (数十 MB) がある。archives は TODO の記録
+exclude = ["/docs", "/archives", "*.xcf", "*.pptx"]
+
+[tool.ruff]
+line-length = 78
+# archives/ は決着した項目の記録。ruff format は Markdown 中の python
+# ブロックも整形するので、対象から外す。
+extend-exclude = ["archives"]
+
+[tool.ruff.lint]
+extend-select = ["I", "B", "SIM", "UP", "PTH"]
+
+[tool.mypy]
+python_version = "3.14"
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "click,flask,flask.*,flask_socketio,flask_socketio.*"
+ignore_missing_imports = true
+follow_untyped_imports = true

@@ -7,7 +7,7 @@ MyLogger.py
 
 Usage:
 --
-from MyLogger import get_logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
+from .MyLogger import get_logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 class A:
     _log = get_logger(__name__, False)

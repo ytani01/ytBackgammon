@@ -3,28 +3,37 @@
 # (c) Yoichi Tanibayashi
 #
 """
-ytbg.py
+__main__.py
 """
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
-from ytBackgammonServer import ytBackgammonServer
+import json
+from pathlib import Path
+
+import click
 from flask import Flask, request
 from flask_socketio import SocketIO
-import json
-from MyLogger import get_logger
-import click
+
+from . import __prog_name__, __version__
+from .MyLogger import get_logger
+from .ytBackgammonServer import ytBackgammonServer
+
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
-MY_NAME = 'ytBackgammon Server'
-VERSION = '0.80'
+MY_NAME = __prog_name__
+VERSION = __version__
+
+# パッケージに同梱した webroot (templates/, static/)
+WEBROOT = Path(__file__).absolute().parent / 'webroot'
 
 _log = get_logger(__name__, True)
 
-app = Flask(__name__)
+app = Flask(__name__,
+            template_folder=str(WEBROOT / 'templates'),
+            static_folder=str(WEBROOT / 'static'))
 app.config['SECRET_KEY'] = 'secret!'
 app.config['DEBUG'] = False
-app.config['JSON_AS_ASCII'] = False  # XXX 文字化け対策が効かない TBD
 
 socketio = SocketIO(app, cors_allowed_origins='*')
 
@@ -56,7 +65,8 @@ def handle_connect():
 
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(reason=None):
+    # python-socketio 5.x は切断理由を引数で渡してくる
     svr.on_disconnect(request)
 
 
@@ -90,7 +100,13 @@ def main(server_id, port, image_dir, debug):
     svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, image_dir, debug=True)
 
     try:
-        socketio.run(app, host='0.0.0.0', port=int(port), debug=debug)
+        # 共有ボード用の小さなサーバなので、開発用の Werkzeug で動かす。
+        # 端末以外から起動すると 5.x では止められるため、明示的に許可する。
+        #
+        # debug は渡さない。渡すと Werkzeug の対話デバッガが
+        # 0.0.0.0 に出てしまう (TODO-001)。--debug はログレベルだけに効く
+        socketio.run(app, host='0.0.0.0', port=int(port),
+                     allow_unsafe_werkzeug=True)
     finally:
         _log.info('end')
 
