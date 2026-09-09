@@ -36,34 +36,38 @@ TODO-003 で gevent へ移行したときに、reviewer が見つけた。
 
 ---
 
-## TODO-007. save_data() が board.roll を保存しない
+## TODO-007. board.roll が使われていない
 
-- [ ] `board.roll` が何に使われているかを確かめる（クライアント側を含む）
-- [ ] 直すか、対応しないかを決める
-- [ ] 直すなら `hist_ent2str()` に `roll` を足し、
-      `tests/test_save_load.py` の往復テストから `roll` を除く処理を消す
+- [ ] `init_gameinfo()` から `board.roll` を消す
+- [ ] クライアントが `gameinfo.board.roll` を読んでいないことを確かめる
+- [ ] `tests/test_save_load.py` の往復テストから `roll` を除く処理を消す
 
 TODO-006 でテストを書いたときに見つかった。`init_gameinfo()`
-（`yt_backgammon.py:61`）は `board.roll` を持つが、`hist_ent2str()`
+（`yt_backgammon.py:59`）は `board.roll` を持つが、`hist_ent2str()`
 （`yt_backgammon_server.py:200-228`）が出力しないので、**保存 → 読み込みの
 往復で `board.roll` が失われる**。実際に保存した JSON に `roll` キーが
 無いことを確かめてある。
 
-`CLAUDE.md` の「`gameinfo` にキーを足したときは `hist_ent2str()` も直さないと
-保存されずに落ちる」に、まさに当てはまる。
+調べたところ、`board.roll` は `init_gameinfo()` で `False` を置くだけで、
+サーバもクライアントも読み書きしていない。クライアントが使う `roll` は
+`dice` メッセージの `data.roll`（`ytbg.js:1886, 4217`）で、`gameinfo` の
+`board.roll` とは別物。
 
-- **まず `roll` の役割を確かめる。** 失われても実害が無いなら、
-  その理由を書いて対応しないという結論もありうる
+**保存する側に足すのではなく、`gameinfo` から消す**（利用者と決めた）。
+保存ファイルには元から `roll` キーが無いので、既存のデータをそのまま
+読み込める。
+
 - 今の `tests/test_save_load.py::test_save_and_load_roundtrip` は、
   この差異を吸収するため比較前に両辺から `roll` を除いている。
-  直したらその処理も消す
+  消したらその処理も要らなくなる
 
 |      | main | 担当 |
 |------|------|------|
-| 見込み | Opus 5 / effort high | verifier + reviewer |
+| 見込み | Opus 5 / effort high | verifier |
 
-- 保存する内容が変わるのでレビューの担当を入れる
-- 変更は `hist_ent2str()` の数行の見込みなので、実装は main が行う
+- キーを 1 つ消すのとテストの除外処理を消すだけなので、実装は main
+- `gameinfo` の構造が変わるが分岐は変わらないので、レビューの担当は置かない
+- クライアントが読んでいないことの確認は verifier
 
 ---
 
