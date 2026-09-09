@@ -29,9 +29,17 @@ uv run ruff check .
 uv run mypy src
 ```
 
-`-d` / `--debug` はログレベルを DEBUG にするだけ（`MyLogger.get_logger(name, debug)`）。
-Flask の debug モードには渡していない。渡すと Werkzeug の対話デバッガが
-`0.0.0.0` に出てしまうため（TODO-001）。
+サーバは **gevent の WSGI サーバ**で動かす（TODO-003）。Werkzeug の開発サーバは
+websocket を扱えず、クライアントが切断するたびにログへエラーが出ていた。
+`__main__.py` は先頭で `monkey.patch_all()` を呼んでいるので、**import の順番を
+変えない**（履歴の連続再生が `time.sleep()` を使っており、置き換えないと
+再生中にサーバ全体が止まる）。同じ理由で、**`__init__.py` に `socket` や `ssl` を
+使う import を足さない**（patch より前に読まれてしまう）。
+
+`-d` / `--debug` はログレベルを DEBUG にし、gevent のアクセスログ
+（`socketio.run()` の `log_output`）を出す。Flask の debug モードには渡していない。
+渡すと対話デバッガが `0.0.0.0` に出てしまうため（TODO-001）。アクセスログだけは
+`pywsgi` が stderr へ直接書くので、`MyLogger` の書式とは揃わない。
 
 テストの仕組みは無い。動作確認はブラウザで実際に触って行う。
 ruff と mypy は入っているが、既存コードの指摘はまだ残っている（TODO-002）。

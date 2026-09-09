@@ -8,6 +8,13 @@ __main__.py
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
+# gevent の WSGI サーバで動かすので、他を import する前に標準ライブラリを
+# 置き換える (TODO-003)。履歴の連続再生が time.sleep() を使っており、
+# 置き換えないと再生中にサーバ全体が止まる
+from gevent import monkey
+
+monkey.patch_all()
+
 import json
 from pathlib import Path
 
@@ -35,7 +42,8 @@ app = Flask(__name__,
 app.config['SECRET_KEY'] = 'secret!'
 app.config['DEBUG'] = False
 
-socketio = SocketIO(app, cors_allowed_origins='*')
+socketio = SocketIO(app, cors_allowed_origins='*',
+                    async_mode='gevent')
 
 svr_id = "0"
 svr = None
@@ -100,13 +108,14 @@ def main(server_id, port, image_dir, debug):
     svr = ytBackgammonServer(MY_NAME, VERSION, svr_id, image_dir, debug=True)
 
     try:
-        # 共有ボード用の小さなサーバなので、開発用の Werkzeug で動かす。
-        # 端末以外から起動すると 5.x では止められるため、明示的に許可する。
+        # gevent の WSGI サーバで動かす (TODO-003)。Werkzeug の開発サーバは
+        # websocket を扱えず、切断のたびにログへエラーが出ていた
         #
-        # debug は渡さない。渡すと Werkzeug の対話デバッガが
-        # 0.0.0.0 に出てしまう (TODO-001)。--debug はログレベルだけに効く
+        # debug は渡さない。渡すと Flask の対話デバッガとリローダが
+        # 効いてしまう (TODO-001)。--debug はログレベルと、
+        # gevent のアクセスログ (log_output) だけに効く
         socketio.run(app, host='0.0.0.0', port=int(port),
-                     allow_unsafe_werkzeug=True)
+                     log_output=debug)
     finally:
         _log.info('end')
 
