@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-007。** これまでに 6 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-009` から。**
+**残っている項目: TODO-004、TODO-007、TODO-009。** これまでに 6 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-010` から。**
 
 ---
 
@@ -25,6 +25,9 @@ TODO-003 で gevent へ移行したときに、reviewer が見つけた。
 - **停止時間は測っていない。** 今の規模（数 KB の JSON）なら問題にならないと
   見ているが、根拠は無い。まず測ってから、対処するかを決める
 - 対処するなら、`gevent.fileobject` を使うか、保存を別の greenlet へ追い出す
+- **TODO-009 で Starlette + uvicorn へ移したら、この節を書き直す。** asyncio でも
+  `open()` はイベントループを止めるので問題は残るが、gevent 前提の説明と
+  `gevent.fileobject` の案は当てはまらなくなる（対処は `asyncio.to_thread()`）
 
 |      | main | 担当 |
 |------|------|------|
@@ -60,6 +63,59 @@ TODO-006 でテストを書いたときに見つかった。`init_gameinfo()`
 
 - 保存する内容が変わるのでレビューの担当を入れる
 - 変更は `hist_ent2str()` の数行の見込みなので、実装は main が行う
+
+---
+
+## TODO-009. Flask + gevent から Starlette + uvicorn へ移す
+
+- [ ] サーバを Starlette + 素の WebSocket + uvicorn で書き直す
+- [ ] `ytbg.js` の通信部分を素の WebSocket に替え、再接続を足す
+- [ ] `index.html` から socket.io の CDN 読み込みを消す
+- [ ] テストを async に合わせる
+- [ ] `ytbg.sh` と `CLAUDE.md` を直す
+
+gevent は `monkey.patch_all()` が前提なので、import の順番と `__init__.py` に
+置ける import が縛られている（TODO-003、TODO-005）。socket.io は再接続以外の
+機能を使っておらず、`index.html` が CDN から読んでいるので外部に依存する。
+asyncio へ移せば待ちが `await` として見え、通信層も薄くなる。
+
+利用者と相談して決めたこと。
+
+- **Starlette + 素の WebSocket + uvicorn にする。** Tornado も候補だったが、
+  ASGI の外に出るので選ばなかった（python-socketio の Tornado 対応は
+  `# pragma: no cover` で、作者のテストが通っていない）
+- **socket.io はやめる。** 使っているのは再接続だけ。ping は uvicorn が
+  既定で 20 秒ごとに送り（`ws_ping_interval`）、ブラウザは pong を自動で
+  返すので JS 側には要らない。**インターネット越しに使うが**、`on_connect`
+  が `gameinfo` を丸ごと送るので、つなぎ直せば復旧する。取りこぼした差分を
+  埋める仕組みは要らない
+- **プロトコルの一方向化はこの項目ではやらない。** 今は操作メッセージの
+  転送と状態の丸ごと送信の 2 経路があり、同じ更新ロジックが Python と JS の
+  両方にある。直すなら `ytbg.js` の作り直しになるので、別に立てる
+
+やること。
+
+- `emit(..., broadcast=True)` の代わりに、接続中の WebSocket の集合を持って
+  回す。今の `_client_sid` がその実体になる
+- 連続再生の `time.sleep()` を `await asyncio.sleep()` に、`_repeat_flag` を
+  Task の `cancel()` に置き換える
+- `emit()` がリクエストコンテキストに依存しなくなるので、`conftest.py` の
+  差し替えを見直す
+
+変えないもの。
+
+- メッセージの形（`{src, type, data, history}`）
+- 保存の形式と `save_data()` の呼び方。**同期のまま移す。**
+  `asyncio.to_thread()` へ逃がすかは TODO-004 で決める
+- 盤面のロジック、画像、`ytbg.html`
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- 複数のファイルにまたがり、実装・テスト・文書が同時に要るので実装も分ける
+- 通信層が変わるのでレビューの担当も入れる
+- ブラウザでの操作確認は verifier に任せる（TODO-003 と同じ手順が使える）
 
 ---
 
