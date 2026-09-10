@@ -3536,39 +3536,51 @@ class Board extends BgImage {
         */
         this.gameinfo = gameinfo;
         
-        // escape checkers
-        for (let player=0; player < 2; player++) {
-            for (let i=0; i < 15; i++) {
-                let ch = this.checker[player][i];
-                ch.el.hidden = true;
-                ch.cur_point = undefined;
-                ch.move(0, 0, false, 0);
-            }
-        }
-
         // clear points
         // console.log(`Board.load_gameinfo> clear points`);
         for (let i=0; i < this.point.length; i++) {
             this.point[i].checkers = [];
         } // for(i)
 
-        // put checkers
+        // put checkers (TODO-017)
+        //
+        // 退避させずに配り直すので、動いて見えるのは位置が変わった
+        // チェッカーだけになる。hidden (display:none) の間に座標を動かすと
+        // CSS の transition が効かず、sec を渡しても一瞬で切り替わる。
+        //
+        // point の中の積み順と重なり順は add() が checkers の長さから
+        // 決めるので、idx (ch_point[p][c][1]) の小さい順に呼ぶ。
+        // add() が cur_point も設定するので put_checker() は通さない
+        // (pip count と closeout の判定が 30 回走る。どちらもこのあと
+        // pip_count() と set_turn() がまとめて行う)。
+        //
+        // idx で回すループにはしない。idx はその point に既にある
+        // 両プレーヤーぶんの枚数なので、free move で 1 つの point に
+        // 16 枚以上乗ると 15 以上になる。0〜14 だけを拾うループだと、
+        // そのチェッカーがどの point にも入らないまま画面に残り、
+        // put_checker() の splice(-1, 1) が無関係な駒を配列から外す。
         const ch_point = gameinfo.board.checker;
         /*
         console.log(
             `Board.load_gameinfo> ch_point=${JSON.stringify(ch_point)}`);
         */
-        for (let i=0; i < 15; i++) {
-            for (let p=0; p < 2; p++) {
-                for (let c=0; c < 15; c++) {
-                    const ch = this.checker[p][c];
-                    if ( ch_point[p][c][1] == i ) {
-                        this.put_checker(ch, ch_point[p][c][0], sec, false);
-                        ch.el.hidden = false;
-                    }
-                } // for (c)
-            } // for (p)
-        } // for(i)
+        let ch_list = [];
+        for (let p=0; p < 2; p++) {
+            for (let c=0; c < 15; c++) {
+                ch_list.push({ ch: this.checker[p][c],
+                               point: ch_point[p][c][0],
+                               idx: ch_point[p][c][1] });
+            } // for (c)
+        } // for (p)
+
+        // 同じ idx が並んだときの順番は、Array.sort が安定なので
+        // 積んだ順 (player, checker の順) のまま
+        ch_list.sort((a, b) => a.idx - b.idx);
+
+        for (let e of ch_list) {
+            e.ch.el.hidden = false;
+            this.point[e.point].add(e.ch, sec);
+        } // for (e)
 
         // score
         this.score[0].set(gameinfo.score[0]);
