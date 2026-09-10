@@ -3528,7 +3528,8 @@ class Board extends BgImage {
      * load all game information
      * @param {Object} gameinfo - game information object
      */
-    load_gameinfo(gameinfo, sec=2, history_flag=false) {
+    load_gameinfo(gameinfo, sec=2, history_flag=false,
+                  clock_state=undefined) {
         /*
         console.log(`Board.load_gameinfo(`
                     + `gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
@@ -3585,10 +3586,25 @@ class Board extends BgImage {
         this.clock_limit.set(1, gameinfo.clock_limit[1]);
 
         if ( ! history_flag ) {
-            this.player_clock[0].stop();
-            this.player_clock[1].stop();
-            this.player_clock[0].set(gameinfo.board.clock[0]);
-            this.player_clock[1].set(gameinfo.board.clock[1]);
+            if ( clock_state === undefined ) {
+                // ファイルから読んだとき。止まった状態にする
+                this.player_clock[0].stop();
+                this.player_clock[1].stop();
+                this.player_clock[0].set(gameinfo.board.clock[0]);
+                this.player_clock[1].set(gameinfo.board.clock[1]);
+            } else {
+                // サーバが持っている状態から戻す (TODO-016)。
+                // gameinfo.board.clock は最後に止まった時点の値なので、
+                // 動作中の残り時間は clock_state.clock を使う
+                this.set_clock_switch(clock_state.sw);
+                for (let p=0; p < 2; p++) {
+                    this.player_clock[p].stop();
+                    this.player_clock[p].set(clock_state.clock[p]);
+                    if ( clock_state.active[p] ) {
+                        this.player_clock[p].resume();
+                    }
+                }
+            }
         }
 
         // player name
@@ -4203,7 +4219,8 @@ window.onload = () => {
             if ( msg.type == "gameinfo" ) {
                 board.load_gameinfo(msg.data.gameinfo,
                                     msg.data.sec,
-                                    msg.data.history_flag);
+                                    msg.data.history_flag,
+                                    msg.data.clock_state);
                 return;
             } // "gameinfo"
 

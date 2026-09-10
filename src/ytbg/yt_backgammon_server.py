@@ -11,6 +11,7 @@ import asyncio
 import copy
 import json
 import os
+import time
 from pathlib import Path
 
 from starlette.templating import Jinja2Templates
@@ -60,6 +61,17 @@ class ytBackgammonServer:
         self._replay_task: asyncio.Task | None = None
         self._replay_lock = asyncio.Lock()
 
+        # クロックの状態 (TODO-016)。gameinfo には入れない。
+        # 入れると履歴に載り、back / fwd でクロックの発着まで戻ってしまう。
+        # _clock_start は動作の基準になる時刻で、残り時間はここからの
+        # 経過分を引いて求める (_cur_clock())
+        # _clock_sw の初期値は index.html の Clock のチェックボックス
+        # (既定で checked) に合わせる。False にすると、つないだ画面が
+        # clock_state を受けてチェックを外し、既定が反転する
+        self._clock_sw = True
+        self._clock_active = [False, False]
+        self._clock_start = [time.monotonic(), time.monotonic()]
+
         [hist_len, _fwd_hist_len] = self.load_data(self._datafile_path)
         if hist_len < 1:
             self.__log.warning('load_data({}): error', self._datafile_path)
@@ -86,7 +98,13 @@ class ytBackgammonServer:
         self._bg._gameinfo['clock_limit'][1] = clock_limit1
         self._bg._gameinfo['board']['playername'][0] = player0_name
         self._bg._gameinfo['board']['playername'][1] = player1_name
-        
+
+        # クロックは clock_limit に戻し、止まった状態で始める (TODO-016)。
+        # init_gameinfo() が入れるのは固定値なので、clock_limit を
+        # 変えてあると食い違う
+        self._reset_clock(0)
+        self._reset_clock(1)
+
         self.add_history(self._bg._gameinfo)
 
     def add_history(self, gameinfo=None):
@@ -130,6 +148,63 @@ class ytBackgammonServer:
                 self.__log.warning('{}: {}:{}', self.client_name(ws),
                                    type(result).__name__, result)
 
+    def _load_hist_ent(self, hist_ent):
+        """
+        履歴のエントリを、いまの gameinfo にする (TODO-016)
+
+        **クロックの残り時間だけは引き継ぎ、巻き戻さない。** クロックは
+        履歴の対象外で (TODO-010 で決めた)、戻すと動いているクロックが
+        昔の値から数え直しになる。しかもその値は次の gameinfo に
+        clock_state として乗り、全員の画面が飛ぶ。ytbg.js も
+        history_flag が真のときはクロックに触らないので、そちらとも揃う。
+        """
+        clock = self._bg._gameinfo['board']['clock']
+        self._bg._gameinfo = copy.deepcopy(hist_ent)
+        self._bg._gameinfo['board']['clock'] = clock
+
+    def _cur_clock(self, player):
+        """
+        いま表示されているはずの残り時間 [持ち時間, 猶予] を返す (TODO-016)
+
+        動作中なら、_clock_start からの経過分を猶予から引き、猶予で足りない
+        分を持ち時間から引く。ytbg.js の PlayerClock.update() と同じ計算で、
+        持ち時間はマイナスも許す（JS 側も止めていない）。
+        クロックが止まっているときと clock_sw が off のときは進めない。
+        """
+        [sec0, sec1] = self._bg._gameinfo['board']['clock'][player]
+
+        if not self._clock_sw or not self._clock_active[player]:
+            return [sec0, sec1]
+
+        sec1 -= time.monotonic() - self._clock_start[player]
+        if sec1 < 0:
+            sec0 += sec1
+            sec1 = 0
+
+        return [round(sec0, 1), round(sec1, 1)]
+
+    def _freeze_clock(self, player):
+        """
+        進んだ分を gameinfo に書き戻し、基準の時刻を打ち直す (TODO-016)
+
+        クロックの動き方が変わる直前に呼ぶ。呼んだ時点の残り時間が
+        gameinfo['board']['clock'] に入るので、そこから先は新しい状態で
+        数え直せる。
+        """
+        self._bg._gameinfo['board']['clock'][player] = self._cur_clock(player)
+        self._clock_start[player] = time.monotonic()
+
+    def _reset_clock(self, player):
+        """
+        残り時間を clock_limit に戻して止める (TODO-016)
+
+        ytbg.js の PlayerClock.reset() に対応する。
+        """
+        self._bg._gameinfo['board']['clock'][player] = list(
+            self._bg._gameinfo['clock_limit'])
+        self._clock_active[player] = False
+        self._clock_start[player] = time.monotonic()
+
     async def emit_gameinfo(self, sec=0, history_flag=False):
         """
         send game information to all clients
@@ -147,7 +222,15 @@ class ytBackgammonServer:
                     'sec': sec,
                     'hist_i': len(self._history),
                     'hist_n': len(self._history) + len(self._fwd_hist),
-                    'history_flag': history_flag
+                    'history_flag': history_flag,
+                    # クロックの状態 (TODO-016)。gameinfo['board']['clock']
+                    # は最後に止まった時点の値なので、動作中の残り時間は
+                    # こちらで送る
+                    'clock_state': {
+                        'sw': self._clock_sw,
+                        'active': list(self._clock_active),
+                        'clock': [self._cur_clock(0), self._cur_clock(1)],
+                    }
                 }
             })
 
@@ -172,7 +255,7 @@ class ytBackgammonServer:
         try:
             while len(self._history) > 1:
                 self._fwd_hist.append(self._history.pop())
-                self._bg._gameinfo = copy.deepcopy(self._history[-1])
+                self._load_hist_ent(self._history[-1])
 
                 self.__log.debug('_history=({}), _fwd_hist=({})',
                                  len(self._history), len(self._fwd_hist))
@@ -209,7 +292,7 @@ class ytBackgammonServer:
         try:
             while len(self._fwd_hist) > 0:
                 self._history.append(self._fwd_hist.pop())
-                self._bg._gameinfo = copy.deepcopy(self._history[-1])
+                self._load_hist_ent(self._history[-1])
 
                 self.__log.debug('_history=({}), _fwd_hist=({})',
                                  len(self._history), len(self._fwd_hist))
@@ -488,6 +571,9 @@ class ytBackgammonServer:
         if msg['type'] == 'set_gameinfo':
             # data: gameinfo
             self._bg.set_gameinfo(msg['data'])
+            # 盤面ごと入れ替わるので、クロックは止まった状態にする (TODO-016)
+            self._clock_active = [False, False]
+            self._clock_start = [time.monotonic(), time.monotonic()]
             self.add_history(self._bg._gameinfo)
             await self.emit_gameinfo(0)
             return
@@ -527,10 +613,51 @@ class ytBackgammonServer:
         if msg['type'] == 'set_clock_limit':
             # data: {'index': int, 'clock_limit': int}
             self._bg.set_clock_limit(msg['data'])
+            # ytbg.js の受信側は両方のクロックを reset() する。合わせる
+            self._reset_clock(0)
+            self._reset_clock(1)
 
         if msg['type'] == 'set_player_clock':
             # data: {'player': int, 'clock': [int(sec), int(sec)]}
             self._bg.set_player_clock(msg['data'])
+            # 残り時間が入れ替わったので、数え直しの基準も打ち直す
+            self._clock_start[msg['data']['player']] = time.monotonic()
+
+        # ここから 5 つはクロックの動作そのもの (TODO-016)。TODO-012 で
+        # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
+        # 返せるように戻した。転送は今までどおり続けるので、すでに開いて
+        # いる画面の動きは変わらない
+        if msg['type'] == 'set_clock_switch':
+            # data: {'switch': bool}
+            # off の間は進まないので、切り替える前に進んだ分を確定させる
+            self._freeze_clock(0)
+            self._freeze_clock(1)
+            self._clock_sw = msg['data']['switch']
+
+        if msg['type'] == 'start_clock':
+            # data: {'player': int}
+            # ytbg.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
+            player = msg['data']['player']
+            self._freeze_clock(player)
+            self._bg._gameinfo['board']['clock'][player][1] = (
+                self._bg._gameinfo['clock_limit'][1])
+            self._clock_active[player] = True
+
+        if msg['type'] == 'resume_clock':
+            # data: {'player': int}
+            player = msg['data']['player']
+            self._freeze_clock(player)
+            self._clock_active[player] = True
+
+        if msg['type'] == 'stop_clock':
+            # data: {'player': int}
+            player = msg['data']['player']
+            self._freeze_clock(player)
+            self._clock_active[player] = False
+
+        if msg['type'] == 'reset_clock':
+            # data: {'player': int}
+            self._reset_clock(msg['data']['player'])
 
         # append history or not
         if msg['history']:

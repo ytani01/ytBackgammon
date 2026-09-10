@@ -82,6 +82,8 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
   差し替えていない `bg_server_raw` を使う（`tests/test_broadcast.py`）
 - `on_json(ws, msg)` の第 1 引数は `req` フィクスチャ（WebSocket のスタブ）。
   **`request` は pytest の予約語**なので、その名前のフィクスチャは作れない
+- クロックのテスト（`tests/test_clock.py`）は `time.monotonic()` を
+  差し替えて時間を進める。実時間を待たない
 - **テストが通ることだけを見ない。** `src/` をわざと壊して、狙ったテストが
   落ちることを確かめる（TODO-013）。最初に書いた 55 件のうち、
   `broadcast=True` を全部外しても `history_flag` を反転しても
@@ -151,15 +153,41 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 1 つ詰まると、他のクライアントの処理も連続再生の次の 1 手も止まる。
 消すにはクライアントごとの送信キューが要る（TODO-009 ではやっていない）。
 
-なお、クロックの進行はクライアント側だけで動いている。サーバの `on_json()`
-にあるのは `set_clock_limit` と `set_player_clock` の 2 つだけで、`gameinfo` を
-更新する。`start_clock` / `stop_clock` などは分岐を持たず、末尾の
-`add_history` と broadcast へ落ちる（TODO-012）。
+### クロック
+
+**表示を進めるのはクライアント側だけ**だが、残り時間の基準はサーバも持つ
+（TODO-016）。`on_json()` には `set_clock_limit` / `set_player_clock` に加えて
+`set_clock_switch` / `start_clock` / `stop_clock` / `resume_clock` /
+`reset_clock` の分岐があり、いずれも return せず、末尾の `add_history` と
+broadcast へ落ちる（受け取ったメッセージの転送は今までどおり）。
+
+サーバが `gameinfo` とは別に持つのは次の 3 つ。**`gameinfo` には入れない。**
+入れると履歴に載り、`back` / `fwd` でクロックの発着まで巻き戻ってしまう。
+
+- `_clock_sw` — クロック機能そのものの ON/OFF
+- `_clock_active` — プレーヤーごとの動作中かどうか
+- `_clock_start` — 数え始めた時刻（`time.monotonic()`）
+
+残り時間は `gameinfo['board']['clock']` に入っている値から
+`_clock_start` の経過分を引いて求める（`_cur_clock()`。計算は `ytbg.js` の
+`PlayerClock.update()` と同じで、持ち時間はマイナスも許す）。動き方が変わる
+直前に `_freeze_clock()` でそこまでの分を `gameinfo` へ書き戻し、時刻を
+打ち直す。`emit_gameinfo()` は `_cur_clock()` の値を `clock_state`
+（`sw` / `active` / `clock`）として添えるので、**あとからつないだ
+クライアントも動作中の表示に戻せる**。`gameinfo['board']['clock']` の側は
+最後に止まった時点の値なので、動作中の残り時間はそちらではなく
+`clock_state` を見る。
+
+`_clock_sw` の初期値は `True`。`index.html` の Clock のチェックボックスが
+既定で checked なので、`False` にすると、つないだ画面が `clock_state` を
+受けてチェックを外してしまう。
 
 ### 履歴（戻す・進める）
 
 `_history` と `_fwd_hist` の 2 つのスタック。戻すと `_history` から pop して
-`_fwd_hist` へ積む。
+`_fwd_hist` へ積む。gameinfo を履歴のもので置き換えるのは `_load_hist_ent()`
+で、**クロックの残り時間だけは引き継ぐ**（TODO-016。クロックは履歴の対象外
+なので、戻すと動いているクロックが昔の値から数え直しになる）。
 
 連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
 `await asyncio.sleep()` を挟みながら 1 手ずつ送る。**再生中に別の再生要求が

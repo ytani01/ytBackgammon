@@ -433,7 +433,8 @@ async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
     assert sent['type'] == 'gameinfo'
     data = sent['data']
     assert set(data.keys()) == {
-        'gameinfo', 'sec', 'hist_i', 'hist_n', 'history_flag'}
+        'gameinfo', 'sec', 'hist_i', 'hist_n', 'history_flag', 'clock_state'}
+    assert set(data['clock_state'].keys()) == {'sw', 'active', 'clock'}
 
 
 async def test_back_moves_hist_i_by_n(bg_server, req, emitted, no_sleep):
