@@ -464,3 +464,32 @@ async def test_new_resets_clock_to_limit(fake_time, bg_server, req):
 
     assert bg_server._bg._gameinfo['board']['clock'] == [[60, 6], [60, 6]]
     assert bg_server._clock_active == [False, False]
+
+
+async def test_clear_hist_keeps_running_clock(fake_time, bg_server, req):
+    """
+    履歴を消しても、動いているクロックはそのまま進み続ける (TODO-019)。
+
+    clear_history() は _history と _fwd_hist しか触らないが、
+    クロックはサーバが gameinfo とは別に持っているので、そこへ
+    副作用が漏れないことを固定しておく。
+    """
+    await clock_on(bg_server, req)
+    await bg_server.on_json(
+        req, {'type': 'set_player_clock',
+              'data': {'player': 0, 'clock': [100, 12]}, 'history': True})
+
+    await send(bg_server, req, 'start_clock', 0)
+    fake_time.advance(5)
+    assert bg_server._cur_clock(0) == [100, 7]
+
+    await bg_server.on_json(
+        req, {'type': 'clear_hist', 'data': {}, 'history': False})
+
+    assert bg_server._clock_sw is True
+    assert bg_server._clock_active == [True, False]
+    assert bg_server._cur_clock(0) == [100, 7]
+
+    # 消したあとも数え続ける
+    fake_time.advance(3)
+    assert bg_server._cur_clock(0) == [100, 4]

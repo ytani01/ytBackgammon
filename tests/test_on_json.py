@@ -12,6 +12,7 @@ TODO-009 で通信層を Flask-SocketIO から Starlette + 素の WebSocket へ
 先に固めておき、移行後は同じテストを通すだけで済むようにする。
 網羅率を上げるのが目的ではない。
 """
+import asyncio
 import copy
 
 import pytest
@@ -403,6 +404,71 @@ async def test_fwd2_behaves_like_fwd_all(bg_server, req, no_sleep):
 
     assert len(bg_server._fwd_hist) == 0
     assert len(bg_server._history) == 3
+
+
+async def test_clear_hist_leaves_one_entry(bg_server, req, emitted, no_sleep):
+    """clear_hist は履歴を 1 件だけにし、hist_i / hist_n を 1 / 1 で返す"""
+    bg_server.add_history(bg_server._bg._gameinfo)
+    bg_server.add_history(bg_server._bg._gameinfo)
+    await bg_server.backward_hist(1, sleep_sec=0)
+    emitted.clear()
+
+    msg = {'type': 'clear_hist', 'data': {}, 'history': False}
+    await bg_server.on_json(req, msg)
+
+    assert len(bg_server._history) == 1
+    assert bg_server._fwd_hist == []
+
+    sent = emitted.last
+    assert sent['type'] == 'gameinfo'
+    assert sent['data']['hist_i'] == 1
+    assert sent['data']['hist_n'] == 1
+    # 盤面が動くわけではないので、アニメーションの時間は 0
+    assert sent['data']['sec'] == 0
+    assert sent['data']['history_flag'] is False
+    assert sent['data']['last_op'] is None
+
+
+async def test_clear_hist_keeps_board(bg_server, req):
+    """clear_hist は盤面を変えない"""
+    await bg_server.on_json(
+        req, {'type': 'put_checker',
+              'data': {'ch': 101, 'p': 5, 'idx': 2}, 'history': True})
+    before = copy.deepcopy(bg_server._bg._gameinfo['board'])
+
+    msg = {'type': 'clear_hist', 'data': {}, 'history': False}
+    await bg_server.on_json(req, msg)
+
+    assert bg_server._bg._gameinfo['board'] == before
+
+
+async def test_clear_hist_stops_running_replay(bg_server, req):
+    """
+    走っている連続再生を止めてから消す。
+
+    止めずに消すと、再生の Task が差し替わったあとの _history を
+    pop し続ける (TODO-019)。sleep を潰さずに動かし、途中で
+    clear_hist を割り込ませる。
+    """
+    for _ in range(20):
+        bg_server.add_history(bg_server._bg._gameinfo)
+
+    await bg_server.on_json(
+        req, {'type': 'back_all', 'data': {}, 'history': False})
+    task = bg_server._replay_task
+    await asyncio.sleep(0.25)
+    assert not task.done(), '0.1 秒間隔なのでまだ走っているはず'
+
+    await bg_server.on_json(
+        req, {'type': 'clear_hist', 'data': {}, 'history': False})
+
+    assert task.cancelled()
+    assert len(bg_server._history) == 1
+    assert bg_server._fwd_hist == []
+
+    # 止まった再生が後から動き出して、消した履歴を戻さない
+    await asyncio.sleep(0.25)
+    assert len(bg_server._history) == 1
 
 
 async def test_new_keeps_score_playername_clock_limit_and_resets_board(

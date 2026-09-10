@@ -4039,6 +4039,10 @@ class SoundBase {
 const new_game = () => {
     nav.checked=false;
     console.log("new_game()");
+    if (! confirm("New Game を始めます。\n"
+                  + "全員の盤面が初期配置に戻ります。")) {
+        return;
+    }
     emit_msg("new", {}, false);
 };
 
@@ -4098,6 +4102,22 @@ const fwd_all = () => {
     nav.checked=false;
     console.log("fwd_all()");
     emit_msg("fwd_all", {}, false);
+};
+
+/**
+ * 履歴を削除して、今の盤面だけを残す (TODO-019)
+ *
+ * 1 枚のボードを全員で共有しているので、消すと全員の履歴が消え、
+ * 元に戻せない。押した人の画面で確認を取る。
+ */
+const clear_hist = () => {
+    nav.checked=false;
+    console.log("clear_hist()");
+    if (! confirm("履歴を削除します。\n"
+                  + "全員の履歴が消え、元に戻せません。")) {
+        return;
+    }
+    emit_msg("clear_hist", {}, false);
 };
     
 /**

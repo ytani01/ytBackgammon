@@ -122,6 +122,29 @@ class ytBackgammonServer:
             self.save_data(self._datafile_path)
             self.__log.debug('history=({})', len(self._history))
 
+    async def clear_history(self):
+        """
+        履歴を消し、今の盤面 1 件だけにする (TODO-019)。
+
+        盤面そのものは変えないので、消したあとも表示は同じまま。
+        _fwd_hist も捨てるので、戻すことも進めることもできなくなる。
+
+        連続再生の Task が _history を pop している最中に差し替えると
+        壊れるので、**_run_replay() 経由で呼ぶこと。** 待つところが
+        無いので async にする必要は無いが、_run_replay() に渡すために
+        async def にしてある。
+        """
+        self.__log.debug('')
+
+        self._fwd_hist = []
+        self._cur_sn = 1
+        self._bg._gameinfo['sn'] = self._cur_sn
+        self._history = [copy.deepcopy(self._bg._gameinfo)]
+        self.save_data(self._datafile_path)
+
+        self.__log.debug('_history=({}), _fwd_hist=({})',
+                         len(self._history), len(self._fwd_hist))
+
     async def broadcast(self, msg):
         """
         send a message to all connected clients
@@ -517,9 +540,9 @@ class ytBackgammonServer:
         """
         前の連続再生を止めてから、その場で最後まで走らせる。
 
-        n > 0 の back / fwd 用 (TODO-009)。移行前は backward_hist() が
-        同期に走り切ってから on_json() が返っていたので、同時に 2 通
-        来たら 2 手ぶん動いた。_replay_lock を握ったまま走らせることで、
+        n > 0 の back / fwd と clear_hist 用 (TODO-009、TODO-019)。
+        移行前は backward_hist() が同期に走り切ってから on_json() が
+        返っていたので、同時に 2 通来たら 2 手ぶん動いた。_replay_lock を握ったまま走らせることで、
         その順序に戻している。例外は呼び出し元 (on_json) へ抜けて、
         受信ループの受け皿から on_error() へ届く。
         """
@@ -566,6 +589,13 @@ class ytBackgammonServer:
         if msg['type'] == 'fwd_all':
             # data: {}
             await self._start_replay(self.forward_hist, 0)
+            return
+
+        if msg['type'] == 'clear_hist':
+            # data: {}
+            # back と同じく、走っている連続再生を止めてから消す
+            await self._run_replay(self.clear_history)
+            await self.emit_gameinfo(0)
             return
 
         if msg['type'] == 'new':
