@@ -12,8 +12,9 @@
 なり、`load_gameinfo()` は位置が変わったチェッカーだけを動かすようになった。
 
 - [ ] サーバ: 操作系も `emit_gameinfo()` で返すようにし、直前の操作を添える
-- [ ] クライアント: `ws.onmessage` の 8 分岐を消し、`gameinfo` と直前の操作から
+- [ ] クライアント: `ws.onmessage` の分岐を消し、`gameinfo` と直前の操作から
       描き直す
+- [ ] 音と dice の演出を「直前の操作」から出す
 - [ ] `tests/` と `CLAUDE.md` を直す
 
 TODO-010 で「受信側だけ一方向にする」と決めた。サーバ → クライアントを
@@ -39,6 +40,30 @@ TODO-010 で「受信側だけ一方向にする」と決めた。サーバ → 
   emit した直後に `put_checker()` を先行実行し、その盤面で `check_disable()` と
   `winner_is()` を呼ぶ。往復を待つと判定が 1 手古い盤面で走る
 
+### 着手時に固めた設計（2026-09-10）
+
+前提が 2 つ片付いたので、残る作業は次の形になる。
+
+1. **サーバ。** 操作系は末尾で `broadcast(msg)` する代わりに、
+   `emit_gameinfo(sec, history_flag=False, last_op=msg)` を呼ぶ。
+   `emit_gameinfo()` に `last_op` を足す。`sec` は `put_checker` のときだけ
+   `SEC_CHECKER_MOVE`（0.2）で、他は 0
+2. **クライアント。** `ws.onmessage` から `gameinfo` 以外の分岐を消し、
+   `load_gameinfo(gameinfo, sec, history_flag, clock_state, last_op)` だけにする
+3. **演出は `last_op` から出す。** `load_gameinfo()` は盤面を描き直すだけで、
+   音も dice の回転も鳴らさない（`sound=false` で呼んでいる）。
+   `last_op` を見て、`put_checker` なら put / hit の音、`dice` なら roll の
+   演出と音、`set_turn` なら turn_change の音を鳴らす
+
+**チェッカーのアニメーションは `last_op` に頼らなくてよい**（TODO-017 で
+`load_gameinfo()` が位置の変わった駒だけを動かすようになった。Playwright で
+実測済み）。`last_op` が要るのは**音と dice の演出**のため。
+
+**音の二重は起きない。** `Checker.on_mouse_up_xy()` の先行適用は
+`put_checker(ch, dst_p, 0.2, false)` と `sound=false` で呼んでおり、
+「音は返ってきたメッセージで鳴らす」と決まっている（`ytbg.js:2555-2561` の
+コメント）。`last_op` で鳴らす形は、この作りをそのまま引き継ぐ
+
 ### 気をつけること
 
 - **`gameinfo` を丸ごと送るので通信量が増える。** 履歴操作では今も全体を
@@ -46,7 +71,10 @@ TODO-010 で「受信側だけ一方向にする」と決めた。サーバ → 
 - **`resign` はサーバだけに分岐がある。** 数を合わせるときに落とさない。
   クロック系の 5 つ（`set_clock_switch` / `start_clock` / `stop_clock` /
   `resume_clock` / `reset_clock`）は TODO-016 でサーバにも分岐ができたので、
-  今は両方にある
+  今は両方にある。クロックの状態は `clock_state` で送っているので、
+  **こちらも `emit_gameinfo()` に寄せられる**
+- **`board.turn == -1` のときに `put_checker` を捨てる分岐**（`ytbg.js`）が
+  今はある。盤面は `gameinfo` で同期されるので、捨てるのは音だけでよい
 - `emit_gameinfo()` は `broadcast()` を通るので、**いちばん遅い
   クライアントを待つ**（TODO-009 で残した制約）。操作系もその待ちに
   乗ることになる
