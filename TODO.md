@@ -11,8 +11,8 @@
 |------|------|------|
 | 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
 
-- [ ] `package.json` を作る（devDependency は playwright だけ）
-- [ ] `.gitignore` に `node_modules/` を足す
+- [ ] `package.json` と `package-lock.json` を作る
+- [ ] `.gitignore` に `node_modules/` を足し、`*.json` の例外を書く
 - [ ] `tests/browser/` に確認用のスクリプトを置く
 - [ ] テストが利用者のデータに触れないようにする
 - [ ] `CLAUDE.md` の「実行」の節に走らせ方を足す
@@ -81,11 +81,27 @@ TODO-024（サーバ分割）で `Storage` へ移る。
 - **reviewer** — `DATAFILE_DIR` の条件式が変わるため入れる。範囲はそこと、
   テストが確かめている中身が狙いどおりか（通ることだけを見ていないか）に絞る
 
-### 決めること
+### 決まっていること
 
-- playwright のバージョンを固定するか（今回試したのは 1.63.0）
-- `tests/browser/` を `uv run pytest` から呼べるようにするか、
-  `node` で直接走らせるか
+着手前に相談して決めた。
+
+**playwright は `^1.63.0` とし、`package-lock.json` をコミットする。**
+`pyproject.toml` が `>=` で `uv.lock` をコミットしているのと同じ流儀。
+ロックがあるので再現性は保たれ、上げたいときは `npm update` する。
+
+**走らせるのは `node --test tests/browser/`。** TODO-026 で足す
+`node --test tests/js/` と揃い、**JS のテストは node、Python のテストは
+pytest** と責務が分かれる。`CLAUDE.md` にはコマンドが 2 つ並ぶことになる。
+
+**`.gitignore` の `*.json` は残し、`!package.json` と
+`!package-lock.json` の例外を書く。** `*.json` は 1 行目にあり、
+**今このリポジトリでは 1 つも無視していない**（保存先が `$HOME` のため
+実害が出ていなかっただけ）。このままだと `package.json` を作っても
+コミットされない。保険として残すのは、盤面のデータファイルをうっかり
+コミットしないため。
+
+`node --test` は v26.8.2 で動くことを確かめた。システムの chromium は
+152.0.7977.82。
 
 ---
 
