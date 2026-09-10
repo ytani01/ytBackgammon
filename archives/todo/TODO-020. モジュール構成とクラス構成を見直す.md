@@ -357,12 +357,16 @@ TODO-021 で消すもの:
   `for "clock_sw"` というタイプミス（`for` が効いておらず、ラベルを
   押しても切り替わらない）
 
-## 着手前にやること
+## サブエージェントの定義
 
-**`.claude/agents/` がまだ無い。** TODO-021 を立てるときに、
-implementer / verifier / reviewer の定義を作る。`CLAUDE.md` の
-「コードやファイルを変える項目では、確認の担当を必ず別のサブエージェントに
-分ける」に沿うため。**置いたあとは Claude Code の再起動が要る**（利用者が行う）。
+`~/.claude/agents/` に implementer / verifier / reviewer / wording が
+常設されており、**このプロジェクト用に足すものは無い**。定義は工程で
+切られていて言語に依存しないので、JS の項目でもそのまま使える。
+`verifier` が走らせる検証は `CLAUDE.md` の「実行」の節にある
+`uv run pytest` / `uv run ruff check .` / `uv run mypy src`。
+
+TODO-025 以降で `node --test tests/js/` が加わるので、そのときに
+`CLAUDE.md` の「実行」の節へ足す（定義側は直さなくてよい）。
 
 ## テスト
 
