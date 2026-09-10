@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 概要
 
-ネットワーク共有型のバックギャモンボード。Flask + Flask-SocketIO のサーバと、
+ネットワーク共有型のバックギャモンボード。Starlette + uvicorn のサーバと、
 ブラウザ上の JavaScript クライアントからなる。**対戦相手を組ませるゲームサーバではなく、
 「1 枚のボードを全員で共有して自由に触れる」ことを目的にしている**（観戦者も操作できる）。
 ルールチェックは補助であり、free move モードで無効化できる。
@@ -37,20 +37,22 @@ uv run ruff check .
 uv run mypy src
 ```
 
-サーバは **gevent の WSGI サーバ**で動かす（TODO-003）。Werkzeug の開発サーバは
-websocket を扱えず、クライアントが切断するたびにログへエラーが出ていた。
-`__main__.py` は先頭で `monkey.patch_all()` を呼んでいるので、**import の順番を
-変えない**（履歴の連続再生が `time.sleep()` を使っており、置き換えないと
-再生中にサーバ全体が止まる）。同じ理由で、**`__init__.py` に `socket` や `ssl` を
-使う import を足さない**（patch より前に読まれてしまう）。`mylog.py`（loguru）も
-`socket` / `ssl` / `asyncio` を引き込むので、`__init__.py` には置かない
-（TODO-005）。
+サーバは **uvicorn（ASGI）** で動かす（TODO-009）。Flask + Flask-SocketIO +
+gevent から移した。socket.io はやめて素の WebSocket を使う。
+`monkey.patch_all()` が無くなったので、**import の順番と `__init__.py` に置ける
+import の制約は無くなった**（TODO-003、TODO-005 で書いていた縛り）。
+
+WebSocket のパスは `/ws`。ping は uvicorn の既定（20 秒ごと）に任せる。
+ブラウザが pong を自動で返すので、JS 側には何も要らない。クライアントは
+切れたら 1 秒から始めて倍にしながら（上限 10 秒）つなぎ直す。つなぎ直せば
+`on_connect()` が `gameinfo` を丸ごと送るので、**取りこぼした差分を埋める
+仕組みは持たない**。
 
 `-d` / `--debug` は `main()` の先頭の `loggerInit(debug)` に渡してログの水準を
-DEBUG にし、gevent のアクセスログ（`socketio.run()` の `log_output`）を出す。
-Flask の debug モードには渡していない。
-渡すと対話デバッガが `0.0.0.0` に出てしまうため（TODO-001）。アクセスログだけは
-`pywsgi` が stderr へ直接書くので、loguru の書式とは揃わない。
+DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替える。
+`-d` なしのときは uvicorn 自身のログ（`Uvicorn running on ...`、
+`connection open`）も出ない。uvicorn のログは loguru とは別系統なので、
+`-d` を付けたときの書式は揃わない。
 
 テストは `tests/` にあり、`uv run pytest` で走る（TODO-006）。`gameinfo` の
 更新、履歴、保存・読み込みに加えて、`on_json()` の `type` ごとの振る舞いを
@@ -59,29 +61,34 @@ Flask の debug モードには渡していない。
 
 テストを足すときの注意:
 
-- **`gevent.monkey.patch_all()` を呼ばない。** `backward_hist()` /
+- テストは `pytest-asyncio` の `asyncio_mode = "auto"` で走るので、
+  `async def` のテストをそのまま書ける。`backward_hist()` /
   `forward_hist()` には `sleep_sec=0` を渡す。`on_json()` 経由では
-  `sleep_sec` を渡せないので、`no_sleep` フィクスチャで `time.sleep` を
-  潰す（stdlib の `time` そのものを差し替えるので、テストの間はプロセス
-  全体に効く）
+  `sleep_sec` を渡せないので、`no_sleep` フィクスチャで `asyncio.sleep` を
+  差し替える。**何もしない関数にはしない**（連続再生は Task なので、
+  他の Task へ制御を渡す必要がある。本物の `asyncio.sleep(0)` を呼ぶ）
+- 連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
+  `on_json()` は待たずに返る。**完了を待つテストは
+  `await bg_server._replay_task`**（TODO-009）
 - `ytBackgammonServer` はコンストラクタの中で `load_data()` を呼び、
   保存先を `DATAFILE_DIR`（`$HOME`）から組み立てる。`conftest.py` の
   `bg_server` フィクスチャが `DATAFILE_DIR` を `tmp_path` に差し替えている
   ので、利用者の `~/ytbg-*.json` は読み書きされない。**このとき履歴が
   1 件積まれる**ので、件数を数えるテストはそれを前提に書く
-- `flask_socketio.emit` はリクエストコンテキストの外では使えない。
-  同じフィクスチャが `yt_backgammon_server.emit` を `fake_emit()` に
-  差し替え、送られたメッセージを `emitted`（`EmittedMessages`）へ積む。
-  テストは**送られたメッセージの列**を見る（`messages` / `types` / `last` /
-  `last_kwargs`）。TODO-009 で通信層を替えたら `fake_emit()` だけ直す
-- `on_json(request, msg)` の第 1 引数は `req` フィクスチャ。
+- 同じフィクスチャが `broadcast()` を丸ごと差し替え、送られたメッセージを
+  `emitted`（`EmittedMessages`）へ積む。テストは**送られたメッセージの列**を
+  見る（`messages` / `types` / `last`）。**この差し替えのせいで
+  `broadcast()` の中身は動かない**ので、送信そのものを見るテストは
+  差し替えていない `bg_server_raw` を使う（`tests/test_broadcast.py`）
+- `on_json(ws, msg)` の第 1 引数は `req` フィクスチャ（WebSocket のスタブ）。
   **`request` は pytest の予約語**なので、その名前のフィクスチャは作れない
 - **テストが通ることだけを見ない。** `src/` をわざと壊して、狙ったテストが
   落ちることを確かめる（TODO-013）。最初に書いた 55 件のうち、
   `broadcast=True` を全部外しても `history_flag` を反転しても
-  `SEC_CHECKER_MOVE` を変えても、1 件も落ちなかった
+  `SEC_CHECKER_MOVE` を変えても、1 件も落ちなかった。TODO-009 でも、
+  `broadcast()` を空にしても 1 件も落ちない状態が見つかっている
 
-ruff と mypy は入っているが、既存コードの指摘はまだ残っている（TODO-002）。
+`uv run ruff check .` と `uv run mypy src` の指摘は 0 件（TODO-011、TODO-009）。
 `mypy src` は `tests/` を見ていない。
 
 ## 構成
@@ -89,12 +96,20 @@ ruff と mypy は入っているが、既存コードの指摘はまだ残って
 Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/` と
 `static/` は `src/ytbg/webroot/` の下。
 
+- `src/ytbg/__init__.py` — パッケージの定数。`webroot/` の絶対パス（`WEBROOT`）は
+  ここにあり、`__main__.py` と `yt_backgammon_server.py` の両方が使う。
+  `__file__` から組み立てるので、どこから起動しても解決する
 - `src/ytbg/__main__.py` — エントリポイント（`[project.scripts]` の `ytbg`）。
-  Flask のルーティング（`/`, `/p1`, `/p2` はすべて同じ `index.html`）と SocketIO の
-  イベント登録だけを行い、処理は `svr` に委譲する。`svr` はグローバルで、
-  `main()` の中で生成される。`template_folder` / `static_folder` は
-  `__file__` から組み立てた `webroot/` の絶対パスなので、どこから起動しても解決する
-- `src/ytbg/yt_backgammon_server.py` — サーバ側の中心。クライアントからの `json`
+  Starlette のルーティング（`/`, `/p1`, `/p2` はすべて同じ `index.html`、
+  `/static`、WebSocket は `/ws`）と、**WebSocket の受信ループ**を持つ。
+  受け取ったメッセージの処理は `svr` に委譲するが、**例外のときに接続を
+  続けるか切るかはこのループが決めている**（TODO-009）。
+  `WebSocketDisconnect` と、受信そのもののその他の例外では抜ける。
+  JSON として読めないときと、`on_json()` の中で例外が起きたときは、
+  ログに出して**接続を保ったまま続ける**（移行前の Flask-SocketIO も
+  イベントハンドラの例外で切断はしなかった）。
+  `svr` はグローバルで、`main()` の中で生成される
+- `src/ytbg/yt_backgammon_server.py` — サーバ側の中心。クライアントから届いた
   メッセージの分岐、履歴の管理、`~/ytbg-{server_id}.json` への保存・読み込み、
   全クライアントへの broadcast
 - `src/ytbg/yt_backgammon.py` — `gameinfo`（盤面の状態そのもの）を保持し、
@@ -103,9 +118,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   ファイル先頭のコメントにクラス階層図がある
   （`BgBase` → `BgText`/`BgImage` → 各表示要素、`Board`）
 - `src/ytbg/webroot/templates/index.html` — ボード 1 面。JS/CSS はタイムスタンプ付き
-  URL で動的に読み込む（キャッシュ避け）。画像パスに `{{image_dir}}` が埋め込まれる。
-  socket.io はクライアント側 4.x を CDN から読む
-- `ytbg.html` — 複数サーバの画面を iframe で並べる一覧ページ（Flask 経由ではなく静的）
+  URL で動的に読み込む（キャッシュ避け）。画像パスに `{{image_dir}}` が埋め込まれる
+- `ytbg.html` — 複数サーバの画面を iframe で並べる一覧ページ（サーバ経由ではなく静的）
 
 ### サーバ 1 プロセス ＝ ボード 1 面
 
@@ -126,11 +140,16 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **26, 27 がバー**（`bar_point(player) = 26 + player`）。プレーヤー 0 は番号が
 減る方向、プレーヤー 1 は増える方向に進む（`calc_dst_point()`）。
 
-メッセージは全て SocketIO の `json` イベント 1 本で、
+メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
 `{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
-`type` の分岐はサーバの `on_json()` とクライアントの `ws.on("json")` の
+`type` の分岐はサーバの `on_json()` とクライアントの `ws.onmessage` の
 **両方に同じ名前で書かれている**ので、`type` を足すときは両方直す。
 `history: true` を付けたメッセージだけが履歴に 1 手として積まれる。
+
+全員への送信（`broadcast()`）は `asyncio.gather()` で並行に送るが、
+**いちばん遅いクライアントを待つ**（全員へ送り終わるまで次へ進まない）。
+1 つ詰まると、他のクライアントの処理も連続再生の次の 1 手も止まる。
+消すにはクライアントごとの送信キューが要る（TODO-009 ではやっていない）。
 
 なお、クロックの進行はクライアント側だけで動いている。サーバの `on_json()`
 にあるのは `set_clock_limit` と `set_player_clock` の 2 つだけで、`gameinfo` を
@@ -140,8 +159,19 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 ### 履歴（戻す・進める）
 
 `_history` と `_fwd_hist` の 2 つのスタック。戻すと `_history` から pop して
-`_fwd_hist` へ積む。連続再生は `_repeat_flag` を見ながら `time.sleep()` で
-1 手ずつ emit するので、**再生中に別の再生要求が来ると前の再生を止めてから始める**。
+`_fwd_hist` へ積む。
+
+連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
+`await asyncio.sleep()` を挟みながら 1 手ずつ送る。**再生中に別の再生要求が
+来ると、前の Task を cancel してから始める**（TODO-009）。cancel と Task の
+差し替えは `_replay_lock` の中でまとめて行う。**そうしないと、cancel を待つ
+間に別の要求が入り込み、どこからも辿れない再生 Task が残る**（実際に起きた。
+逆方向の 2 本が打ち消し合って止まらなくなる）。
+
+n 手ぶんの `back` / `fwd`（n > 0）は Task にせず、ロックを握ったまま
+その場で走り切る。Task にすると、2 人が同時に押したときに片方が cancel されて
+1 手分失われる。そのかわり、走っている間は cancel できない（`ytbg.js` は
+n = 1 しか送らないので、待たされるのは 1 手分だけ）。
 
 保存は `save_data()` が JSON を文字列連結で組み立てている（`json.dump` ではない）。
 1 手 1 行に近い読みやすい形にするためで、`gameinfo` にキーを足したときは

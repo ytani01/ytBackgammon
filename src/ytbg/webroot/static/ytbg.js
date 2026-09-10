@@ -66,6 +66,10 @@
 const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
+// 再接続の間隔 [sec]。つながるまで倍にし、つながったら最小へ戻す
+const WS_RETRY_SEC_MIN = 1;
+const WS_RETRY_SEC_MAX = 10;
+let ws_retry_sec = WS_RETRY_SEC_MIN;
 let board = undefined;
 const nav = document.getElementById("nav-input");
 
@@ -84,7 +88,13 @@ const SOUND_TURN_CHANGE = "/static/sounds/turn_change1.mp3";
  */
 const emit_msg = (type, data, history=false) => {
     console.log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
-    ws.emit("json", {src: "client", type: type, data: data, history: history});
+    if ( ws === undefined || ws.readyState !== WebSocket.OPEN ) {
+        // 切断中は捨てる。つなぎ直せばサーバから gameinfo が送られてくる
+        console.log(`emit_msg> not connected .. ignored`);
+        return;
+    }
+    ws.send(JSON.stringify({src: "client", type: type,
+                            data: data, history: history}));
 };
 
 /**
@@ -2618,13 +2628,10 @@ class Board extends BgImage {
      * @param {number} x - 
      * @param {number} y - 
      * @param {number} player - 0 or 1
-     * @param {io.connect} ws - websocket
      */
-    constructor(id, x, y, ws) {
+    constructor(id, x, y) {
         console.log(`Board(id=${id},x=${x},y=${y})`);
         super(id, x, y, 0, undefined, undefined);
-
-        this.ws = ws;
 
         this.free_move = false;
         this.disp_pip = false;
@@ -4136,137 +4143,163 @@ window.onload = () => {
     // menu
     const nav_el = document.getElementById("nav-drawer");
 
-    // connect to server
-    let url = `${document.location.protocol}//${document.domain}`;
-    console.log(`location.port=${location.port}`);
-    if ( location.port != "" ) {
-        url += ":" + location.port;
-    }
-    url += "/";
-    console.log(`url=${url}`);
-
-    ws = io.connect(url);
-
     // initialize board
     board = new Board("board",
                       nav_el.offsetWidth  + 20,
-                      nav_el.offsetHeight + 40,
-                      ws);
+                      nav_el.offsetHeight + 40);
 
-    ws.on("connect", function() {
-        console.log("ws.on(connected)");
-    });
-
-    ws.on("disconnect", function() {
-        console.log("ws.on(disconnected)");
-    });
+    // WebSocket の URL
+    const ws_url = () => {
+        const proto =
+              (document.location.protocol === "https:") ? "wss:" : "ws:";
+        let url = `${proto}//${document.domain}`;
+        console.log(`location.port=${location.port}`);
+        if ( location.port != "" ) {
+            url += ":" + location.port;
+        }
+        url += "/ws";
+        return url;
+    };
 
     /**
-     * msg := {
-     *   type: str,
-     *   data: Object
-     * }
+     * connect to server
+     *
+     * 切れたら一定時間後につなぎ直す。間隔は WS_RETRY_SEC_MIN から
+     * 倍にしていき、WS_RETRY_SEC_MAX で頭打ち。つながったら戻す。
+     * つなぎ直せばサーバが gameinfo を送ってくるので、切れている間の
+     * 取りこぼしを埋める仕組みは要らない。
      */
-    ws.on("json", function(msg) {
-        console.log(`ws.on(json):msg=${JSON.stringify(msg)}`);
+    const ws_connect = () => {
+        const url = ws_url();
+        console.log(`ws_connect> url=${url}`);
+        ws = new WebSocket(url);
 
-        if ( msg.type == "gameinfo" ) {
-            board.load_gameinfo(msg.data.gameinfo,
-                                msg.data.sec,
-                                msg.data.history_flag);
-            return;
-        } // "gameinfo"
+        ws.onopen = function() {
+            console.log("ws.onopen()");
+            ws_retry_sec = WS_RETRY_SEC_MIN;
+        };
 
-        if ( msg.type == "put_checker" ) {
-            if ( board.turn == -1 ) {
-                console.log(`ws.on(json)put_checker>`
-                            + `turn=${board.turn}..ignored`);
+        ws.onerror = function() {
+            // 続けて onclose が呼ばれるので、ここでは再接続しない
+            console.log("ws.onerror()");
+        };
+
+        ws.onclose = function() {
+            console.log(`ws.onclose()> retry in ${ws_retry_sec} sec`);
+            setTimeout(ws_connect, ws_retry_sec * 1000);
+            ws_retry_sec = Math.min(ws_retry_sec * 2, WS_RETRY_SEC_MAX);
+        };
+
+        /**
+         * msg := {
+         *   type: str,
+         *   data: Object
+         * }
+         */
+        ws.onmessage = function(ev) {
+            const msg = JSON.parse(ev.data);
+            console.log(`ws.onmessage:msg=${JSON.stringify(msg)}`);
+
+            if ( msg.type == "gameinfo" ) {
+                board.load_gameinfo(msg.data.gameinfo,
+                                    msg.data.sec,
+                                    msg.data.history_flag);
                 return;
-            }
-            const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
-            console.log(`ws.on(json)put_checker)> ch_id=${ch_id}`);
-            let ch = board.search_checker(ch_id);
+            } // "gameinfo"
 
-            board.put_checker(ch, msg.data.p, 0.2);
-            return;
-        } // "put_checker"
+            if ( msg.type == "put_checker" ) {
+                if ( board.turn == -1 ) {
+                    console.log(`ws.onmessage>put_checker>`
+                                + `turn=${board.turn}..ignored`);
+                    return;
+                }
+                const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
+                console.log(`ws.onmessage>put_checker> ch_id=${ch_id}`);
+                let ch = board.search_checker(ch_id);
 
-        if ( msg.type == "cube" ) {
-            board.cube.set(msg.data.value, msg.data.side, msg.data.accepted);
-            return;
-        } // "cube"
-
-        if ( msg.type == "dice" ) {
-            console.log(`ws.on(json)>type=dice,turn=${board.turn}`);
-            if ( board.turn == -1 ) {
+                board.put_checker(ch, msg.data.p, 0.2);
                 return;
-            }
-            if ( JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
-                // let playpromise = board.sound_turn_change.play();
-            }
+            } // "put_checker"
 
-            board.roll_btn[msg.data.player].set(msg.data.dice,
-                                                   msg.data.roll);
-            if ( board.turn < 0 ) {
-                board.player_name[0].off();
-                board.player_name[1].off();
-            }
-            return;
-        } // "dice"
+            if ( msg.type == "cube" ) {
+                board.cube.set(msg.data.value, msg.data.side, msg.data.accepted);
+                return;
+            } // "cube"
 
-        if ( msg.type == "set_turn" ) {
-            board.set_turn(msg.data.turn, msg.data.resign);
-            return;
-        } // set_turn
+            if ( msg.type == "dice" ) {
+                console.log(`ws.onmessage>type=dice,turn=${board.turn}`);
+                if ( board.turn == -1 ) {
+                    return;
+                }
+                if ( JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
+                    // let playpromise = board.sound_turn_change.play();
+                }
 
-        if ( msg.type == "set_playername" ) {
-            board.player_name[msg.data.player].set(msg.data.name);
-            return;
-        } // set_playername
-        
-        if ( msg.type == "set_score" ) {
-            board.score[msg.data.player].set(msg.data.score);
-            return;
-        } // set_score
-        
-        if ( msg.type == "set_clock_switch" ) {
-            board.set_clock_switch(msg.data.switch);
-            console.log(`clock_sw=${board.clock_sw}`);
-            return;
-        } // set_clock_switch
+                board.roll_btn[msg.data.player].set(msg.data.dice,
+                                                    msg.data.roll);
+                if ( board.turn < 0 ) {
+                    board.player_name[0].off();
+                    board.player_name[1].off();
+                }
+                return;
+            } // "dice"
 
-        if ( msg.type == "set_clock_limit" ) {
-            board.clock_limit.set(msg.data.index, msg.data.clock_limit);
-            board.player_clock[0].reset();
-            board.player_clock[1].reset();
-            return;
-        } // set_clock_limit
+            if ( msg.type == "set_turn" ) {
+                board.set_turn(msg.data.turn, msg.data.resign);
+                return;
+            } // set_turn
+
+            if ( msg.type == "set_playername" ) {
+                board.player_name[msg.data.player].set(msg.data.name);
+                return;
+            } // set_playername
         
-        if ( msg.type == "set_player_clock" ) {
-            board.player_clock[msg.data.player].set(msg.data.clock);
-            return;
-        } // set_player_clock
+            if ( msg.type == "set_score" ) {
+                board.score[msg.data.player].set(msg.data.score);
+                return;
+            } // set_score
         
-        if ( msg.type == "resume_clock" ) {
-            board.player_clock[msg.data.player].resume();
-            return;
-        } // set_player_clock
+            if ( msg.type == "set_clock_switch" ) {
+                board.set_clock_switch(msg.data.switch);
+                console.log(`clock_sw=${board.clock_sw}`);
+                return;
+            } // set_clock_switch
+
+            if ( msg.type == "set_clock_limit" ) {
+                board.clock_limit.set(msg.data.index, msg.data.clock_limit);
+                board.player_clock[0].reset();
+                board.player_clock[1].reset();
+                return;
+            } // set_clock_limit
         
-        if ( msg.type == "start_clock" ) {
-            board.player_clock[msg.data.player].start();
-            return;
-        } // set_player_clock
+            if ( msg.type == "set_player_clock" ) {
+                board.player_clock[msg.data.player].set(msg.data.clock);
+                return;
+            } // set_player_clock
         
-        if ( msg.type == "stop_clock" ) {
-            board.player_clock[msg.data.player].stop();
-            return;
-        } // set_player_clock
+            if ( msg.type == "resume_clock" ) {
+                board.player_clock[msg.data.player].resume();
+                return;
+            } // set_player_clock
         
-        if ( msg.type == "reset_clock" ) {
-            board.player_clock[msg.data.player].reset();
-            return;
-        } // set_player_clock
+            if ( msg.type == "start_clock" ) {
+                board.player_clock[msg.data.player].start();
+                return;
+            } // set_player_clock
         
-        console.log("ws.on(json)>msg.type=???");
-    }); // ws.on(json)
+            if ( msg.type == "stop_clock" ) {
+                board.player_clock[msg.data.player].stop();
+                return;
+            } // set_player_clock
+        
+            if ( msg.type == "reset_clock" ) {
+                board.player_clock[msg.data.player].reset();
+                return;
+            } // set_player_clock
+        
+            console.log("ws.onmessage>msg.type=???");
+        }; // ws.onmessage
+    }; // ws_connect
+
+    ws_connect();
 }; // window.onload

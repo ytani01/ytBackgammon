@@ -1,93 +1,38 @@
 # TODO
 
-**残っている項目: TODO-004、TODO-009、TODO-010。**
-これまでに 11 件を決着させた。
+**残っている項目: TODO-004、TODO-010。**
+これまでに 12 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-015` から。**
 
 ---
 
-## TODO-004. save_data() のファイル I/O が gevent では全体を止める
+## TODO-004. save_data() のファイル I/O がイベントループを止める
 
 - [ ] 実際にどれだけ止まるのかを測る
 - [ ] 実害があるなら対処する
 
 `add_history()` は 1 手ごとに `save_data()` を呼ぶが、`save_data()` は履歴全体を
-毎回 JSON 文字列に組み立て直してファイルに書き込む。`monkey.patch_all()` は
-`builtins.open` を置き換えないため、gevent は通常ファイルの読み書きを非同期に
-しない。そのため 1 回の書き込みの間、プロセス全体（全 greenlet）が止まり、
-他のクライアントの処理も進まない。
+毎回 JSON 文字列に組み立て直してファイルに書き込む。**同期の `open()` と
+`write()` なので、その間 asyncio のイベントループが止まる。** 止まっている間は、
+他のクライアントのメッセージも、連続再生の次の 1 手も進まない。
 
-threading のときは書き込み中に GIL が解放されるので、他のスレッドは進めた。
-TODO-003 で gevent へ移行したときに、reviewer が見つけた。
+TODO-003 で gevent へ移行したときに reviewer が見つけた。そのときは
+「`monkey.patch_all()` が `builtins.open` を置き換えないので、書き込みの間
+全 greenlet が止まる」という形だった。**TODO-009 で asyncio へ移しても同じことが
+起きる**（原因の説明だけが変わった）。保存は依頼どおり同期のまま移してある。
 
 - 履歴が伸びるほど 1 回の書き込み量が増え、止まる時間も伸びる
-- 連続再生を止める要求（`_repeat_flag` の書き換え）の反映も、`save_data()` の
-  実行中は遅れる
 - **停止時間は測っていない。** 今の規模（数 KB の JSON）なら問題にならないと
   見ているが、根拠は無い。まず測ってから、対処するかを決める
-- 対処するなら、`gevent.fileobject` を使うか、保存を別の greenlet へ追い出す
-- **TODO-009 で Starlette + uvicorn へ移したら、この節を書き直す。** asyncio でも
-  `open()` はイベントループを止めるので問題は残るが、gevent 前提の説明と
-  `gevent.fileobject` の案は当てはまらなくなる（対処は `asyncio.to_thread()`）
+- 対処するなら `asyncio.to_thread()` へ逃がす。ただし呼び出し元
+  （`add_history()` / `backward_hist()` / `forward_hist()`）が async になるので、
+  波及範囲も見る
+- TODO-009 で残した「`broadcast()` はいちばん遅いクライアントを待つ」という
+  制約と**同じ性質の話**（1 か所の待ちが全体を止める）。まとめて測ってもよい
 
 |      | main | 担当 |
 |------|------|------|
 | 見込み | Opus 5 / effort high | verifier + reviewer |
-
----
-
-## TODO-009. Flask + gevent から Starlette + uvicorn へ移す
-
-- [ ] サーバを Starlette + 素の WebSocket + uvicorn で書き直す
-- [ ] `ytbg.js` の通信部分を素の WebSocket に替え、再接続を足す
-- [ ] `index.html` から socket.io の CDN 読み込みを消す
-- [ ] テストを async に合わせる
-- [ ] `ytbg.sh` と `CLAUDE.md` を直す
-
-gevent は `monkey.patch_all()` が前提なので、import の順番と `__init__.py` に
-置ける import が縛られている（TODO-003、TODO-005）。socket.io は再接続以外の
-機能を使っておらず、`index.html` が CDN から読んでいるので外部に依存する。
-asyncio へ移せば待ちが `await` として見え、通信層も薄くなる。
-
-利用者と相談して決めたこと。
-
-- **Starlette + 素の WebSocket + uvicorn にする。** Tornado も候補だったが、
-  ASGI の外に出るので選ばなかった（python-socketio の Tornado 対応は
-  `# pragma: no cover` で、作者のテストが通っていない）
-- **socket.io はやめる。** 使っているのは再接続だけ。ping は uvicorn が
-  既定で 20 秒ごとに送り（`ws_ping_interval`）、ブラウザは pong を自動で
-  返すので JS 側には要らない。**インターネット越しに使うが**、`on_connect`
-  が `gameinfo` を丸ごと送るので、つなぎ直せば復旧する。取りこぼした差分を
-  埋める仕組みは要らない
-- **プロトコルの一方向化はこの項目ではやらない。** 今は操作メッセージの
-  転送と状態の丸ごと送信の 2 経路があり、同じ更新ロジックが Python と JS の
-  両方にある。直すなら `ytbg.js` の作り直しになるので、別に立てる
-
-やること。
-
-- `emit(..., broadcast=True)` の代わりに、接続中の WebSocket の集合を持って
-  回す。今の `_client_sid` がその実体になる
-- 連続再生の `time.sleep()` を `await asyncio.sleep()` に、`_repeat_flag` を
-  Task の `cancel()` に置き換える
-- `emit()` がリクエストコンテキストに依存しなくなるので、`conftest.py` の
-  差し替えを見直す
-
-変えないもの。
-
-- メッセージの形（`{src, type, data, history}`）
-- 保存の形式と `save_data()` の呼び方。**同期のまま移す。**
-  `asyncio.to_thread()` へ逃がすかは TODO-004 で決める
-- 盤面のロジック、画像、`ytbg.html`
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- 複数のファイルにまたがり、実装・テスト・文書が同時に要るので実装も分ける
-- 通信層が変わるのでレビューの担当も入れる
-- ブラウザでの操作確認は verifier に任せる（TODO-003 と同じ手順が使える）
-
----
 
 ## TODO-010. プロトコルを一方向にするか決める
 
@@ -98,7 +43,7 @@ asyncio へ移せば待ちが `await` として見え、通信層も薄くなる
 
 今は同じ変化を 2 つの経路で伝えている。操作系（`put_checker`、`dice` など）は、
 サーバが状態を更新したうえで**受け取ったメッセージをそのまま全員へ転送**し
-（`yt_backgammon_server.py:426`）、受け取った JS が**自分でもう一度同じ操作を
+（`yt_backgammon_server.py:540`）、受け取った JS が**自分でもう一度同じ操作を
 適用する**。履歴系（`back`、`fwd`、`new`）は `emit_gameinfo()` で**状態を
 丸ごと送る**。
 
@@ -150,6 +95,7 @@ asyncio へ移せば待ちが `await` として見え、通信層も薄くなる
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-009.** Flask + gevent から Starlette + uvicorn へ移す](archives/todo/TODO-009.%20Flask%20+%20gevent%20から%20Starlette%20+%20uvicorn%20へ移す.md)
 - [**TODO-014.** バージョンを git tag に連動させる](archives/todo/TODO-014.%20バージョンを%20git%20tag%20に連動させる.md)
 - [**TODO-013.** on_json の分岐ごとのテストを足す](archives/todo/TODO-013.%20on_json%20の分岐ごとのテストを足す.md)
 - [**TODO-012.** on_json のクロック系の分岐を消す](archives/todo/TODO-012.%20on_json%20のクロック系の分岐を消す.md)

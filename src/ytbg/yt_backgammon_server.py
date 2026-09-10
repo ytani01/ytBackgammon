@@ -7,17 +7,20 @@ yt_backgammon_server.py
 __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
+import asyncio
 import copy
 import json
 import os
-import time
 from pathlib import Path
 
-from flask import render_template
-from flask_socketio import emit
+from starlette.templating import Jinja2Templates
+from starlette.websockets import WebSocket
 
+from . import WEBROOT
 from .mylog import getLogger
 from .yt_backgammon import ytBackgammon
+
+templates = Jinja2Templates(directory=str(WEBROOT / 'templates'))
 
 
 class ytBackgammonServer:
@@ -41,13 +44,21 @@ class ytBackgammonServer:
             f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.json')
         self.__log.debug('_datafile_path={}', self._datafile_path)
 
-        self._client_sid = []
+        # 接続中の WebSocket と、ログ用の識別名 (TODO-009)。
+        # socket.io の sid に当たるものは無いので、自前の連番を振る
+        self._clients: dict[WebSocket, str] = {}
+        self._client_sn = 0
+
         self._history = []
         self._fwd_hist = []
         self._cur_sn = 0
 
         self._bg = ytBackgammon(self._svr_ver)
-        self._repeat_flag = False
+
+        # 履歴の連続再生の Task (TODO-009)。走っていなければ None。
+        # 差し替えと cancel は必ず _replay_lock の中で行う
+        self._replay_task: asyncio.Task | None = None
+        self._replay_lock = asyncio.Lock()
 
         [hist_len, _fwd_hist_len] = self.load_data(self._datafile_path)
         if hist_len < 1:
@@ -93,7 +104,33 @@ class ytBackgammonServer:
             self.save_data(self._datafile_path)
             self.__log.debug('history=({})', len(self._history))
 
-    def emit_gameinfo(self, sec=0, history_flag=False):
+    async def broadcast(self, msg):
+        """
+        send a message to all connected clients
+
+        Parameters
+        ----------
+        msg: dict
+            {'src': str, 'type': str, 'data': object, ...}
+        """
+        clients = list(self._clients)
+        if not clients:
+            return
+
+        # 詰まったクライアントが 1 つあっても、他の送信が始まるのを
+        # 待たせないように並行に送る (TODO-009)。1 つが失敗しても
+        # 残りへは届く。送信に失敗する理由は切断だけとは限らないので、
+        # 例外の種類は絞らずに握る
+        results = await asyncio.gather(
+            *[ws.send_json(msg) for ws in clients],
+            return_exceptions=True)
+
+        for ws, result in zip(clients, results, strict=True):
+            if isinstance(result, BaseException):
+                self.__log.warning('{}: {}:{}', self.client_name(ws),
+                                   type(result).__name__, result)
+
+    async def emit_gameinfo(self, sec=0, history_flag=False):
         """
         send game information to all clients
 
@@ -102,19 +139,19 @@ class ytBackgammonServer:
         sec: int
             for animation
         """
-        emit('json',
-             {
-                 'src': 'server', 'dst': 'all', 'type': 'gameinfo',
-                 'data': {
-                     'gameinfo': self._bg._gameinfo,
-                     'sec': sec,
-                     'hist_i': len(self._history),
-                     'hist_n': len(self._history) + len(self._fwd_hist),
-                     'history_flag': history_flag
-                 }
-             }, broadcast=True)
+        await self.broadcast(
+            {
+                'src': 'server', 'dst': 'all', 'type': 'gameinfo',
+                'data': {
+                    'gameinfo': self._bg._gameinfo,
+                    'sec': sec,
+                    'hist_i': len(self._history),
+                    'hist_n': len(self._history) + len(self._fwd_hist),
+                    'history_flag': history_flag
+                }
+            })
 
-    def backward_hist(self, n=1, sleep_sec=0.1):
+    async def backward_hist(self, n=1, sleep_sec=0.1):
         """
         backward history
 
@@ -132,30 +169,26 @@ class ytBackgammonServer:
         if n == 0:
             sec = 0.1
 
-        while self._repeat_flag:
-            self._repeat_flag = False
-            time.sleep(.5)
+        try:
+            while len(self._history) > 1:
+                self._fwd_hist.append(self._history.pop())
+                self._bg._gameinfo = copy.deepcopy(self._history[-1])
 
-        self._repeat_flag = True
-        while len(self._history) > 1 and self._repeat_flag:
-            self._fwd_hist.append(self._history.pop())
-            self._bg._gameinfo = copy.deepcopy(self._history[-1])
+                self.__log.debug('_history=({}), _fwd_hist=({})',
+                                 len(self._history), len(self._fwd_hist))
 
-            self.__log.debug('_history=({}), _fwd_hist=({})',
-                             len(self._history), len(self._fwd_hist))
+                await self.emit_gameinfo(sec, history_flag=True)
 
-            self.emit_gameinfo(sec, history_flag=True)
+                count += 1
+                if n > 0 and count >= n:
+                    break
 
-            count += 1
-            if n > 0 and count >= n:
-                break
+                await asyncio.sleep(sleep_sec)
+        finally:
+            # 途中で cancel されても、そこまでの結果は保存する
+            self.save_data(self._datafile_path)
 
-            time.sleep(sleep_sec)
-
-        self._repeat_flag = False
-        self.save_data(self._datafile_path)
-
-    def forward_hist(self, n=1, sleep_sec=0.1):
+    async def forward_hist(self, n=1, sleep_sec=0.1):
         """
         forward history
 
@@ -173,28 +206,24 @@ class ytBackgammonServer:
         if n == 0:
             sec = 0.1
 
-        while self._repeat_flag:
-            self._repeat_flag = False
-            time.sleep(.5)
+        try:
+            while len(self._fwd_hist) > 0:
+                self._history.append(self._fwd_hist.pop())
+                self._bg._gameinfo = copy.deepcopy(self._history[-1])
 
-        self._repeat_flag = True
-        while len(self._fwd_hist) > 0 and self._repeat_flag:
-            self._history.append(self._fwd_hist.pop())
-            self._bg._gameinfo = copy.deepcopy(self._history[-1])
+                self.__log.debug('_history=({}), _fwd_hist=({})',
+                                 len(self._history), len(self._fwd_hist))
 
-            self.__log.debug('_history=({}), _fwd_hist=({})',
-                             len(self._history), len(self._fwd_hist))
+                await self.emit_gameinfo(sec, history_flag=True)
 
-            self.emit_gameinfo(sec, history_flag=True)
+                count += 1
+                if n > 0 and count >= n:
+                    break
 
-            count += 1
-            if n > 0 and count >= n:
-                break
-
-            time.sleep(sleep_sec)
-
-        self._repeat_flag = False
-        self.save_data(self._datafile_path)
+                await asyncio.sleep(sleep_sec)
+        finally:
+            # 途中で cancel されても、そこまでの結果は保存する
+            self.save_data(self._datafile_path)
 
     def hist_ent2str(self, h):
         board = h['board']
@@ -303,73 +332,164 @@ class ytBackgammonServer:
             self._bg._gameinfo = copy.deepcopy(self._history[-1])
         return len(self._history), len(self._fwd_hist)
 
-    def on_connect(self, request):
-        self.__log.info('request.sid={!a}', request.sid)
-        self.__log.info('from {}:{}',
-                        request.event['args'][0]['REMOTE_ADDR'],
-                        request.event['args'][0]['REMOTE_PORT'])
+    def client_name(self, ws):
+        """
+        ログに出す、クライアントを見分けるための名前。
 
-        self._client_sid.append(copy.deepcopy(request.sid))
+        socket.io の sid に当たるものは WebSocket には無いので、接続順の
+        連番と接続元を組み合わせた文字列を on_connect() で振っている
+        (TODO-009)。まだ登録されていない WebSocket なら '?' を返す。
+        """
+        return self._clients.get(ws, '?')
 
-        self.emit_gameinfo(0)
+    async def on_connect(self, ws):
+        self._client_sn += 1
+        client = ws.client
+        if client is None:
+            name = f'c{self._client_sn}'
+        else:
+            name = f'c{self._client_sn}@{client.host}:{client.port}'
 
-    def on_disconnect(self, request):
-        self.__log.info('request.sid={!a}', request.sid)
-        self._client_sid.remove(request.sid)
+        self._clients[ws] = name
+        self.__log.info('connect: {} (clients={})',
+                        name, len(self._clients))
 
-    def on_error(self, request, e):
-        self.__log.error('e={!a}:{!a}', type(e).__name__, e)
-        self.__log.error('event[message]={!a}', request.event["message"])
-        self.__log.error('event[args]={!a}', request.event["args"])
+        await self.emit_gameinfo(0)
 
-    def on_json(self, request, msg):
+    async def on_disconnect(self, ws):
+        name = self._clients.pop(ws, None)
+        if name is None:
+            # accept() の前に切れた場合など、登録されていないことがある
+            self.__log.debug('unknown client')
+            return
+
+        self.__log.info('disconnect: {} (clients={})',
+                        name, len(self._clients))
+
+    def on_error(self, ws, e, msg=None):
+        """
+        ws: WebSocket | None
+            どのクライアントで起きたか。連続再生の Task のように
+            特定のクライアントに紐づかない場合は None
+        """
+        self.__log.error('{}: e={!a}:{!a}',
+                         self.client_name(ws), type(e).__name__, e)
+        self.__log.error('msg={!a}', msg)
+
+    async def _cancel_replay(self):
+        """
+        走っている連続再生の Task を止め、終わるまで待つ (TODO-009)。
+
+        **_replay_lock を持った状態で呼ぶこと。** ロックの外で呼ぶと、
+        待っている間に別の要求が新しい Task を作り、_replay_task から
+        辿れない再生が残る。
+        """
+        task = self._replay_task
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                self.__log.debug('replay canceled')
+
+        self._replay_task = None
+
+    async def _replay(self, func, *args, **kwargs):
+        """
+        連続再生の本体。Task にして走らせる。
+
+        Task の中で起きた例外は誰も受け取らないので、ここで
+        on_error() へ渡す (TODO-009)。
+        """
+        try:
+            await func(*args, **kwargs)
+        except asyncio.CancelledError:
+            # CancelledError は BaseException 側なので、下の
+            # except Exception には元々捕まらない。cancel を
+            # エラー扱いしないことを読んで分かるように書いてある
+            raise
+        except Exception as e:  # noqa: BLE001
+            self.on_error(None, e)
+
+    async def _start_replay(self, func, *args, **kwargs):
+        """
+        前の連続再生を止めてから、新しい再生を Task として始める。
+
+        Task は待たずに返る。再生中も他のメッセージを処理できるように
+        するため (TODO-009)。止めるところから作るところまでを
+        _replay_lock で囲むので、再生は常に 1 本だけになる。
+        """
+        async with self._replay_lock:
+            await self._cancel_replay()
+            self._replay_task = asyncio.create_task(
+                self._replay(func, *args, **kwargs))
+
+    async def _run_replay(self, func, *args, **kwargs):
+        """
+        前の連続再生を止めてから、その場で最後まで走らせる。
+
+        n > 0 の back / fwd 用 (TODO-009)。移行前は backward_hist() が
+        同期に走り切ってから on_json() が返っていたので、同時に 2 通
+        来たら 2 手ぶん動いた。_replay_lock を握ったまま走らせることで、
+        その順序に戻している。例外は呼び出し元 (on_json) へ抜けて、
+        受信ループの受け皿から on_error() へ届く。
+        """
+        async with self._replay_lock:
+            await self._cancel_replay()
+            await func(*args, **kwargs)
+
+    async def on_json(self, ws, msg):
         """
         msg := {'type': str, 'data': object}
         """
-        self.__log.info('request.sid={}', request.sid)
+        self.__log.info('client={}', self.client_name(ws))
         self.__log.info('msg={}', msg)
 
         if msg['type'] == 'back':
             # data: {n: n}
-            self.backward_hist(msg['data']['n'])
+            await self._run_replay(
+                self.backward_hist, msg['data']['n'])
             return
 
         if msg['type'] == 'back2':
             # data: {}
-            self.backward_hist(0, sleep_sec=.5)
+            await self._start_replay(
+                self.backward_hist, 0, sleep_sec=.5)
             return
 
         if msg['type'] == 'back_all':
             # data: {}
-            self.backward_hist(0)
+            await self._start_replay(self.backward_hist, 0)
             return
 
         if msg['type'] == 'fwd':
             # data: {n: n}
-            self.forward_hist(msg['data']['n'])
+            await self._run_replay(
+                self.forward_hist, msg['data']['n'])
             return
 
         if msg['type'] == 'fwd2':
             # data: {}
-            self.forward_hist(0, sleep_sec=.5)
+            await self._start_replay(
+                self.forward_hist, 0, sleep_sec=.5)
             return
 
         if msg['type'] == 'fwd_all':
             # data: {}
-            self.forward_hist(0)
+            await self._start_replay(self.forward_hist, 0)
             return
 
         if msg['type'] == 'new':
             # data: {}
             self.new_game()
-            self.emit_gameinfo(3, False)
+            await self.emit_gameinfo(3, False)
             return
 
         if msg['type'] == 'set_gameinfo':
             # data: gameinfo
             self._bg.set_gameinfo(msg['data'])
             self.add_history(self._bg._gameinfo)
-            self.emit_gameinfo(0)
+            await self.emit_gameinfo(0)
             return
 
         # ここから下は return せず、末尾の add_history と broadcast まで落ちる
@@ -417,13 +537,16 @@ class ytBackgammonServer:
             self.add_history(self._bg._gameinfo)
 
         # broadcast
-        emit('json', msg, broadcast=True)
+        await self.broadcast(msg)
 
-    def app_index(self):
+    def app_index(self, request):
         self.__log.debug('')
-        return render_template('index.html',
-                               name=self._svr_name,
-                               version=self._svr_ver,
-                               server_id=self._svr_id,
-                               image_dir=self._image_dir)
+        return templates.TemplateResponse(
+            request, 'index.html',
+            {
+                'name': self._svr_name,
+                'version': self._svr_ver,
+                'server_id': self._svr_id,
+                'image_dir': self._image_dir,
+            })
 ##

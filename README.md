@@ -62,7 +62,7 @@
 * OS: FreeBSD, Linux
 * Python 3.14 以上
 * [uv](https://docs.astral.sh/uv/)
-* flask, flask-socketio (``uv sync`` が入れます)
+* starlette, uvicorn (``uv sync`` が入れます)
 
 
 ## Usage
@@ -151,15 +151,16 @@ user@host:~/ytBackgammon$ ./ytbg-stop.sh   # 停止
 
 ## A. References 
 
-### A.1 Flask + Webscoket
+### A.1 Starlette + WebSocket
 
-* [Flask-Socket-IO](https://github.com/miguelgrinberg/Flask-SocketIO)
-  - [Flask-SocketIOでWebSocketアプリケーション](https://qiita.com/nanakenashi/items/6497caf1c56c36f47be9)
-  
+* [Starlette](https://www.starlette.io/)
+  - [WebSockets](https://www.starlette.io/websockets/)
+* [uvicorn](https://www.uvicorn.org/)
 
-### A.2 Javascript socket.io
 
-* https://cdnjs.com/libraries/socket.io
+### A.2 Javascript WebSocket
+
+* [WebSocket - MDN](https://developer.mozilla.org/ja/docs/Web/API/WebSocket)
 
 
 ### A.3 CSS

@@ -6,11 +6,10 @@ conftest.py
 
 テストで共通に使うフィクスチャ。
 """
-import types
+import asyncio
 
 import pytest
 
-from ytbg import yt_backgammon_server
 from ytbg.mylog import loggerInit
 from ytbg.yt_backgammon import ytBackgammon
 from ytbg.yt_backgammon_server import ytBackgammonServer
@@ -28,28 +27,32 @@ def bg():
 
 class EmittedMessages:
     """
-    emit() の呼び出しを記録し、'json' イベントのメッセージ列として見る。
+    broadcast() の呼び出しを記録し、メッセージの列として見る。
 
-    on_json() が見ているのは flask_socketio.emit() ではなく、それが
-    送る 'json' イベントの中身 (msg) であり、テストが確かめたいのも
-    「どの msg が何通、どんな順で送られたか」。TODO-009 で通信層が
-    Starlette + 素の WebSocket へ入れ替わっても、送信の仕組みが変わる
-    だけで「on_json がどの msg を送るべきか」は変わらないはずなので、
-    このクラスの形はそのまま残し、fake_emit の差し替え方だけを
-    直せばテスト側は書き換えずに済む、という意図で分けている。
+    テストが確かめたいのは「どの msg が何通、どんな順で全員へ
+    送られたか」。TODO-009 で通信層が Flask-SocketIO から
+    Starlette + 素の WebSocket へ入れ替わり、
+    emit('json', msg, broadcast=True) が
+    ytBackgammonServer.broadcast(msg) になったので、差し替える対象は
+    そちらへ移した。messages / types / last / clear の見方は
+    変えていない。
+
+    broadcast() は全員へ送るメソッドそのものなので、ここに積まれた
+    msg は全員へ送られたもの。broadcast されたかどうかを
+    emit() の kwargs で見分ける必要はなくなった。
     """
 
     def __init__(self):
         self.calls = []
 
-    def append(self, event, data=None, **kwargs):
-        self.calls.append((event, data, kwargs))
+    def append(self, msg):
+        """broadcast() へ渡された msg を積む"""
+        self.calls.append(msg)
 
     @property
     def messages(self):
-        """event == 'json' で送られた data (メッセージ本体) の列"""
-        return [data for event, data, _kwargs in self.calls
-                if event == 'json']
+        """全員へ送られた msg (メッセージ本体) の列"""
+        return list(self.calls)
 
     @property
     def types(self):
@@ -57,22 +60,10 @@ class EmittedMessages:
         return [m['type'] for m in self.messages]
 
     @property
-    def kwargs(self):
-        """event == 'json' の呼び出しごとの kwargs の列 (messages と同じ並び)"""
-        return [kwargs for event, _data, kwargs in self.calls
-                if event == 'json']
-
-    @property
     def last(self):
         """messages の最後。無ければ None"""
         msgs = self.messages
         return msgs[-1] if msgs else None
-
-    @property
-    def last_kwargs(self):
-        """kwargs の最後。無ければ None"""
-        kw = self.kwargs
-        return kw[-1] if kw else None
 
     def clear(self):
         """積んだものを捨てる"""
@@ -85,36 +76,83 @@ def emitted():
     return EmittedMessages()
 
 
+class FakeClient:
+    """
+    WebSocket の代わり (TODO-009)。
+
+    send_json() された msg を積む。fail=True なら送信で例外を投げる。
+    _clients のキーにするのでハッシュ可能であること
+    (types.SimpleNamespace はハッシュ不可で使えない)。
+    """
+
+    client = None
+
+    def __init__(self, name='c', fail=False):
+        self.name = name
+        self.fail = fail
+        self.sent = []
+
+    async def send_json(self, msg):
+        # 送信は即座に終わるとは限らないので、1 度は他へ制御を渡す
+        await asyncio.sleep(0)
+        if self.fail:
+            raise RuntimeError(f'{self.name}: send failed')
+        self.sent.append(msg)
+
+    @property
+    def types(self):
+        """送られた msg の 'type' の列"""
+        return [m['type'] for m in self.sent]
+
+
 @pytest.fixture
 def req():
     """
-    on_json(request, msg) の第 1 引数の代わり。
+    on_json(ws, msg) の第 1 引数 (WebSocket) の代わり。
 
-    on_json() は request.sid をログに出すだけなので、これで足りる。
-    'request' は pytest の予約済みフィクスチャ名で上書きできないため
-    (実測: "'request' is a reserved word for fixtures")、'req' にしている。
+    on_json() は client_name(ws) をログに出すだけで、未登録の
+    WebSocket なら '?' になるので、FakeClient をそのまま使う。
+    名前を 'req' にしてあるのは、'request' が pytest の予約済み
+    フィクスチャ名で上書きできないため
+    (実測: "'request' is a reserved word for fixtures")。
     """
-    return types.SimpleNamespace(sid='test-sid')
+    return FakeClient('req')
+
+
+@pytest.fixture
+def make_client():
+    """
+    FakeClient を作る。
+
+    テスト側が conftest を import しなくて済むように、フィクスチャで
+    渡す (conftest の直接 import は tests/__init__.py を足すと壊れる)。
+    """
+    return FakeClient
 
 
 @pytest.fixture
 def no_sleep(monkeypatch):
     """
-    yt_backgammon_server.time.sleep を何もしない関数に差し替える。
+    asyncio.sleep の待ち時間を 0 にする。
 
     on_json() の back_all / back2 / fwd_all / fwd2 は backward_hist(0) /
     forward_hist(0, sleep_sec=.5) を呼ぶので、テスト側から sleep_sec を
-    渡せない。gevent.monkey.patch_all() は呼ばず、monkeypatch で
+    渡せない。
+
+    何もしない関数にはしない。連続再生は Task として走っており、
+    他の Task へ制御を渡す必要があるので、本物の asyncio.sleep(0) を
+    呼ぶ (TODO-009)。
+
+    asyncio は stdlib のモジュールそのものなので、この差し替えは
+    テストの間プロセス全体の asyncio.sleep に効く。monkeypatch が
     テスト終了後に元へ戻す。
-
-    yt_backgammon_server.time は stdlib の time モジュールそのものなので、
-    この差し替えはテストの間プロセス全体の time.sleep に効く
-    (yt_backgammon_server モジュールの中だけには閉じていない)。
     """
-    def fake_sleep(*_args, **_kwargs):
-        pass
+    real_sleep = asyncio.sleep
 
-    monkeypatch.setattr(yt_backgammon_server.time, 'sleep', fake_sleep)
+    async def fake_sleep(*_args, **_kwargs):
+        await real_sleep(0)
+
+    monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
 
 
 @pytest.fixture
@@ -124,16 +162,33 @@ def bg_server(tmp_path, monkeypatch, emitted):
 
     - DATAFILE_DIR を tmp_path に差し替え、利用者の
       ~/ytbg-*.json を読み書きしないようにする
-    - emit をモジュール直下で差し替え、呼び出し引数を
-      emitted へ積む
+    - broadcast() を差し替え、全員へ送られた msg を emitted へ積む
     """
     monkeypatch.setattr(
         ytBackgammonServer, 'DATAFILE_DIR', str(tmp_path))
 
-    def fake_emit(event, data=None, **kwargs):
-        emitted.append(event, data, **kwargs)
+    async def fake_broadcast(_self, msg):
+        emitted.append(msg)
 
-    monkeypatch.setattr(yt_backgammon_server, 'emit', fake_emit)
+    monkeypatch.setattr(ytBackgammonServer, 'broadcast', fake_broadcast)
+
+    return ytBackgammonServer(
+        svr_name='test', svr_ver='test', svr_id='test',
+        image_dir='images1a')
+
+
+@pytest.fixture
+def bg_server_raw(tmp_path, monkeypatch):
+    """
+    broadcast() を差し替えていない ytBackgammonServer。
+
+    broadcast() の中身と、接続の出入り (on_connect / on_disconnect) を
+    確かめるテスト用 (TODO-009)。送信先は FakeClient を _clients へ
+    直接入れて用意する。DATAFILE_DIR を tmp_path に差し替えるのは
+    bg_server と同じ。
+    """
+    monkeypatch.setattr(
+        ytBackgammonServer, 'DATAFILE_DIR', str(tmp_path))
 
     return ytBackgammonServer(
         svr_name='test', svr_ver='test', svr_id='test',
