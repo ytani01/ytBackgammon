@@ -22,8 +22,14 @@
 モジュール構成・クラス構成といった基本設計から見直す。動作に問題が
 出ないなら大きく変えてよい。質の良いコードを優先する。
 
-**この項目では設計を決めるだけで、`src/` は触っていない。**
-実装は TODO-021 以降に分ける。
+## やったこと
+
+**設計を決めただけで、`src/` は触っていない。** 決めた構成は
+[`docs/design.md`](../../docs/design.md) にある。実装は TODO-022 以降に分けた。
+
+設計文書を `archives/` ではなく `docs/` に置いたのは、**これが
+これから参照し続ける現行の指針だから**。`archives/` は決着した項目の記録で、
+実装の根拠として参照しない場所なので、設計本体を置くと辿れなくなる。
 
 ## 現状で分かったこと
 
@@ -74,302 +80,112 @@ JavaScript 側（`ytbg.js` 4,351 行が 1 ファイル）:
 - `Checker.on_mouse_up_xy()` がサーバの応答を待たずに先行して
   `put_checker()` を呼んでおり、`load_gameinfo()` の配置と別経路になっている
 
-## 決めたこと
+## 相談して決めたこと
 
-### 前提（相談して決めた）
+| 論点 | 決めたこと |
+|------|-----------|
+| 進め方 | 設計を決める項目を先に立て、実装は分割して後から立てる |
+| 保存ファイルと `gameinfo` の構造 | 変えてよい。**旧形式の読み込みは残す**（手元の対局記録が生き残るように） |
+| JS の分割方式 | **ES Modules**。バンドラは入れない |
+| ルール判定の置き場所 | **クライアントの純粋ロジック層**。サーバは持たない |
+| `window.open(...)` | 消す |
+| 盤面のファイル保存・読み込み | 消す |
+| `ytbg.html` | 対象外 |
 
-- 保存ファイル（`~/ytbg-*.json`）と `gameinfo` の構造は**変えてよい**。
-  ただし**旧形式の読み込みは残す**
-- JS は **ES Modules** で複数ファイルに分ける。バンドラは入れない
-- ルール判定は**クライアントの純粋ロジック層**へ切り出す。サーバは持たない
-- 「1 枚のボードを全員で共有して自由に触れる」という目的と、
-  free move モードは変えない
-
-### Python のモジュール構成
-
-```
-src/ytbg/
-  __init__.py    パッケージ定数（WEBROOT, __version__）
-  __main__.py    click の main() だけ
-  app.py         create_app() — ルーティングと WebSocket の受信ループ
-  mylog.py       （変えない）
-  gameinfo.py    GameInfo / BoardState / CubeState の dataclass
-  message.py     クライアント → サーバのメッセージの型
-  clock.py       Clock
-  history.py     History
-  storage.py     Storage（保存・読み込み、旧形式の変換）
-  hub.py         ClientHub（接続中の WebSocket と broadcast）
-  replay.py      Replayer（連続再生の Task 管理）
-  server.py      BackgammonServer（上をまとめ、メッセージを捌く）
-```
-
-1 ファイル 100 行前後になる。クラス名は Python の慣習に合わせ、
-`ytBackgammonServer` を `BackgammonServer` にする。`ytBackgammon` は
-`GameInfo` に吸収して無くす（今も gameinfo を持つだけで、
-更新の処理はサーバ側から直接書かれている）。
-
-### gameinfo の型付けは dataclass
-
-TypedDict なら JSON との変換が要らないが、振る舞いを持てない。
-カプセル化が壊れているのが今いちばん困っているところなので、
-**dataclass にして更新の操作をそこへ集める**。JSON 化は
-`dataclasses.asdict()`、読み込みは `from_dict()` を自前で書き、
-旧形式の変換もそこで吸収する。
-
-### クロックを gameinfo から外す
-
-`clock_limit` と `board.clock` を `GameInfo` から出し、`Clock` が
-`limit` / `sw` / `active` / 残り時間 / 基準の時刻をまとめて持つ。
-
-外すと 2 箇所の帳尻合わせが消える。
-
-- `_load_hist_ent()` の「クロックの残り時間だけは引き継ぐ」という例外
-  （TODO-016 で足したもの。クロックは履歴の対象外と TODO-010 で決めたのに、
-  gameinfo に入っているため履歴に載ってしまうのが原因）
-- `new_game()` が `score` / `playername` / `clock_limit` を退避して
-  `init_gameinfo()` のあとに書き戻している処理
-
-`new_game()` は「`board` を作り直し、`turn` と `resign` を戻す」だけになる。
-`score` と `playername` は gameinfo に残す（`init_gameinfo()` が消して
-しまうのが問題だっただけで、履歴に載ること自体は自然）。
-
-### GameInfo の構造
-
-```python
-@dataclass
-class CubeState:
-    side: int = -1          # -1: center, 0|1: player
-    value: int = 1
-    accepted: bool = True
-
-@dataclass
-class BoardState:
-    playername: list[str]
-    cube: CubeState
-    dice: list[list[int]]              # [2][4]
-    checker: list[list[list[int]]]     # [2][15] = [point, idx]
-
-@dataclass
-class GameInfo:
-    sn: int
-    server_version: str
-    game_num: int
-    match_score: int
-    score: list[int]
-    turn: int                # <=-1:操作不可, 0|1:各プレーヤー, >=2:両方可
-    resign: int
-    board: BoardState
-```
-
-チェッカーの ID（`player * 100 + i`）とポイント番号（0〜25 が盤上、
-26/27 がバー）は変えない。
-
-### 保存は JSON Lines へ
-
-`~/ytbg-{server_id}.jsonl` に 1 行 1 手で書く。
-
-```
-{"v": 2, "clock": {...}}
-{"h": {...gameinfo...}}
-{"h": {...gameinfo...}}
-{"f": {...gameinfo...}}
-```
-
-1 行目がメタで、形式のバージョンとクロックの状態。`h` が `_history`、
-`f` が `_fwd_hist` で、書かれた順がスタックの順。
-
-`json.dumps()` を 1 行につき 1 回呼ぶだけになるので、**キーを足したときに
-`hist_ent2str()` を直し忘れて落ちる、という危険が無くなる**。
-`json.dumps(..., indent=2)` でまとめて書くと checker の配列が縦に伸びて
-1 手 60 行になり読めないので、行で区切るこの形にした
-（「1 手 1 行に近い読みやすい形」という元の狙いは、むしろこちらのほうが揃う）。
-
-旧形式（`~/ytbg-{server_id}.json`）は `.jsonl` が無いときだけ読む。
-`clock_limit` と `board.clock` は最後のエントリの値を `Clock` の初期値にする。
-書き戻しは常に `.jsonl` で、**旧ファイルは消さない**。
-
-### メッセージの型付けとディスパッチ
-
-`message.py` に type ごとの frozen dataclass を置き、`parse(msg)` が
-`type` を見て組み立てる。`data` のキーが足りなければそこで例外になるので、
-今のように `msg['data']['n']` が奥で `KeyError` を出すことがなくなる。
-
-`on_json()` の 20 個の `if` は登録表に置き換える。今の分岐は
-「前半は return し、後半は末尾の `add_history` と `emit_gameinfo` へ落ちる」
-という 2 段構造になっているので、**ハンドラの戻り値でそれを表す**。
-
-- `None` を返す … 自分で送信済み。共通の後処理をしない
-  （`back` / `back2` / `back_all` / `fwd` / `fwd2` / `fwd_all` /
-  `clear_hist` / `new` / `set_gameinfo` の 9 つ）
-- `float` を返す … アニメーションの秒数。共通の後処理
-  （`history` フラグを見て履歴へ積み、`emit_gameinfo`）を行う
-  （盤面とクロックを変える 14 個）
-
-### JavaScript のファイル構成
-
-```
-static/js/
-  main.js       エントリ。DOM を作り、Board を組み立て、WebSocket をつなぐ
-  ws.js         接続・再接続・送信
-  log.js        レベル付きのログ（?debug=1 で有効）
-  layout.js     盤面の座標
-  dom.js        要素の生成
-  settings.js   Cookie / QueryString / ヘッダのチェックボックス
-  sound.js      効果音
-  board.js      Board。gameinfo を受けて表示要素を更新する
-  rules/
-    position.js  Position — 盤面を単純なデータで表す
-    move.js      行き先の計算
-    judge.js     盤面の判定
-  ui/
-    base.js      BgBase / BgText / BgImage
-    point.js     BoardPoint
-    checker.js   Checker
-    cube.js      Cube
-    dice.js      Dice / RollButton
-    clock.js     PlayerClock / ClockLimit
-    label.js     PlayerName / PlayerScore / PlayerPipCount
-    button.js    ボタン各種
-```
-
-### ルール層の要は Position
-
-今のルール判定が切り出せないのは、`this.point[p].checkers`（DOM を持つ
-`Checker` の配列）を見ているため。**盤面を単純なデータで表す `Position` を
-作り、ルール層はそれだけを受け取る。**
-
-```js
-export class Position {
-    // pt[p] = { player: 0|1|null, n: 枚数 }   p = 0..27
-    static from_gameinfo(gameinfo) { ... }
-    owner(p) / count(p)
-    with_move(from_p, to_p, player)   // 動かした後の Position を返す
-}
-```
-
-`rules/` の関数はすべて `Position` と `player` と出目だけを受け取り、
-DOM も `Board` も見ない。`BgBase` にある `goal_point()` / `bar_point()` /
-`calc_dst_point()` / `get_pip()` もここへ移す。
-
-`winner_is()` の `this.resign = -1` という書き換えと、`pip_count()` の
-表示更新は切り離す。判定は値を返すだけにし、表示は呼んだ側が行う。
-
-### 継承階層の組み直し
-
-- 属性を足すだけの中間クラス（`BoardText` / `PlayerText` / `PlayerItem` /
-  `OnBoardImage` / `OnBoardButton`）をやめ、コンストラクタのオプション引数で
-  `board` と `player` を渡す。段数が 5 から 2 になる
-- `EmitButton` の 6 つのサブクラス（`BackButton` … `FwdAllButton`）は
-  引数が違うだけなので、`EmitButton` 1 つにして生成時に type と data を渡す
-- `BannerButton` の 3 つのサブクラス（`Pass` / `ResignBanner` / `Win`）は
-  押したときの動作をコールバックで渡す
-- クラス数は 35 前後から 20 前後になる
-
-### DOM 生成を JS へ移す
-
-`index.html` に残すのは header と `<div id="board">` だけにし、
-`<body data-image-dir="{{image_dir}}" data-server-id="{{server_id}}">` で
-値を渡す。要素は `dom.js` が作る。
-
-`BgImage.get_image_dir()` が `src` の文字列を切り出して画像ディレクトリを
-逆算している処理は、JS が最初からディレクトリを知ることになるので消える。
-
-`onClick` / `onChange` 属性は全部やめて `addEventListener` にする。
-**ES Modules ではスコープが閉じてグローバル関数が見えなくなるので、
-これは避けられない**（`onClick="new_game();"` は動かなくなる）。
-
-### 表示更新の経路を 1 本にする
-
-`Board.apply(gameinfo, {sec, history_flag, clock_state, last_op})` を
-表示を変える唯一の経路にする。
-
-`Checker.on_mouse_up_xy()` の**先行実行は残す**。共有ボードなので、
-ドラッグを離した瞬間に反応が無いと操作感が悪い。ただし今のように
-`put_checker()` を直接呼ぶのではなく、**`Position.with_move()` で
-予測した gameinfo を作って `apply()` に渡す**形にする。これで
-`put_checker()` と `load_gameinfo()` の二重実装が消える。
-
-### JS のテスト
-
-`tests/js/` に置き、`node --test tests/js/` で走らせる。
-**`node --test` は Node の標準機能なので npm パッケージは要らない**。
-対象は `rules/` と `Position`。DOM を触るクラスはテストせず、
-今までどおり実際に触って確かめる。
+理由は [`docs/design.md`](../../docs/design.md) の「採らなかった案」にある。
 
 ## やらないと決めたこと
 
-- **eslint とバンドラは入れない。** npm と `node_modules` を持ち込むと、
-  `uv` だけで済んでいる運用が変わる。書き方の慣習は `CLAUDE.md` に書く
-- **ルール判定をサーバへ移さない。** ドラッグ中の反応にサーバ往復が要る
-  設計になり、free move の扱いも作り直しになる
-- **座標のレスポンシブ化はしない。** `bx` / `by` の絶対座標は `layout.js` に
-  集約するところまでで、画面幅に追随させるのは今回の範囲外
-- **`ytbg.html` は対象外。** サーバを通らない静的ページで、本体と独立している
+- **`ytbg.html` は見直さない。** サーバを通らない静的ページで、本体と
+  独立している。URL が `ytbg1〜4.ytani.net` でベタ書きされているのは
+  分かっているが、今回の範囲に入れない
 - **盤面のファイル保存・読み込みは復活させない。** `gen_gameinfo()` /
-  `write_gameinfo()` / `read_gameinfo()` は消す（メニューは `index.html` で
+  `write_gameinfo()` / `read_gameinfo()` は消す。メニューは `index.html` で
   コメントアウトされており、`gen_gameinfo()` は古い `point` 形式を返し
-  `board.player_name`（実際は `playername`）を読む壊れた状態）。
+  `board.player_name`（実際は `playername`）を読む壊れた状態。
   履歴はサーバ側に保存されているので、盤面が失われることはない
+- **座標のレスポンシブ化はしない。** `bx` / `by` の絶対座標は `layout.js` に
+  集約するところまでで、画面幅に追随させるのは別の話
+- **eslint とバンドラは入れない。** `npm` と `node_modules` を持ち込むと、
+  `uv` だけで済んでいる運用が変わる。ただし**ブラウザでの動作確認に使う
+  playwright は例外**として入れる（TODO-021 で決めた。確認の質が上がる
+  ほうを採った）
 
-## 実装項目の案
+## 実装項目の分割
 
 | 番号 | 見出し |
 |------|--------|
-| TODO-021 | デッドコードを消す |
-| TODO-022 | gameinfo を dataclass にし、クロックを外し、保存を JSON Lines へ移す |
-| TODO-023 | サーバを分割する（hub / history / storage / replay / app） |
-| TODO-024 | メッセージを型付けし、`on_json` をディスパッチ表にする |
-| TODO-025 | JS のルール層を純粋関数として切り出し、`node --test` を足す |
-| TODO-026 | JS を ES Modules に分割し、継承階層を組み直す |
-| TODO-027 | DOM 生成を JS へ移し、`onClick` 属性をやめる |
-| TODO-028 | 表示更新の経路を 1 本にする |
+| TODO-021 | ブラウザでの動作確認の仕組みを作る |
+| TODO-022 | デッドコードを消す |
+| TODO-023 | gameinfo を dataclass にし、クロックを外し、保存を JSON Lines へ移す |
+| TODO-024 | サーバを分割する（hub / history / storage / replay / app） |
+| TODO-025 | メッセージを型付けし、`on_json` をディスパッチ表にする |
+| TODO-026 | JS のルール層を純粋関数として切り出し、`node --test` を足す |
+| TODO-027 | JS を ES Modules に分割し、継承階層を組み直す |
+| TODO-028 | DOM 生成を JS へ移し、`onClick` 属性をやめる |
+| TODO-029 | 表示更新の経路を 1 本にする |
 
 順番の理由:
 
-- **TODO-021 が先頭。** 消すものを後の項目が運ばずに済む
-- **TODO-022 で gameinfo の構造が変わる。** JS 側は追随の最小限だけ直す
-- TODO-023 と TODO-024 は Python の内部の整理で、挙動は変えない
-- **TODO-025 は TODO-022 のあと。** `Position` が gameinfo から作られる
-- **TODO-026 は TODO-025 のあと。** ルール層が先に出ていれば残りの分割が素直になる
-- **TODO-027 は TODO-026 のあと。** ES Modules になっていないと `onClick` をやめられない
-- **TODO-028 が最後。** `Position` とルール層が揃ってからでないと予測が作れない
+- **TODO-021 が先頭。** 以降の項目の確認担当が使う。決めた時点では
+  デッドコード削除を先頭にしていたが、ブラウザでの確認ができると
+  分かった（後述）ので入れ替えた
+- **TODO-022 は早いうちに。** 消すものを後の項目が運ばずに済む
+- **TODO-023 で gameinfo の構造が変わる。** JS 側は追随の最小限だけ直す
+- TODO-024 と TODO-025 は Python の内部の整理で、挙動は変えない
+- **TODO-026 は TODO-023 のあと。** `Position` が gameinfo から作られる
+- **TODO-027 は TODO-026 のあと。** ルール層が先に出ていれば残りの分割が素直になる
+- **TODO-028 は TODO-027 のあと。** ES Modules になっていないと
+  `onClick` をやめられない
+- **TODO-029 が最後。** `Position` とルール層が揃ってからでないと予測が作れない
 
-TODO-022 が終われば、Python 側（023、024）と JS 側（025〜028）は
+TODO-023 が終われば、Python 側（024、025）と JS 側（026〜029）は
 独立に進められる。
 
-TODO-021 で消すもの:
-
-- `gen_gameinfo()` / `write_gameinfo()` / `read_gameinfo()` と、
-  グローバルの `write_gameinfo` / `read_gameinfo` / `clear_filename`、
-  定数 `GAMEINFO_FILE`、`index.html` のコメントアウトされたメニュー
-- `Checker.get_available_points()`（`return []` の T.B.D.）
-- `Board.clock_on()` / `Board.clock_off()`（呼ばれていない）
-- `apply_sound_switch()` の
-  `window.open("http://www.ytani.net:8080/ytbackgammon/", '_parent')`
-  （Sound のチェックボックスを切り替えるたびに、親フレームごと外部サイトへ
-  移動する）と、その手前の使われていない `GlobalSoundSwitch` / `board_num` の
-  取り直し
-- `CookieBase.save()`（`if (Object.keys(this.data)) return;` は配列が
-  常に真なので必ず戻る。呼び出しも無い）
-- `RollButton.roll()` の使われていない `modified`
-- dice histogram のコメントアウトの塊
-- `index.html` の `for"disp-pip"` / `for"clock_limit0"` / `for"clock_limit1"` /
-  `for "clock_sw"` というタイプミス（`for` が効いておらず、ラベルを
-  押しても切り替わらない）
+TODO-022 で消すものは、この項目の調査で場所と未使用であることを確かめてある。
 
 ## サブエージェントの定義
 
 `~/.claude/agents/` に implementer / verifier / reviewer / wording が
 常設されており、**このプロジェクト用に足すものは無い**。定義は工程で
 切られていて言語に依存しないので、JS の項目でもそのまま使える。
-`verifier` が走らせる検証は `CLAUDE.md` の「実行」の節にある
-`uv run pytest` / `uv run ruff check .` / `uv run mypy src`。
 
-TODO-025 以降で `node --test tests/js/` が加わるので、そのときに
-`CLAUDE.md` の「実行」の節へ足す（定義側は直さなくてよい）。
+**いったん「`.claude/agents/` がまだ無いので作る」と書いてしまい、あとで
+訂正した**（コミット `49ce0cc`）。プロジェクトの `.claude/agents/` だけを見て、
+グローバルの定義を見ていなかった。
+
+## ブラウザでの動作確認ができると分かった
+
+「ブラウザでの確認は利用者にお願いすることになる」と書いたところ、
+できるのではと指摘を受けて試したら、**できた**。
+
+| やったこと | 結果 |
+|------------|------|
+| 盤面を開いてスクリーンショット | chromium の headless 単体（追加インストール不要） |
+| Roll ボタンを押す | `dice = [4,0,0,0]`（turn=2 なので 1 個 = 先手決め） |
+| チェッカーをドラッグ | `cur_point` が 6 → 26 に変わった |
+| 2 枚目のタブへの同期 | 同じ `cur_point` が読めた |
+| JS の内部状態 | `board.turn` / `board.free_move` / `board.moving_checker.id` |
+
+仕組みを整えるのが TODO-021。実測で分かったこと:
+
+- **システムの `/usr/bin/chromium` を `executablePath` で指定する。**
+  `~/.cache/ms-playwright/` にあるリビジョン（1234）は playwright 1.63.0 が
+  要求するもの（1243）と合わず、そのままでは起動しない。指定しないと
+  `npx playwright install` で数百 MB を落としに行くことになる
+- **`#p000` を掴むと `moving_checker` は `p002` になる。** 「クリックされた
+  ポイントの先端のチェッカーに持ち換える」という `Checker.on_mouse_down_xy()`
+  の意図どおりで、正しい挙動。テストを書くときはここで取り違えやすい
+- 初回ロード時にコンソールエラーが 2 件（404）出る。2 回目以降は出ない。
+  **正体は未特定**
+- `pgrep -f 'ytbg.*cctest'` で**自分のシェルを巻き込んだ**。パターンが、
+  それを実行しているシェルのコマンドラインにもマッチする。
+  `CLAUDE.md` には「`pkill` はパターンで自分のシェルを巻き込むので
+  `pgrep` で PID を確かめてから」とあるが、`pgrep` 自体も同じ穴を持つ
 
 ## テスト
 
 この項目ではコードを変えていないので、テストは走らせていない。
 実装の各項目で `uv run pytest` / `uv run ruff check .` / `uv run mypy src` を
-確かめる。TODO-025 以降は `node --test tests/js/` も足す。
+確かめる。TODO-021 以降は `tests/browser/`、TODO-026 以降は
+`node --test tests/js/` も足す。

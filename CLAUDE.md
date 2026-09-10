@@ -95,6 +95,10 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 
 ## 構成
 
+**これから作る構成は [`docs/design.md`](docs/design.md) にある**（TODO-020 で
+決めた）。モジュール分割、`gameinfo` の dataclass 化、保存形式、JS の
+ES Modules 化、ルール層の切り出しは、そちらが正。以下はいまの実装。
+
 Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/` と
 `static/` は `src/ytbg/webroot/` の下。
 
