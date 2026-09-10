@@ -63,7 +63,6 @@
  *
  *=====================================================
  */
-const GAMEINFO_FILE = "gameinfo.json";
 
 let ws = undefined;
 // 再接続の間隔 [sec]。つながるまで倍にし、つながったら最小へ戻す
@@ -2964,7 +2963,6 @@ class Board extends BgImage {
         this.cookie.set(this.cookie_sound, this.sound);
         this.el_sound.checked = this.sound;
 
-        window.open("http://www.ytani.net:8080/ytbackgammon/",'_parent');
         console.log(`Board.apply_sound_switch>sound=${this.sound}`);
         return this.sound;
     } // Board.apply_sound_switch()
@@ -3457,88 +3455,6 @@ class Board extends BgImage {
 
         return dst_p1;
     }
-
-    /**
-     * generate game information
-     * @return {gameinfo} - game information object
-     */
-    gen_gameinfo() {
-        console.log(`Board.gen_gameinfo()`);
-        
-        let cube_side = this.cube.player;
-        if ( cube_side === undefined ) {
-            cube_side = -1;
-        }
-        
-        let point = [];
-        for (let i=0; i < this.point.length; i++) {
-            let ch = this.point[i].checkers;
-            point[i] = Array(ch.length);
-            if ( ch.length > 0 ) {
-                point[i].fill(ch[0].player);
-            }
-        } // for(i)
-        console.log(`point=${JSON.stringify(point)}`);
-
-        let gameinfo = {
-            server_version: this.gameinfo.server_version,
-            game_num: this.gameinfo.game_num,
-            match_score: this.gameinfo.match_score,
-            score: this.gameinfo.score,
-            turn: this.turn,
-            resign: this.resign,
-            clock_limit: this.gameinfo.clock_limit,
-            board: {
-                playername: this.gameinfo.board.player_name,
-                clock: this.gameinfo.board.clock,
-                cube: {
-                    side: cube_side,
-                    value: this.cube.value,
-                    accepted: this.cube.accepted
-                },
-                dice: [
-                    this.roll_btn[0].get(),
-                    this.roll_btn[1].get()
-                ],
-                point: point
-            }
-        };
-        
-        return gameinfo;
-    } // Board.gen_gameinfo()
-
-    /**
-     * write game information to file
-     */
-    write_gameinfo() {
-        console.log(`Boad.write_gameinfo()`);
-
-        const gameinfo_json = JSON.stringify(this.gen_gameinfo());
-        console.log(`Board.write_gameinfo():gameinfo_json=${gameinfo_json}`);
-
-        const blob_gameinfo = new Blob([gameinfo_json],
-                                       {"type": "application/json"});
-        document.getElementById("write_gameinfo").download = GAMEINFO_FILE;
-        document.getElementById("write_gameinfo").href
-            = window.URL.createObjectURL(blob_gameinfo);
-    } // Board.write_gameinfo()
-
-    /**
-     *
-     */
-    read_gameinfo() {
-        let file = document.getElementById("read_gameinfo").files[0];
-        console.log(`Board.read_gameinfo>file.name=${file.name}`);
-
-        const reader = new FileReader();
-        reader.onloadend = (e) => {
-            const gameinfo = JSON.parse(e.target.result);
-            console.log(`Board.read_gameinfo>gameinfo=${gameinfo}`);
-            this.load_gameinfo(gameinfo);
-            emit_msg("set_gameinfo", gameinfo);
-        };
-        reader.readAsText(file);
-    } // Board.read_gameinfo()
 
     /**
      * load all game information
@@ -4126,26 +4042,6 @@ const clear_hist = () => {
 const board_inverse = () => {
     nav.checked=false;
     board.inverse(0.5);
-};
-
-/**
- *
- */
-const write_gameinfo = () => {
-    nav.checked=false;
-    board.write_gameinfo();
-};
-
-const read_gameinfo = () => {
-    nav.checked=false;
-    board.read_gameinfo();
-};
-
-/**
- *
- */
-const clear_filename = () => {
-    document.getElementById("read_gameinfo").value="";
 };
 
 /**
