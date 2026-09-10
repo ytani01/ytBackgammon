@@ -21,9 +21,11 @@ from ytbg.yt_backgammon import ytBackgammon
 # ---------------------------------------------------------------------
 # 末尾へ落ちる型 (put_checker / cube / dice / set_turn /
 # set_playername / set_score / resign / set_clock_limit /
-# set_player_clock)
+# set_player_clock と、クロックの動作そのものの 5 つ)
 #
-# これらは return せず、末尾の add_history と broadcast まで落ちる。
+# これらは return せず、末尾の add_history と emit_gameinfo まで落ちる。
+# 返るのは gameinfo で、受け取った msg は last_op として添えられる
+# (TODO-015)。
 # ---------------------------------------------------------------------
 
 async def test_put_checker_updates_only_target(bg_server, req):
@@ -41,8 +43,15 @@ async def test_put_checker_updates_only_target(bg_server, req):
     assert bg_server._bg._gameinfo['board']['checker'][0][0] == [6, 0]
 
 
-async def test_put_checker_broadcasts_msg(bg_server, req, emitted):
-    """put_checker は受け取った msg をそのまま broadcast する"""
+async def test_put_checker_sends_gameinfo_with_last_op(
+        bg_server, req, emitted):
+    """
+    put_checker で送られるのは gameinfo で、直前の操作が last_op に入る
+    (TODO-015)。
+
+    チェッカーが動くので、アニメーションの時間 SEC_CHECKER_MOVE (0.2) も
+    添える (べた書き)。
+    """
     msg = {'type': 'put_checker',
            'data': {'ch': 12, 'p': 3, 'idx': 0}, 'history': False}
     expected = copy.deepcopy(msg)
@@ -50,8 +59,14 @@ async def test_put_checker_broadcasts_msg(bg_server, req, emitted):
 
     # emitted には broadcast() (全員へ送るメソッド) へ渡った msg だけが
     # 積まれる。送信元だけへ送る実装に変えたら emitted は空になる
-    assert emitted.last == expected
+    sent = emitted.last
     assert len(emitted.messages) == 1
+    assert sent['type'] == 'gameinfo'
+    assert sent['data']['last_op'] == expected
+    assert sent['data']['sec'] == 0.2
+    assert sent['data']['history_flag'] is False
+    # 盤面も、その操作を反映したものが送られる
+    assert sent['data']['gameinfo']['board']['checker'][0][12] == [3, 0]
 
 
 async def test_history_true_appends_one_entry(bg_server, req):
@@ -174,34 +189,66 @@ async def test_set_player_clock_updates_only_target_player(bg_server, req):
 
 
 @pytest.mark.parametrize(
-    ('msg_type', 'data'),
+    ('msg_type', 'data', 'get_value', 'value'),
     [
-        ('put_checker', {'ch': 5, 'p': 10, 'idx': 0}),
-        ('cube', {'side': 0, 'value': 2, 'accepted': True}),
-        ('dice', {'player': 1, 'dice': [1, 2, 0, 0]}),
-        ('set_turn', {'turn': 0, 'resign': -1}),
-        ('set_playername', {'player': 1, 'name': 'Bob'}),
-        ('set_score', {'player': 1, 'score': 2}),
-        ('resign', {'player': 0}),
-        ('set_clock_limit', {'index': 1, 'clock_limit': 30}),
-        ('set_player_clock', {'player': 1, 'clock': [60, 3]}),
+        ('put_checker', {'ch': 5, 'p': 10, 'idx': 0},
+         lambda g: g['board']['checker'][0][5], [10, 0]),
+        ('cube', {'side': 0, 'value': 2, 'accepted': True},
+         lambda g: g['board']['cube'],
+         {'side': 0, 'value': 2, 'accepted': True}),
+        ('dice', {'player': 1, 'dice': [1, 2, 0, 0]},
+         lambda g: g['board']['dice'][1], [1, 2, 0, 0]),
+        ('set_turn', {'turn': 0, 'resign': -1},
+         lambda g: g['turn'], 0),
+        ('set_playername', {'player': 1, 'name': 'Bob'},
+         lambda g: g['board']['playername'][1], 'Bob'),
+        ('set_score', {'player': 1, 'score': 2},
+         lambda g: g['score'][1], 2),
+        ('resign', {'player': 0},
+         lambda g: g['resign'], 0),
+        ('set_clock_limit', {'index': 1, 'clock_limit': 30},
+         lambda g: g['clock_limit'][1], 30),
+        ('set_player_clock', {'player': 1, 'clock': [60, 3]},
+         lambda g: g['board']['clock'][1], [60, 3]),
+        # クロックの動作そのものの 3 つ。gameinfo 側は変わらないので、
+        # 変わらないことを見る (状態は clock_state で送られる。
+        # そちらは tests/test_clock.py)
+        ('set_clock_switch', {'switch': False},
+         lambda g: g['clock_limit'], [120, 12]),
+        ('resume_clock', {'player': 1},
+         lambda g: g['board']['clock'][1], [120, 12]),
+        ('reset_clock', {'player': 1},
+         lambda g: g['board']['clock'][1], [120, 12]),
     ],
 )
-async def test_fallthrough_types_broadcast_the_received_msg(
-        bg_server, req, emitted, msg_type, data):
-    """末尾へ落ちる 9 つの type それぞれで、受け取った msg がそのまま broadcast される"""
+async def test_fallthrough_types_send_gameinfo_with_last_op(
+        bg_server, req, emitted, msg_type, data, get_value, value):
+    """
+    末尾へ落ちる type それぞれで、gameinfo が 1 通だけ送られ、
+    その last_op が受け取った msg で、gameinfo にはその操作が
+    反映されている (TODO-015)。
+
+    受け取った msg をそのまま転送していた形の置き換え。転送をやめても
+    「何が起きたか」がクライアントに届くことを、last_op で確かめる。
+    """
     msg = {'type': msg_type, 'data': data, 'history': False}
     expected = copy.deepcopy(msg)
     await bg_server.on_json(req, msg)
 
-    assert emitted.last == expected
+    sent = emitted.last
+    assert len(emitted.messages) == 1
+    assert sent['type'] == 'gameinfo'
+    assert sent['data']['last_op'] == expected
+    assert get_value(sent['data']['gameinfo']) == value
+    # sec が付くのはチェッカーが動くときだけ
+    assert sent['data']['sec'] == (0.2 if msg_type == 'put_checker' else 0)
 
 
 # ---------------------------------------------------------------------
 # return する型 (back / back2 / back_all / fwd / fwd2 / fwd_all /
 # new / set_gameinfo)
 #
-# これらは末尾まで落ちず、元の msg は broadcast されない。
+# これらは末尾まで落ちず、元の msg は last_op として返らない。
 # ---------------------------------------------------------------------
 
 @pytest.mark.parametrize(
@@ -211,7 +258,7 @@ async def test_fallthrough_types_broadcast_the_received_msg(
 )
 async def test_returning_types_do_not_broadcast_original_msg(
         bg_server, req, emitted, no_sleep, msg_type):
-    """return する 8 つの type では、元の msg の type は broadcast されない"""
+    """return する 8 つの type では、元の msg の type は送られない"""
     bg_server.add_history(bg_server._bg._gameinfo)
     bg_server.add_history(bg_server._bg._gameinfo)
 
@@ -236,6 +283,8 @@ async def test_returning_types_do_not_broadcast_original_msg(
     # 何かは送られたことを確かめ、空振りで通らないようにする
     assert 'gameinfo' in emitted.types
     assert msg_type not in emitted.types
+    # 操作に紐づかない送信なので last_op は付かない (TODO-015)
+    assert all(m['data']['last_op'] is None for m in emitted.messages)
 
 
 async def test_back_moves_history_by_n(bg_server, req, no_sleep):
@@ -423,8 +472,7 @@ async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
            'data': {'player': 0, 'score': 1}, 'history': True}
     await bg_server.on_json(req, msg)
 
-    # set_score は末尾で emit('json', msg) するだけで emit_gameinfo() は
-    # 呼ばない。emit_gameinfo() が送る形は直接呼んで確かめる。
+    # 引数なしで呼んだときの形を確かめる (TODO-015 で last_op が増えた)
     await bg_server.emit_gameinfo()
 
     sent = emitted.last
@@ -433,8 +481,11 @@ async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
     assert sent['type'] == 'gameinfo'
     data = sent['data']
     assert set(data.keys()) == {
-        'gameinfo', 'sec', 'hist_i', 'hist_n', 'history_flag', 'clock_state'}
+        'gameinfo', 'sec', 'hist_i', 'hist_n', 'history_flag', 'clock_state',
+        'last_op'}
     assert set(data['clock_state'].keys()) == {'sw', 'active', 'clock'}
+    # 操作に紐づかない送信では last_op は None (TODO-015)
+    assert data['last_op'] is None
 
 
 async def test_back_moves_hist_i_by_n(bg_server, req, emitted, no_sleep):

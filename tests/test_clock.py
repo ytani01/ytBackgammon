@@ -234,8 +234,9 @@ async def test_set_clock_limit_resets_both_clocks(fake_time, bg_server, req):
     """
     set_clock_limit は両方のクロックを clock_limit に戻して止める。
 
-    ytbg.js の受信側が player_clock[0] / [1] を reset() しているので、
-    サーバもそれに合わせる。
+    TODO-015 より前は ytbg.js の受信側が player_clock[0] / [1] を
+    reset() していた。今はクライアントが clock_state に従うので、
+    サーバのこの動きがそのまま画面に出る。
     """
     await clock_on(bg_server, req)
     await send(bg_server, req, 'start_clock', 0)
@@ -311,6 +312,61 @@ async def test_clock_state_carries_current_clock(
     assert clock_state['clock'] == [[120, 7], [120, 12]]
     # gameinfo の側は止まった時点の値のまま
     assert emitted.last['data']['gameinfo']['board']['clock'][0] == [120, 12]
+    # 直接呼んだので、直前の操作は付かない (TODO-015)
+    assert emitted.last['data']['last_op'] is None
+
+
+async def test_clock_ops_send_gameinfo_with_clock_state(
+        fake_time, bg_server, req, emitted):
+    """
+    クロックの 5 つの type も gameinfo で返り、動作中かどうかは
+    clock_state に入る (TODO-015)。
+
+    受け取った msg をそのまま転送するのをやめたので、クライアントは
+    この clock_state だけを見てクロックを合わせる。
+    """
+    await clock_on(bg_server, req)
+    emitted.clear()
+
+    await send(bg_server, req, 'start_clock', 1)
+
+    sent = emitted.last
+    assert len(emitted.messages) == 1
+    assert sent['type'] == 'gameinfo'
+    assert sent['data']['last_op']['type'] == 'start_clock'
+    assert sent['data']['clock_state']['active'] == [False, True]
+
+    fake_time.advance(5)
+    await send(bg_server, req, 'stop_clock', 1)
+
+    sent = emitted.last
+    assert sent['type'] == 'gameinfo'
+    assert sent['data']['last_op']['type'] == 'stop_clock'
+    assert sent['data']['clock_state']['active'] == [False, False]
+    assert sent['data']['clock_state']['clock'][1] == [120, 7]
+
+    await send(bg_server, req, 'resume_clock', 1)
+
+    sent = emitted.last
+    assert sent['data']['last_op']['type'] == 'resume_clock'
+    assert sent['data']['clock_state']['active'] == [False, True]
+    # 猶予は戻らず、止めたところから続く
+    assert sent['data']['clock_state']['clock'][1] == [120, 7]
+
+    await send(bg_server, req, 'reset_clock', 1)
+
+    sent = emitted.last
+    assert sent['data']['last_op']['type'] == 'reset_clock'
+    assert sent['data']['clock_state']['active'] == [False, False]
+    assert sent['data']['clock_state']['clock'][1] == [120, 12]
+
+    await bg_server.on_json(
+        req, {'type': 'set_clock_switch', 'data': {'switch': False},
+              'history': False})
+
+    sent = emitted.last
+    assert sent['data']['last_op']['type'] == 'set_clock_switch'
+    assert sent['data']['clock_state']['sw'] is False
 
 
 async def test_on_connect_sends_running_clock(

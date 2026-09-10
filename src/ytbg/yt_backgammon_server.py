@@ -205,7 +205,7 @@ class ytBackgammonServer:
         self._clock_active[player] = False
         self._clock_start[player] = time.monotonic()
 
-    async def emit_gameinfo(self, sec=0, history_flag=False):
+    async def emit_gameinfo(self, sec=0, history_flag=False, last_op=None):
         """
         send game information to all clients
 
@@ -213,6 +213,11 @@ class ytBackgammonServer:
         ----------
         sec: int
             for animation
+        last_op: dict | None
+            直前の操作 (クライアントから届いた msg そのまま) (TODO-015)。
+            盤面は gameinfo だけで復元できるが、音と dice の回転は
+            「何が起きたか」が分からないと出せないので添える。
+            履歴の再生や接続時のように、操作に紐づかない送信では None
         """
         await self.broadcast(
             {
@@ -223,6 +228,7 @@ class ytBackgammonServer:
                     'hist_i': len(self._history),
                     'hist_n': len(self._history) + len(self._fwd_hist),
                     'history_flag': history_flag,
+                    'last_op': last_op,
                     # クロックの状態 (TODO-016)。gameinfo['board']['clock']
                     # は最後に止まった時点の値なので、動作中の残り時間は
                     # こちらで送る
@@ -578,7 +584,8 @@ class ytBackgammonServer:
             await self.emit_gameinfo(0)
             return
 
-        # ここから下は return せず、末尾の add_history と broadcast まで落ちる
+        # ここから下は return せず、末尾の add_history と
+        # emit_gameinfo まで落ちる (TODO-015)
         if msg['type'] == 'put_checker':
             # data: {'ch': int, 'p': int, 'idx': int}
             self._bg.put_checker(msg['data']['ch'],
@@ -613,7 +620,9 @@ class ytBackgammonServer:
         if msg['type'] == 'set_clock_limit':
             # data: {'index': int, 'clock_limit': int}
             self._bg.set_clock_limit(msg['data'])
-            # ytbg.js の受信側は両方のクロックを reset() する。合わせる
+            # 両方のクロックを clock_limit に戻して止める。TODO-015 より前は
+            # ytbg.js の受信側がこうしていた。今はクライアントが
+            # clock_state に従うので、ここが唯一の決め手になる
             self._reset_clock(0)
             self._reset_clock(1)
 
@@ -625,8 +634,8 @@ class ytBackgammonServer:
 
         # ここから 5 つはクロックの動作そのもの (TODO-016)。TODO-012 で
         # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
-        # 返せるように戻した。転送は今までどおり続けるので、すでに開いて
-        # いる画面の動きは変わらない
+        # 返せるように戻した。TODO-015 で転送をやめたので、すでに開いて
+        # いる画面も、ここで作った状態を clock_state で受け取って合わせる
         if msg['type'] == 'set_clock_switch':
             # data: {'switch': bool}
             # off の間は進まないので、切り替える前に進んだ分を確定させる
@@ -663,8 +672,12 @@ class ytBackgammonServer:
         if msg['history']:
             self.add_history(self._bg._gameinfo)
 
-        # broadcast
-        await self.broadcast(msg)
+        # 受け取った msg をそのまま転送するのではなく、gameinfo に
+        # 直前の操作を添えて返す (TODO-015)。クライアントは gameinfo で
+        # 盤面を作り直し、音と dice の回転だけを last_op から出す。
+        # チェッカーが動くときだけアニメーションの時間を渡す
+        sec = self.SEC_CHECKER_MOVE if msg['type'] == 'put_checker' else 0
+        await self.emit_gameinfo(sec, history_flag=False, last_op=msg)
 
     def app_index(self, request):
         self.__log.debug('')

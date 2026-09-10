@@ -1332,8 +1332,12 @@ class Cube extends OnBoardImage {
             val = 64;
         }
 
-        //this.board.player_clock[player].change_turn();
-        this.board.player_clock[player].stop();
+        // ダブルは手番を渡すのと同じ扱いにする。掛けた側のクロックを
+        // 止めて、相手のクロックを動かす (テイクかパスかを考える時間は
+        // 相手の持ち時間から使う)。stop() では自分の画面しか止まらず、
+        // サーバへ知らせないので、返ってきた gameinfo で動き出す
+        // (TODO-015)
+        this.board.player_clock[player].change_turn();
         this.emit(val, this.player, false);
     } // Cube.double()
 
@@ -3142,7 +3146,19 @@ class Board extends BgImage {
 
             if ( winner >= 0 ) {
                 console.log(`Board.set_turn>plyaer${winner} win ${score}!`);
-                this.player_clock[winner].emit_stop();
+                // 動いているときだけ止める (TODO-015)
+                //
+                // set_turn() は load_gameinfo() から毎回呼ばれる。
+                // 無条件に emit_stop() を送ると、サーバが返す gameinfo で
+                // また load_gameinfo() が走り、stop_clock を送り直す。
+                // stop_clock は turn も resign も変えないので、止まる条件が
+                // 無いまま回り続ける (実測: 5 秒で 606 通)。
+                // active を見れば 1 巡で収まる。サーバが _clock_active を
+                // false にすると、次の clock_state で resume() されなくなり、
+                // active が false のままになるため
+                if ( this.player_clock[winner].active ) {
+                    this.player_clock[winner].emit_stop();
+                }
                 this.win_btn[winner].on();
                 this.player_name[winner].on();
             }
@@ -3526,15 +3542,41 @@ class Board extends BgImage {
 
     /**
      * load all game information
+     *
+     * 演出 (音と dice の回転) は last_op から出す (TODO-015)。
+     * サーバから届くのは gameinfo だけになったので、盤面は gameinfo で
+     * 作り直し、「何が起きたか」でしか決められないものだけを
+     * last_op で補う。
+     *
      * @param {Object} gameinfo - game information object
+     * @param {number} [sec=2]
+     * @param {boolean} [history_flag=false]
+     * @param {Object} [clock_state]
+     * @param {Object} [last_op] - 直前の操作 {type, data, ..}。無ければ null
      */
     load_gameinfo(gameinfo, sec=2, history_flag=false,
-                  clock_state=undefined) {
+                  clock_state=undefined, last_op=undefined) {
         /*
         console.log(`Board.load_gameinfo(`
                     + `gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
         */
         this.gameinfo = gameinfo;
+
+        // last_op は無いこともある (履歴の再生、接続時)。
+        // サーバは JSON の null で送ってくるので、真偽で見る
+        const op_type = last_op ? last_op.type : undefined;
+
+        // put / hit の音は動かす前の位置で決まるので、チェッカーを
+        // 配り直す前に控えておく (TODO-015)
+        let put_ch = undefined;
+        let put_prev_p = undefined;
+        if ( op_type == "put_checker" ) {
+            const ch_id = "p" + ("000" + last_op.data.ch).slice(-3);
+            put_ch = this.search_checker(ch_id);
+            if ( put_ch !== undefined ) {
+                put_prev_p = put_ch.cur_point;
+            }
+        }
         
         // clear points
         // console.log(`Board.load_gameinfo> clear points`);
@@ -3577,10 +3619,28 @@ class Board extends BgImage {
         // 積んだ順 (player, checker の順) のまま
         ch_list.sort((a, b) => a.idx - b.idx);
 
+        // 掴んでいるチェッカーは、手元の座標へ戻す (TODO-015)
+        //
+        // 配り直しは point.add() が座標も z も決めるので、ドラッグ中の
+        // 駒まで定位置へ飛ぶ。gameinfo は操作のたびに届くので、他人が
+        // 名前を変えただけでも掴んでいる駒が一瞬戻ってしまう。
+        // checkers の並びと cur_point は gameinfo どおりに作らせたまま、
+        // 見えている位置と重なり順だけを戻す
+        const mv_ch = this.moving_checker;
+        let mv_pos = undefined;
+        if ( mv_ch !== undefined ) {
+            mv_pos = { x: mv_ch.x, y: mv_ch.y, z: mv_ch.z };
+        }
+
         for (let e of ch_list) {
             e.ch.el.hidden = false;
             this.point[e.point].add(e.ch, sec);
         } // for (e)
+
+        if ( mv_pos !== undefined ) {
+            mv_ch.move(mv_pos.x, mv_pos.y, true, 0);
+            mv_ch.set_z(mv_pos.z);
+        }
 
         // score
         this.score[0].set(gameinfo.score[0]);
@@ -3629,20 +3689,42 @@ class Board extends BgImage {
         this.cube.set(c.value, c.side, c.accepted, false);
 
         // dice
+        //
+        // 振ったときだけ、そのプレーヤーの dice を回して音を鳴らす
+        // (TODO-015)。turn == -1 (操作不可) では演出しない
         const d = gameinfo.board.dice;
         // console.log(`Board.load_gameinfo> dice=${JSON.stringify(d)}`);
-        this.roll_btn[0].set(d[0], false);
-        this.roll_btn[1].set(d[1], false);
+        let roll_player = -1;
+        if ( op_type == "dice" && last_op.data.roll && gameinfo.turn != -1 ) {
+            roll_player = last_op.data.player;
+        }
+        this.roll_btn[0].set(d[0], roll_player == 0);
+        this.roll_btn[1].set(d[1], roll_player == 1);
 
         // 注：順番が重要
         //
         // turn
+        //
+        // turn_change の音は set_turn が鳴らす。turn が変わったときだけ
+        // 鳴るので、set_turn の操作で来たときだけ許す (TODO-015)
         console.log(`Board.load_gameinfo>turn=${gameinfo.turn}`);
-        this.set_turn(gameinfo.turn, this.resign, false);
+        this.set_turn(gameinfo.turn, this.resign, op_type == "set_turn");
 
         // pip count
         this.pip_count(0);
         this.pip_count(1);
+
+        // put / hit の音 (TODO-015)
+        //
+        // 盤面はもう gameinfo で揃っているので、ここで出すのは音だけ。
+        // turn == -1 (操作不可) では鳴らさない
+        if ( put_ch !== undefined && this.turn != -1 ) {
+            if ( last_op.data.p >= 26 && put_prev_p < 26 ) {
+                this.sound_hit.play();
+            } else {
+                this.sound_put.play();
+            }
+        }
     } // Board.load_gameinfo()
 
     /**
@@ -4228,104 +4310,19 @@ window.onload = () => {
             const msg = JSON.parse(ev.data);
             console.log(`ws.onmessage:msg=${JSON.stringify(msg)}`);
 
+            // サーバから届くのは gameinfo だけ (TODO-015)。
+            // 操作系の type はクライアントからサーバへ送るときだけ使う。
+            // 盤面は gameinfo で作り直し、音と dice の回転は
+            // data.last_op (直前の操作) から出す
             if ( msg.type == "gameinfo" ) {
                 board.load_gameinfo(msg.data.gameinfo,
                                     msg.data.sec,
                                     msg.data.history_flag,
-                                    msg.data.clock_state);
+                                    msg.data.clock_state,
+                                    msg.data.last_op);
                 return;
             } // "gameinfo"
 
-            if ( msg.type == "put_checker" ) {
-                if ( board.turn == -1 ) {
-                    console.log(`ws.onmessage>put_checker>`
-                                + `turn=${board.turn}..ignored`);
-                    return;
-                }
-                const ch_id = "p" + ("000" + msg.data.ch).slice(-3);
-                console.log(`ws.onmessage>put_checker> ch_id=${ch_id}`);
-                let ch = board.search_checker(ch_id);
-
-                board.put_checker(ch, msg.data.p, 0.2);
-                return;
-            } // "put_checker"
-
-            if ( msg.type == "cube" ) {
-                board.cube.set(msg.data.value, msg.data.side, msg.data.accepted);
-                return;
-            } // "cube"
-
-            if ( msg.type == "dice" ) {
-                console.log(`ws.onmessage>type=dice,turn=${board.turn}`);
-                if ( board.turn == -1 ) {
-                    return;
-                }
-                if ( JSON.stringify(msg.data.dice) == JSON.stringify([0,0,0,0]) ) {
-                    // let playpromise = board.sound_turn_change.play();
-                }
-
-                board.roll_btn[msg.data.player].set(msg.data.dice,
-                                                    msg.data.roll);
-                if ( board.turn < 0 ) {
-                    board.player_name[0].off();
-                    board.player_name[1].off();
-                }
-                return;
-            } // "dice"
-
-            if ( msg.type == "set_turn" ) {
-                board.set_turn(msg.data.turn, msg.data.resign);
-                return;
-            } // set_turn
-
-            if ( msg.type == "set_playername" ) {
-                board.player_name[msg.data.player].set(msg.data.name);
-                return;
-            } // set_playername
-        
-            if ( msg.type == "set_score" ) {
-                board.score[msg.data.player].set(msg.data.score);
-                return;
-            } // set_score
-        
-            if ( msg.type == "set_clock_switch" ) {
-                board.set_clock_switch(msg.data.switch);
-                console.log(`clock_sw=${board.clock_sw}`);
-                return;
-            } // set_clock_switch
-
-            if ( msg.type == "set_clock_limit" ) {
-                board.clock_limit.set(msg.data.index, msg.data.clock_limit);
-                board.player_clock[0].reset();
-                board.player_clock[1].reset();
-                return;
-            } // set_clock_limit
-        
-            if ( msg.type == "set_player_clock" ) {
-                board.player_clock[msg.data.player].set(msg.data.clock);
-                return;
-            } // set_player_clock
-        
-            if ( msg.type == "resume_clock" ) {
-                board.player_clock[msg.data.player].resume();
-                return;
-            } // set_player_clock
-        
-            if ( msg.type == "start_clock" ) {
-                board.player_clock[msg.data.player].start();
-                return;
-            } // set_player_clock
-        
-            if ( msg.type == "stop_clock" ) {
-                board.player_clock[msg.data.player].stop();
-                return;
-            } // set_player_clock
-        
-            if ( msg.type == "reset_clock" ) {
-                board.player_clock[msg.data.player].reset();
-                return;
-            } // set_player_clock
-        
             console.log("ws.onmessage>msg.type=???");
         }; // ws.onmessage
     }; // ws_connect

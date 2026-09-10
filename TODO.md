@@ -1,91 +1,10 @@
 # TODO
 
-**残っている項目: TODO-015、TODO-018。**
-これまでに 16 件を決着させた。
+**残っている項目: TODO-018。**
+これまでに 17 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-019` から。**
 
 ---
-
-## TODO-015. サーバからの受信を gameinfo 1 本にまとめる
-
-**前提の TODO-016 と TODO-017 は済んだ。** クロックの状態はサーバが持つように
-なり、`load_gameinfo()` は位置が変わったチェッカーだけを動かすようになった。
-
-- [ ] サーバ: 操作系も `emit_gameinfo()` で返すようにし、直前の操作を添える
-- [ ] クライアント: `ws.onmessage` の分岐を消し、`gameinfo` と直前の操作から
-      描き直す
-- [ ] 音と dice の演出を「直前の操作」から出す
-- [ ] `tests/` と `CLAUDE.md` を直す
-
-TODO-010 で「受信側だけ一方向にする」と決めた。サーバ → クライアントを
-`gameinfo` ＋直前の操作の 1 本にまとめ、`type` の二重定義を無くす。
-
-今は操作系（`put_checker`、`cube`、`dice`、`set_turn`、`set_playername`、
-`set_score`、`set_clock_limit`、`set_player_clock` の 8 種類）で、サーバが
-`gameinfo` を更新したうえで**受け取ったメッセージをそのまま転送**し、
-受け取った JS が自分でもう一度同じ操作を適用している
-（`yt_backgammon_server.py:540`、`ytbg.js:4210-4300`）。これを
-`emit_gameinfo()` に寄せる。
-
-「直前の操作」を添えるのは、チェッカーが動くアニメーションに必要だから
-（状態だけでは、どこから動いたか分からない）。`emit_gameinfo()` は今も
-`sec` を送ってアニメーションの時間を渡しているので、そこへ足す形になる。
-
-### 変えないと決めていること（TODO-010）
-
-- **ルール判定は JS 側に残す。** サーバにルール判定は 1 つも無く、移すと
-  `yt_backgammon.py` にルールを新規実装することになる。`CLAUDE.md` の
-  「ルールチェックは補助であり free move で無効化できる」とも合わない
-- **先行適用は残す**（`ytbg.js:2557`、`2572`）。`on_mouse_up_xy()` は
-  emit した直後に `put_checker()` を先行実行し、その盤面で `check_disable()` と
-  `winner_is()` を呼ぶ。往復を待つと判定が 1 手古い盤面で走る
-
-### 着手時に固めた設計（2026-09-10）
-
-前提が 2 つ片付いたので、残る作業は次の形になる。
-
-1. **サーバ。** 操作系は末尾で `broadcast(msg)` する代わりに、
-   `emit_gameinfo(sec, history_flag=False, last_op=msg)` を呼ぶ。
-   `emit_gameinfo()` に `last_op` を足す。`sec` は `put_checker` のときだけ
-   `SEC_CHECKER_MOVE`（0.2）で、他は 0
-2. **クライアント。** `ws.onmessage` から `gameinfo` 以外の分岐を消し、
-   `load_gameinfo(gameinfo, sec, history_flag, clock_state, last_op)` だけにする
-3. **演出は `last_op` から出す。** `load_gameinfo()` は盤面を描き直すだけで、
-   音も dice の回転も鳴らさない（`sound=false` で呼んでいる）。
-   `last_op` を見て、`put_checker` なら put / hit の音、`dice` なら roll の
-   演出と音、`set_turn` なら turn_change の音を鳴らす
-
-**チェッカーのアニメーションは `last_op` に頼らなくてよい**（TODO-017 で
-`load_gameinfo()` が位置の変わった駒だけを動かすようになった。Playwright で
-実測済み）。`last_op` が要るのは**音と dice の演出**のため。
-
-**音の二重は起きない。** `Checker.on_mouse_up_xy()` の先行適用は
-`put_checker(ch, dst_p, 0.2, false)` と `sound=false` で呼んでおり、
-「音は返ってきたメッセージで鳴らす」と決まっている（`ytbg.js:2555-2561` の
-コメント）。`last_op` で鳴らす形は、この作りをそのまま引き継ぐ
-
-### 気をつけること
-
-- **`gameinfo` を丸ごと送るので通信量が増える。** 履歴操作では今も全体を
-  送っているので、増えるのは操作系の分
-- **`resign` はサーバだけに分岐がある。** 数を合わせるときに落とさない。
-  クロック系の 5 つ（`set_clock_switch` / `start_clock` / `stop_clock` /
-  `resume_clock` / `reset_clock`）は TODO-016 でサーバにも分岐ができたので、
-  今は両方にある。クロックの状態は `clock_state` で送っているので、
-  **こちらも `emit_gameinfo()` に寄せられる**
-- **`board.turn == -1` のときに `put_checker` を捨てる分岐**（`ytbg.js`）が
-  今はある。盤面は `gameinfo` で同期されるので、捨てるのは音だけでよい
-- `emit_gameinfo()` は `broadcast()` を通るので、**いちばん遅い
-  クライアントを待つ**（TODO-009 で残した制約）。操作系もその待ちに
-  乗ることになる
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- `ytbg.js` と `yt_backgammon_server.py` の両方が変わり、テストと `CLAUDE.md` も
-  まとまって要るので、実装の担当も分ける
-- 挙動が変わる項目なので、確認とは別にレビューの担当も入れる
 
 ## TODO-018. _history が上限なく伸び続ける
 
@@ -122,6 +41,7 @@ TODO-010 で「受信側だけ一方向にする」と決めた。サーバ → 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-015.** サーバからの受信を gameinfo 1 本にまとめる](archives/todo/TODO-015.%20サーバからの受信を%20gameinfo%201%20本にまとめる.md)
 - [**TODO-004.** save_data() のファイル I/O がイベントループを止める（対応しない）](archives/todo/TODO-004.%20save_data()%20のファイル%20I_O%20がイベントループを止める.md)
 - [**TODO-017.** load_gameinfo() が毎回チェッカーを全部置き直す](archives/todo/TODO-017.%20load_gameinfo()%20が毎回チェッカーを全部置き直す.md)
 - [**TODO-016.** 再接続するとクロックの動作中／停止中が復元されない](archives/todo/TODO-016.%20再接続するとクロックの動作中／停止中が復元されない.md)

@@ -144,9 +144,15 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 
 メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
 `{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
-`type` の分岐はサーバの `on_json()` とクライアントの `ws.onmessage` の
-**両方に同じ名前で書かれている**ので、`type` を足すときは両方直す。
 `history: true` を付けたメッセージだけが履歴に 1 手として積まれる。
+
+**`type` を書くのはクライアント → サーバの向きだけ**で、分岐はサーバの
+`on_json()` にしかない（TODO-015）。サーバが返すのは `gameinfo` 1 本で、
+`data` に直前の操作が `last_op`（受け取った msg そのまま。操作に紐づかない
+送信では `None`）として入る。クライアントは `gameinfo` で盤面を作り直し、
+**音と dice の回転だけを `last_op` から出す**（`Board.load_gameinfo()`）。
+`type` を足すときは `on_json()` に分岐を足し、演出が要るときだけ
+`load_gameinfo()` にも足す。
 
 全員への送信（`broadcast()`）は `asyncio.gather()` で並行に送るが、
 **いちばん遅いクライアントを待つ**（全員へ送り終わるまで次へ進まない）。
@@ -159,7 +165,7 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 （TODO-016）。`on_json()` には `set_clock_limit` / `set_player_clock` に加えて
 `set_clock_switch` / `start_clock` / `stop_clock` / `resume_clock` /
 `reset_clock` の分岐があり、いずれも return せず、末尾の `add_history` と
-broadcast へ落ちる（受け取ったメッセージの転送は今までどおり）。
+`emit_gameinfo()` へ落ちる。
 
 サーバが `gameinfo` とは別に持つのは次の 3 つ。**`gameinfo` には入れない。**
 入れると履歴に載り、`back` / `fwd` でクロックの発着まで巻き戻ってしまう。
