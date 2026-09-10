@@ -32,9 +32,12 @@ uv run ytbg --help                     # ytbg.sh は uv run ytbg を呼ぶだけ
 ./ytbg-boot.sh   # ポート 5001〜5004 で 4 サーバを同時起動
 ./ytbg-stop.sh   # ps + grep で kill
 
-uv run pytest
+uv run pytest              # Python のテスト
 uv run ruff check .
 uv run mypy src
+
+npm install                # 最初の 1 回だけ（playwright を入れる）
+node --test tests/browser/ # ブラウザでの動作確認（JS のテスト）
 ```
 
 サーバは **uvicorn（ASGI）** で動かす（TODO-009）。Flask + Flask-SocketIO +
@@ -56,8 +59,28 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 
 テストは `tests/` にあり、`uv run pytest` で走る（TODO-006）。`gameinfo` の
 更新、履歴、保存・読み込みに加えて、`on_json()` の `type` ごとの振る舞いを
-見ている（TODO-013）。**ブラウザ側の動作確認は今までどおり実際に触って行う**
-（クライアントの JS はテストしていない）。
+見ている（TODO-013）。
+
+**Python のテストは pytest、JS のテストは node で走らせる**（TODO-021）。
+ブラウザでの動作確認は `tests/browser/` にあり、`node --test tests/browser/`
+で走る。サーバを実プロセスとして起動し、playwright の chromium で
+ページを開いて、盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
+コンソールエラーを見る。注意する点:
+
+- **ブラウザはシステムの `/usr/bin/chromium` を `executablePath` で指定して
+  いる**（`tests/browser/helper.mjs`）。`~/.cache/ms-playwright/` にある
+  リビジョンが playwright 1.63.0 の要求と合わないため。
+  `npx playwright install` で落とし直さない
+- 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
+  `ytBackgammonServer.DATAFILE_DIR` が見ており、無ければ `$HOME`。
+  利用者の `~/ytbg-*.json` は読み書きされない
+- ポートは固定せず、空いているものを OS に選ばせる。サーバは
+  `detached` で起動してプロセスグループごと kill する（`uv run` の下に
+  python がぶら下がるため）。`pkill` は使わない
+- 初回ロードで `/favicon.ico` が 404 になる。favicon を用意しておらず、
+  ルートも無い。コンソールエラーの判定からは除いてある
+- **ここでも、通ることだけを見ない。** `src/` をわざと壊して、狙った
+  テストが落ちることを確かめる（TODO-021 で 4 通り試した）
 
 テストを足すときの注意:
 

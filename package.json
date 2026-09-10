@@ -1,0 +1,12 @@
+{
+  "name": "ytbackgammon",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ytBackgammon: browser tests (JS). Python tests are run with pytest.",
+  "scripts": {
+    "test": "node --test tests/browser/"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

@@ -1,4 +1,8 @@
 *.json
+# 盤面のデータファイルをうっかりコミットしないための保険 (TODO-021)。
+# npm の管理ファイルだけは例外にする
+!package.json
+!package-lock.json
 *~
 
 .#*
@@ -107,3 +111,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Node.js
+node_modules/

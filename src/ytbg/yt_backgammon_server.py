@@ -25,7 +25,9 @@ templates = Jinja2Templates(directory=str(WEBROOT / 'templates'))
 
 
 class ytBackgammonServer:
-    DATAFILE_DIR = os.getenv('HOME')
+    # 保存先。ブラウザでの動作確認は実プロセスを起動するので、
+    # 環境変数で一時ディレクトリへ逃がせるようにしてある (TODO-021)
+    DATAFILE_DIR = os.getenv('YTBG_DATA_DIR') or os.getenv('HOME')
     DATAFILE_NAME = 'ytbg'
     SEC_CHECKER_MOVE = 0.2
 
