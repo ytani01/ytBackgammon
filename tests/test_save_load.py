@@ -10,8 +10,8 @@ test_save_load.py
 (形式のバージョンとクロック)、以降が履歴 (h) と進む側の履歴 (f) で、
 書かれた順がスタックの順。
 
-旧形式 (~/ytbg-{server_id}.json) は .jsonl が無いときだけ読む。
-**旧ファイルは消さない。書き戻しは常に .jsonl。**
+旧形式 (~/ytbg-{server_id}.json) の読み込みは TODO-031 で消した。
+**残っている .json は読まないし、消しもしない。**
 """
 import json
 
@@ -22,7 +22,7 @@ from ytbg.gameinfo import GameInfo
 from ytbg.storage import Storage
 
 # 旧形式 (TODO-024 より前) のファイルの中身。
-# clock_limit と board.clock を持ち、gameinfo に入っていた
+# 読まなくなったことを確かめるテストで使う (TODO-031)
 OLD_ENT = {
     'sn': 1,
     'server_version': '0.90',
@@ -42,13 +42,9 @@ OLD_ENT = {
 }
 
 
-def old_file(path, history=None, fwd_hist=None):
-    """旧形式のファイルを書く"""
-    if history is None:
-        history = [OLD_ENT]
-    if fwd_hist is None:
-        fwd_hist = []
-    path.write_text(json.dumps({'history': history, 'fwd_hist': fwd_hist}))
+def old_file(path):
+    """旧形式 (TODO-024 より前) のファイルを書く"""
+    path.write_text(json.dumps({'history': [OLD_ENT], 'fwd_hist': []}))
 
 
 def read_lines(path):
@@ -314,78 +310,42 @@ def test_load_data_keeps_history_when_broken(bg_server):
 
 
 # ---------------------------------------------------------------------
-# 旧形式
+# 旧形式 (読まない)
 # ---------------------------------------------------------------------
 
-def test_old_format_is_read_when_no_jsonl(tmp_path):
-    """.jsonl が無ければ旧形式 (.json) を読む"""
+def test_old_format_is_not_read_and_kept(tmp_path):
+    """
+    旧形式 (.json) は読まないし、消しもしない (TODO-031)。
+
+    読むと空で始まり、書き戻しは .jsonl。旧ファイルは中身ごと残る。
+    """
     storage = Storage(tmp_path / 'ytbg-test.jsonl')
-    old_file(storage.old_path, history=[OLD_ENT], fwd_hist=[OLD_ENT])
+    old_path = tmp_path / 'ytbg-test.json'
+    old_file(old_path)
+    before = old_path.read_text()
 
     history, fwd_hist, clock = storage.load()
 
-    assert len(history) == 1
-    assert len(fwd_hist) == 1
-    assert isinstance(history[0], GameInfo)
-    assert history[0].score == [1, 3]
-    assert history[0].board.playername == ['Alice', 'Bob']
-    assert history[0].board.cube.value == 4
-    assert clock is not None
-    # 旧形式の clock_limit と board.clock が Clock の初期値になる
-    assert clock.limit == [90, 9]
-    assert clock.clock == [[50, 3], [40, 2]]
-    assert clock.sw is True
-    assert clock.active == [False, False]
+    assert history == []
+    assert fwd_hist == []
+    assert clock is None
 
-
-def test_old_format_drops_clock_keys(tmp_path):
-    """旧形式のエントリにある clock_limit と board.clock は読み捨てる"""
-    storage = Storage(tmp_path / 'ytbg-test.jsonl')
-    old_file(storage.old_path)
-
-    history, _fwd_hist, _clock = storage.load()
-
-    ent = history[0].to_dict()
-    assert 'clock_limit' not in ent
-    assert 'clock' not in ent['board']
-
-
-def test_jsonl_wins_when_both_exist(tmp_path):
-    """両方あれば .jsonl を読む"""
-    storage = Storage(tmp_path / 'ytbg-test.jsonl')
-    old_file(storage.old_path)
     storage.save([GameInfo(sn=1, score=[7, 7])], [], Clock(limit=[30, 3]))
 
-    history, _fwd_hist, clock = storage.load()
-
-    assert len(history) == 1
-    assert history[0].score == [7, 7]
-    assert clock is not None
-    assert clock.limit == [30, 3]
-
-
-def test_old_file_is_kept(tmp_path):
-    """旧ファイルは消さない。書き戻しは .jsonl"""
-    storage = Storage(tmp_path / 'ytbg-test.jsonl')
-    old_file(storage.old_path)
-    before = storage.old_path.read_text()
-
-    history, fwd_hist, clock = storage.load()
-    storage.save(history, fwd_hist, clock)
-
-    assert storage.old_path.exists()
-    assert storage.old_path.read_text() == before
     assert storage.path.exists()
+    assert old_path.exists()
+    assert old_path.read_text() == before
 
 
-async def test_server_starts_from_old_format(make_bg_server, tmp_path):
-    """旧形式しか無くても、サーバはそれを読んで起動する"""
+async def test_server_starts_with_only_old_format(make_bg_server, tmp_path):
+    """旧形式しか無いときは、初期配置から始まる (TODO-031)"""
     old_file(tmp_path / 'ytbg-old.json')
 
     svr = make_bg_server('old')
 
     assert len(svr._hist.entries) == 1
-    assert svr._gameinfo.board.playername == ['Alice', 'Bob']
-    assert svr._clock.limit == [90, 9]
-    assert svr._clock.clock == [[50, 3], [40, 2]]
+    assert svr._gameinfo.board.playername == ['', '']
+    assert svr._clock.limit == Clock().limit
+
+
 ##

@@ -224,7 +224,7 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   1 本だけ持つ。`start()` は Task にして投げ、`run()` はロックを
   握ったまま走り切る
 - `src/ytbg/storage.py` — `Storage`（TODO-024）。
-  `~/ytbg-{server_id}.jsonl` への保存・読み込みと、旧形式の変換
+  `~/ytbg-{server_id}.jsonl` への保存・読み込み
 - `src/ytbg/webroot/static/js/` — クライアント。ES Modules で、バンドラは
   使わない（TODO-028）。クラス階層図は `ui/base.js` の先頭にある
   - `main.js` — エントリ。`build_dom()` で要素を作り、`Board` を作り、
@@ -459,10 +459,9 @@ New Game も `confirm()` で確認を取る。共有ボードなので、全員�
 ときに保存側を直し忘れて落ちることが無い。日本語のプレーヤー名はそのまま
 書く（`ensure_ascii=False`。そのぶん `open()` には `encoding='utf-8'` が要る）。
 
-旧形式（`~/ytbg-{server_id}.json`）は **`.jsonl` が無いときだけ**読む。
-`clock_limit` と `board.clock` は最後のエントリの値を `Clock` の初期値に
-する。**書き戻しは常に `.jsonl` で、旧ファイルは消さない**（消すのは
-TODO-031）。
+旧形式（`~/ytbg-{server_id}.json`）の読み込みは TODO-031 で消した。
+**残っている `.json` は読まないし、消しもしない。** `.jsonl` が無ければ
+初期配置から始まる。
 
 ### 画像ディレクトリ
 

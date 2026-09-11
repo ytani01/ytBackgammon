@@ -59,8 +59,8 @@ class BackgammonServer:
         self._svr_ver = svr_ver
         self._svr_id = svr_id
 
-        # 保存は JSON Lines (TODO-024)。旧形式 (.json) は、これが
-        # 無いときだけ Storage が読む
+        # 保存は JSON Lines (TODO-024)。旧形式 (.json) は
+        # もう読まない (TODO-031)
         self._datafile_path = (
             f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
         self.__log.debug('_datafile_path={}', self._datafile_path)
@@ -290,8 +290,8 @@ class BackgammonServer:
         """
         保存したものを読む (TODO-024)。
 
-        .jsonl が無ければ旧形式 (.json) を読む。読めなければ何も
-        書き換えずに (0, 0) を返す。初回起動もそこを通る。
+        読めなければ何も書き換えずに (0, 0) を返す。初回起動も
+        そこを通る。
 
         Returns
         -------

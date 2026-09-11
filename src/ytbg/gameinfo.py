@@ -90,7 +90,7 @@ class BoardState:
     def from_dict(cls, data: dict[str, Any],
                   strict: bool = False) -> BoardState:
         """
-        dict から作る。旧形式の board.clock は読み捨てる (TODO-024)。
+        dict から作る。知らないキーは読み捨てる。
 
         strict なら、キーが欠けていると KeyError になる。
         """
@@ -238,15 +238,16 @@ class GameInfo:
         """
         dict から作る。
 
-        **知らないキーは読み捨てる。** 旧形式 (TODO-024 より前) の
-        clock_limit と board.clock は、これで落ちる。
-        足りないキーは既定値になる。
+        **知らないキーは読み捨て、足りないキーは既定値になる。**
 
         strict なら、to_dict() が出すキーが 1 つでも欠けていると
         KeyError になる。保存したファイル (.jsonl) を読むときに使う。
         綴り違いを黙って既定値にすると、壊れた履歴が初期配置の盤面として
-        読まれてしまうため (TODO-024)。旧形式 (.json) は、余分なキーを
-        読み捨てる必要があるので緩いまま。
+        読まれてしまうため (TODO-024)。
+
+        **既定が strict=False なのは、クライアントから届く
+        set_gameinfo のため** (TODO-031)。こちらは部分的な dict でも
+        受ける (`tests/test_on_json.py` が見ている)。
         """
         base = cls()
         return cls(

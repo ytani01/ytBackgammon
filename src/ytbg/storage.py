@@ -17,14 +17,12 @@ h が _history、f が _fwd_hist で、**書かれた順がスタックの順**�
 1 行につき json.dumps() を 1 回呼ぶだけなので、gameinfo にキーを
 足したときに保存側を直し忘れて落ちることが無くなる。
 
-旧形式 (~/ytbg-{server_id}.json) は **.jsonl が無いときだけ** 読む。
-**旧ファイルは消さない。書き戻しは常に .jsonl。**
-消すのは別項目 (TODO-031)。
+旧形式 (~/ytbg-{server_id}.json) の読み込みは TODO-031 で消した。
+**残っている .json は読まないし、消しもしない。**
 """
 
 import json
 from pathlib import Path
-from typing import Any
 
 from .clock import Clock
 from .gameinfo import GameInfo
@@ -45,7 +43,7 @@ LoadResult = tuple[list[GameInfo], list[GameInfo], Clock | None]
 
 
 class Storage:
-    """JSON Lines のファイルと、旧形式の読み込み"""
+    """JSON Lines のファイルの保存・読み込み"""
 
     FORMAT_VERSION = 2
 
@@ -56,12 +54,10 @@ class Storage:
         Parameters
         ----------
         path: str | Path
-            JSON Lines のファイル (.jsonl)。旧形式のパスは、
-            拡張子を .json に替えたもの
+            JSON Lines のファイル (.jsonl)
         """
         self.path = Path(path)
-        self.old_path = self.path.with_suffix('.json')
-        self.__log.debug('path={}, old_path={}', self.path, self.old_path)
+        self.__log.debug('path={}', self.path)
 
     def save(self, history, fwd_hist, clock) -> bool:
         """
@@ -100,18 +96,22 @@ class Storage:
         """
         保存したものを読む。
 
-        .jsonl があればそれを読み、無いときだけ旧形式 (.json) を読む。
-        どちらも読めなければ ([], [], None)。
+        読めなければ ([], [], None)。
         """
-        if self.path.exists():
-            return self._load_jsonl()
+        if not self.path.exists():
+            self.__log.warning('{}: no data file', self.path)
 
-        if self.old_path.exists():
-            self.__log.info('{}: load old format', self.old_path)
-            return self._load_old()
+            # 旧形式しか無いボードは初期配置から始まる。黙って始めると
+            # 「消えた」ようにしか見えないので、あることだけは知らせる
+            # (TODO-031)
+            old_path = self.path.with_suffix('.json')
+            if old_path.exists():
+                self.__log.warning('{}: old format is not read anymore',
+                                   old_path)
 
-        self.__log.warning('{}: no data file', self.path)
-        return [], [], None
+            return [], [], None
+
+        return self._load_jsonl()
 
     def _load_jsonl(self) -> LoadResult:
         """JSON Lines を読む"""
@@ -150,43 +150,4 @@ class Storage:
                          len(history), len(fwd_hist))
         return history, fwd_hist, clock
 
-    def _load_old(self) -> LoadResult:
-        """
-        旧形式 (TODO-024 より前) を読む。
-
-        clock_limit と board.clock は gameinfo から外したので、
-        **履歴の最後のエントリの値を Clock の初期値にする**。
-        sw は既定 (True)。各エントリに残っているクロックのキーは
-        GameInfo.from_dict() が読み捨てる。
-        """
-        try:
-            # 旧形式は ensure_ascii=True で書かれているので中身は
-            # ASCII だが、読み方を揃える (TODO-024)
-            with self.old_path.open(encoding='utf-8') as f:
-                data = json.load(f)
-
-            raw_history = data['history']
-            raw_fwd_hist = data['fwd_hist']
-            history = [GameInfo.from_dict(h) for h in raw_history]
-            fwd_hist = [GameInfo.from_dict(h) for h in raw_fwd_hist]
-            clock = self._old_clock(raw_history)
-
-        except LOAD_ERRORS as e:
-            self.__log.warning('{}:{}.', type(e).__name__, e)
-            return [], [], None
-
-        self.__log.debug('history=({}), fwd_hist=({})',
-                         len(history), len(fwd_hist))
-        return history, fwd_hist, clock
-
-    def _old_clock(self, raw_history: list[dict[str, Any]]) -> Clock:
-        """旧形式の最後のエントリから Clock を作る"""
-        if not raw_history:
-            return Clock()
-
-        last = raw_history[-1]
-        return Clock(
-            limit=last.get('clock_limit'),
-            clock=(last.get('board') or {}).get('clock'),
-        )
 ##

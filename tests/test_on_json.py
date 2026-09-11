@@ -590,6 +590,26 @@ async def test_set_gameinfo_replaces_gameinfo(bg_server, req, emitted):
     assert emitted.last['type'] == 'gameinfo'
 
 
+async def test_set_gameinfo_accepts_partial_dict(bg_server, req, emitted):
+    """
+    set_gameinfo は、キーが欠けた dict でも受ける (TODO-031)。
+
+    GameInfo.from_dict() の既定が strict=False なのは、この経路の
+    ため。**ファイルを読むときの strict=True と取り違えて、ここまで
+    strict にしないこと。** 欠けたキーは既定値になる。
+    """
+    msg = {'type': 'set_gameinfo', 'data': {'score': [3, 4]},
+           'history': False}
+    await bg_server.on_json(req, msg)
+
+    assert bg_server._gameinfo.score == [3, 4]
+    # 欠けたキーは既定値
+    assert bg_server._gameinfo.turn == 2
+    assert bg_server._gameinfo.board.playername == ['', '']
+    assert len(bg_server._gameinfo.board.checker[0]) == 15
+    assert emitted.last['type'] == 'gameinfo'
+
+
 # ---------------------------------------------------------------------
 # 履歴系で送られるもの
 # ---------------------------------------------------------------------
