@@ -3,6 +3,10 @@
 **残っている項目: TODO-022 と TODO-024〜030 の 8 件。** これまでに 22 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-031` から。**
 
+**着手順は `022 → 024 → 025 → 026 → 028 → 029 → 027 → 030`。**
+未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
+順番と着手順は一致しない。
+
 ---
 
 ## TODO-022. favicon が無く、初回ロードで 404 になる
@@ -11,8 +15,8 @@
 |------|------|------|
 | 見込み | Sonnet 5 / effort medium | main + verifier |
 
-- [ ] favicon をどう用意するか決める
-- [ ] 用意して 404 が出ないようにする
+- [ ] favicon を作って `static/favicon.png` に置く
+- [ ] `index.html` に `<link rel="icon">` を書き、404 が出ないことを確かめる
 - [ ] `tests/browser/` の除外を外す
 
 ### きっかけ
@@ -32,14 +36,12 @@ INFO: 127.0.0.1:35490 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 `tests/browser/helper.mjs` の `console_errors()` がこれを既知として
 除外している。**除外があると、同じ経路の本当のエラーを見落としやすい。**
 
-### 決めること
+### 決めたこと
 
-**favicon をどう用意するか。** 着手するときに相談する。
-
-- ボードの画像（`static/images*/`）から作る。デザインごとに変えるかどうかも決まる
-- 汎用の 1 枚を `static/` に置き、`index.html` に
-  `<link rel="icon" ...>` を書く
-- 空の 204 を返すルートを足す（画像を用意しない）
+- **汎用の 1 枚を `static/favicon.png` に置き、`index.html` に
+  `<link rel="icon">` を書く。** 画像ディレクトリ（`-i`）では変えない
+- **絵柄は、チェッカー・ダイス・ボードの三角形を組み合わせて独自に作る。**
+  既存の画像を縮めるのではなく、小さいサイズでも分かる形にする
 
 ### 分担
 
@@ -65,7 +67,8 @@ INFO: 127.0.0.1:35490 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 - [ ] `storage.py` を作り、`~/ytbg-{server_id}.jsonl` へ 1 行 1 手で保存する
 - [ ] 旧形式（`~/ytbg-{server_id}.json`）を `.jsonl` が無いときだけ読む。
       **旧ファイルは消さない**
-- [ ] JS 側を最小限だけ追随させる
+- [ ] 旧形式の読み込みを消すための項目を TODO-031 として立てる
+- [ ] JS 側を最小限だけ追随させる（クロックの読み先を `clock_state` に寄せる）
 - [ ] テストを直し、`src/` をわざと壊して狙ったテストが落ちることを確かめる
 
 ### きっかけ
@@ -79,6 +82,15 @@ gameinfo の外」「保存は JSON Lines」にある。
 
 **この項目が終われば、Python 側（TODO-025、026）と JS 側（TODO-027〜030）は
 独立に進められる。**
+
+### 決めたこと
+
+- **クロックは `clock_state` に `limit` を足して 1 本にまとめる。**
+  JS は `gameinfo.clock_limit` と `gameinfo.board.clock` を見るのをやめ、
+  クロック関連をすべて `clock_state`（`sw` / `active` / `clock` / `limit`）
+  から読む。送信は今までどおり `gameinfo` 1 本（TODO-015）
+- **旧形式の読み込みは当面残す。** 消すのは別項目（TODO-031）にして、
+  移行が済んだのを確かめてから決める
 
 ### 分担
 
@@ -101,7 +113,7 @@ gameinfo の外」「保存は JSON Lines」にある。
       `svr` と `app` を無くす
 - [ ] `ytBackgammonServer` を `BackgammonServer` に、`ytBackgammon` は
       `GameInfo` に吸収して無くす
-- [ ] WebSocket 経路そのもののテストを足す
+- [ ] WebSocket 経路そのもののテストを足す（Starlette の `TestClient`）
 - [ ] `src/` をわざと壊して狙ったテストが落ちることを確かめる
 
 ### きっかけ
@@ -112,6 +124,12 @@ gameinfo の外」「保存は JSON Lines」にある。
 `storage.py` と `clock.py` は TODO-024 で作るので、ここは残りの分割。
 
 **挙動は変えない。**
+
+### 決めたこと
+
+**WebSocket 経路のテストは Starlette の `TestClient` で書く。**
+`create_app()` に直接つなぐのでプロセスを起こさずに済む。
+dev 依存に `httpx` が 1 つ増える。
 
 ### 分担
 
@@ -141,7 +159,14 @@ gameinfo の外」「保存は JSON Lines」にある。
 戻り値の対応表は [`docs/design.md`](docs/design.md) の
 「メッセージの型付けとディスパッチ」にある。
 
-**挙動は変えない。**
+**挙動は変えない。ただし 1 点だけ例外がある。**
+
+### 決めたこと
+
+**登録表に無い `type` は、警告をログに出して無視する**（履歴に積まず、
+`gameinfo` も送り返さない）。接続は保つ。今はどの `if` にも当たらないまま
+末尾へ落ち、`history` フラグ次第で履歴に積まれて `gameinfo` が
+送り返されるが、これは意図した振る舞いではない。
 
 ### 分担
 
@@ -179,7 +204,12 @@ gameinfo の外」「保存は JSON Lines」にある。
 切り離せていないことが大きい。**
 
 `Position` は TODO-024 の `gameinfo` から作るので、その後に着手する。
+**さらに TODO-028・029 のあとにする。** 非モジュールの `ytbg.js` からは
+ES Modules の `rules/` を import できず、先に切り出すと同じ判定が
+2 つ存在する期間ができるため。
+
 `node --test` は Node の標準機能なので、npm パッケージは要らない。
+テストは `tests/js/*.test.mjs` に置く（`tests/browser/` と揃える）。
 
 ### 分担
 
@@ -203,7 +233,10 @@ gameinfo の外」「保存は JSON Lines」にある。
       コンストラクタのオプション引数で渡す（段数が 5 から 2 になる）
 - [ ] `EmitButton` の 6 つのサブクラスを 1 つにし、生成時に type と data を渡す
 - [ ] `BannerButton` の 3 つのサブクラスをコールバックで渡す形にする
-- [ ] グローバル変数 `board` への依存を整理する
+- [ ] グローバル変数 `board` への依存を整理する。`main.js` が持ち、
+      デバッグ用に `window.board` にも入れる
+- [ ] `/static` に `Cache-Control: no-cache` を返し、`index.html` の
+      `?ts=` 付き URL と動的な `<script>` 生成をやめる
 
 ### きっかけ
 
@@ -211,8 +244,18 @@ gameinfo の外」「保存は JSON Lines」にある。
 全部グローバルスコープで、`this.board` と `board` の参照が混在している。
 クラス数は 35 前後から 20 前後になる見込み。
 
-ルール層が先に出ていれば残りの分割が素直になるので、TODO-027 のあと。
+**TODO-027 より先に着手する。** 非モジュールの `ytbg.js` からは
+ES Modules の `rules/` を import できないため。
 **バンドラは入れない**（TODO-020 で決めた）。
+
+### 決めたこと
+
+- **キャッシュ避けは、サーバが `/static` に `Cache-Control: no-cache` を
+  返す形にする。** 今の `?ts=` 付き URL は、`import` した先のモジュールには
+  効かない。`index.html` は普通の `<script type="module">` 1 行になる
+- **`window.board` は残す。** 各クラスはコンストラクタで受け取った `board`
+  だけを見るが、ブラウザのコンソールから盤面を触れるように
+  `main.js` が `window.board` にも入れる（デバッグ用と明記する）
 
 ### 分担
 
