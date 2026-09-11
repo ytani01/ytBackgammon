@@ -1,59 +1,12 @@
 # TODO
 
-**残っている項目: TODO-024〜030 の 7 件。** これまでに 23 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-031` から。**
+**残っている項目: TODO-025〜031 の 7 件。** これまでに 24 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-032` から。**
 
-**着手順は `024 → 025 → 026 → 028 → 029 → 027 → 030`。**
+**着手順は `025 → 026 → 028 → 029 → 027 → 030`。**
+TODO-031 は、手元のボードが新しい保存形式に移るのを待つので最後。
 未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
 順番と着手順は一致しない。
-
----
-
-## TODO-024. gameinfo を dataclass にし、クロックを外し、保存を JSON Lines へ移す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `gameinfo.py` に `GameInfo` / `BoardState` / `CubeState` を作る
-- [ ] `clock.py` に `Clock` を作り、`clock_limit` と `board.clock` を
-      `GameInfo` から外す
-- [ ] `_load_hist_ent()` の「クロックの残り時間だけは引き継ぐ」例外と、
-      `new_game()` の退避・書き戻しを消す
-- [ ] `storage.py` を作り、`~/ytbg-{server_id}.jsonl` へ 1 行 1 手で保存する
-- [ ] 旧形式（`~/ytbg-{server_id}.json`）を `.jsonl` が無いときだけ読む。
-      **旧ファイルは消さない**
-- [ ] 旧形式の読み込みを消すための項目を TODO-031 として立てる
-- [ ] JS 側を最小限だけ追随させる（クロックの読み先を `clock_state` に寄せる）
-- [ ] テストを直し、`src/` をわざと壊して狙ったテストが落ちることを確かめる
-
-### きっかけ
-
-TODO-020 で決めた構成の中心。**構造・クロック・保存形式の 3 つは連動する**
-ので 1 項目にまとめた（`GameInfo` が変われば `asdict` / `from_dict` も
-保存形式も変わり、クロックを外すこと自体が `GameInfo` の構造変更）。
-
-型と構造は [`docs/design.md`](docs/design.md) の「GameInfo」「クロックは
-gameinfo の外」「保存は JSON Lines」にある。
-
-**この項目が終われば、Python 側（TODO-025、026）と JS 側（TODO-027〜030）は
-独立に進められる。**
-
-### 決めたこと
-
-- **クロックは `clock_state` に `limit` を足して 1 本にまとめる。**
-  JS は `gameinfo.clock_limit` と `gameinfo.board.clock` を見るのをやめ、
-  クロック関連をすべて `clock_state`（`sw` / `active` / `clock` / `limit`）
-  から読む。送信は今までどおり `gameinfo` 1 本（TODO-015）
-- **旧形式の読み込みは当面残す。** 消すのは別項目（TODO-031）にして、
-  移行が済んだのを確かめてから決める
-
-### 分担
-
-- **implementer** — 複数のファイルにまたがり、実装とテストがまとまって要る
-- **verifier** — 4 つのテストと、旧形式の読み込み、`src/` を壊して落ちること
-- **reviewer** — 挙動が変わる。履歴とクロックの絡みは TODO-016 で
-  一度こじれている
 
 ---
 
@@ -279,11 +232,38 @@ ES Modules の `rules/` を import できないため。
 
 ---
 
+## TODO-031. 旧形式（`~/ytbg-{server_id}.json`）の読み込みを消す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | main + verifier |
+
+- [ ] `Storage` から旧形式の読み込み（`_load_old()` / `_old_clock()`）を消す
+- [ ] 旧形式のテストを消す
+- [ ] `CLAUDE.md` の「履歴」の節から旧形式の記述を消す
+
+### きっかけ
+
+TODO-024 で保存を JSON Lines（`~/ytbg-{server_id}.jsonl`）へ移した。
+`.jsonl` が無いときだけ旧形式（`.json`）を読むようにしてあり、
+旧ファイルは消さずに残している。移行が済んだら、この読み込みを消す。
+
+### 決めること
+
+- **いつ消すか。** 手元の 4 つのボード（`~/ytbg-1〜4`）が `.jsonl` に
+  移り、しばらく動かしてからにする。**着手する前に、`.json` しか無い
+  `server_id` が残っていないかを確かめる**
+- 旧ファイル（`.json`）そのものを消すかどうか。消さずに残しておいても
+  実害は無い
+
+---
+
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-024.** gameinfo を dataclass にし、クロックを外し、保存を JSON Lines へ移す](archives/todo/TODO-024.%20gameinfo%20を%20dataclass%20にし、クロックを外し、保存を%20JSON%20Lines%20へ移す.md)
 - [**TODO-022.** favicon が無く、初回ロードで 404 になる](archives/todo/TODO-022.%20favicon%20が無く、初回ロードで%20404%20になる.md)
 - [**TODO-023.** デッドコードを消す](archives/todo/TODO-023.%20デッドコードを消す.md)
 - [**TODO-021.** ブラウザでの動作確認の仕組みを作る](archives/todo/TODO-021.%20ブラウザでの動作確認の仕組みを作る.md)

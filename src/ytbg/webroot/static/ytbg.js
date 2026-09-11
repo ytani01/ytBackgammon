@@ -3151,7 +3151,7 @@ class Board extends BgImage {
                 // また load_gameinfo() が走り、stop_clock を送り直す。
                 // stop_clock は turn も resign も変えないので、止まる条件が
                 // 無いまま回り続ける (実測: 5 秒で 606 通)。
-                // active を見れば 1 巡で収まる。サーバが _clock_active を
+                // active を見れば 1 巡で収まる。サーバが Clock.active を
                 // false にすると、次の clock_state で resume() されなくなり、
                 // active が false のままになるため
                 if ( this.player_clock[winner].active ) {
@@ -3467,7 +3467,7 @@ class Board extends BgImage {
      * @param {Object} gameinfo - game information object
      * @param {number} [sec=2]
      * @param {boolean} [history_flag=false]
-     * @param {Object} [clock_state]
+     * @param {Object} clock_state - {sw, active, clock, limit} (TODO-024)
      * @param {Object} [last_op] - 直前の操作 {type, data, ..}。無ければ null
      */
     load_gameinfo(gameinfo, sec=2, history_flag=false,
@@ -3569,28 +3569,24 @@ class Board extends BgImage {
         this.resign = gameinfo.resign;
 
         // clock
-        console.log(`clock_limit=${JSON.stringify(gameinfo.clock_limit)}`);
-        this.clock_limit.set(0, gameinfo.clock_limit[0]);
-        this.clock_limit.set(1, gameinfo.clock_limit[1]);
+        //
+        // クロックは gameinfo の外にあるので、limit も残り時間も
+        // すべて clock_state から読む (TODO-024)。
+        // clock_limit.set() を history_flag の外で呼ぶのはそのまま
+        // (クロックは履歴の対象外なので、再生中でも今の値でよい)
+        console.log(`clock_state=${JSON.stringify(clock_state)}`);
+        this.clock_limit.set(0, clock_state.limit[0]);
+        this.clock_limit.set(1, clock_state.limit[1]);
 
         if ( ! history_flag ) {
-            if ( clock_state === undefined ) {
-                // ファイルから読んだとき。止まった状態にする
-                this.player_clock[0].stop();
-                this.player_clock[1].stop();
-                this.player_clock[0].set(gameinfo.board.clock[0]);
-                this.player_clock[1].set(gameinfo.board.clock[1]);
-            } else {
-                // サーバが持っている状態から戻す (TODO-016)。
-                // gameinfo.board.clock は最後に止まった時点の値なので、
-                // 動作中の残り時間は clock_state.clock を使う
-                this.set_clock_switch(clock_state.sw);
-                for (let p=0; p < 2; p++) {
-                    this.player_clock[p].stop();
-                    this.player_clock[p].set(clock_state.clock[p]);
-                    if ( clock_state.active[p] ) {
-                        this.player_clock[p].resume();
-                    }
+            // サーバが持っている状態から戻す (TODO-016)。
+            // 動作中の残り時間も clock_state.clock に入っている
+            this.set_clock_switch(clock_state.sw);
+            for (let p=0; p < 2; p++) {
+                this.player_clock[p].stop();
+                this.player_clock[p].set(clock_state.clock[p]);
+                if ( clock_state.active[p] ) {
+                    this.player_clock[p].resume();
                 }
             }
         }

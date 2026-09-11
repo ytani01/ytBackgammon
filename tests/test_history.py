@@ -6,6 +6,8 @@ test_history.py
 """
 import copy
 
+from ytbg.gameinfo import GameInfo
+
 
 def test_add_history_appends_with_incrementing_sn(bg_server):
     """add_history() は sn を 1 ずつ増やしながら履歴に積む"""
@@ -15,7 +17,7 @@ def test_add_history_appends_with_incrementing_sn(bg_server):
     bg_server.add_history(gameinfo)
 
     assert len(bg_server._history) == hist_len0 + 1
-    assert bg_server._history[-1]['sn'] == hist_len0 + 1
+    assert bg_server._history[-1].sn == hist_len0 + 1
     assert bg_server._fwd_hist == []
 
 
@@ -44,13 +46,13 @@ async def test_backward_hist_all(bg_server):
     assert len(bg_server._history) == 1
 
 
-def test_hist_ent2str_contains_sn(bg_server):
-    """hist_ent2str() が sn を含む JSON 風の文字列を作る"""
+def test_history_entry_is_gameinfo(bg_server):
+    """履歴に積まれるのは GameInfo (TODO-024)"""
     h = bg_server._history[-1]
-    s = bg_server.hist_ent2str(h)
 
-    assert f'"sn": {h["sn"]}' in s
-    assert '"checker"' in s
+    assert isinstance(h, GameInfo)
+    assert h.sn == 1
+    assert len(h.board.checker[0]) == 15
 
 
 async def test_clear_history_leaves_only_current(bg_server):
@@ -63,7 +65,7 @@ async def test_clear_history_leaves_only_current(bg_server):
     await bg_server.clear_history()
 
     assert len(bg_server._history) == 1
-    assert bg_server._history[0]['sn'] == 1
+    assert bg_server._history[0].sn == 1
     assert bg_server._fwd_hist == []
 
 
@@ -71,13 +73,13 @@ async def test_clear_history_keeps_board(bg_server):
     """clear_history() は盤面を変えない"""
     bg_server._bg.put_checker(101, 5, 2)
     bg_server.add_history(bg_server._bg._gameinfo)
-    before = copy.deepcopy(bg_server._bg._gameinfo['board'])
+    before = copy.deepcopy(bg_server._bg._gameinfo.board)
 
     await bg_server.clear_history()
 
-    assert bg_server._bg._gameinfo['board'] == before
+    assert bg_server._bg._gameinfo.board == before
     # 残った 1 件も今の盤面
-    assert bg_server._history[0]['board'] == before
+    assert bg_server._history[0].board == before
 
 
 async def test_clear_history_saves_data(bg_server):
@@ -86,7 +88,7 @@ async def test_clear_history_saves_data(bg_server):
     bg_server.add_history(bg_server._bg._gameinfo)
 
     await bg_server.clear_history()
-    [hist_len, fwd_len] = bg_server.load_data(bg_server._datafile_path)
+    [hist_len, fwd_len] = bg_server.load_data()
 
     assert hist_len == 1
     assert fwd_len == 0
@@ -99,4 +101,4 @@ async def test_add_history_after_clear_restarts_sn(bg_server):
 
     bg_server.add_history(bg_server._bg._gameinfo)
 
-    assert [h['sn'] for h in bg_server._history] == [1, 2]
+    assert [h.sn for h in bg_server._history] == [1, 2]

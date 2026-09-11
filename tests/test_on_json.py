@@ -17,6 +17,7 @@ import copy
 
 import pytest
 
+from ytbg.gameinfo import CubeState
 from ytbg.yt_backgammon import ytBackgammon
 
 # ---------------------------------------------------------------------
@@ -31,17 +32,17 @@ from ytbg.yt_backgammon import ytBackgammon
 
 async def test_put_checker_updates_only_target(bg_server, req):
     """put_checker は指定した checker だけを動かし、隣は変わらない"""
-    before1 = copy.deepcopy(bg_server._bg._gameinfo['board']['checker'][1][0])
+    before1 = copy.deepcopy(bg_server._bg._gameinfo.board.checker[1][0])
 
     msg = {'type': 'put_checker',
            'data': {'ch': 101, 'p': 5, 'idx': 2}, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['board']['checker'][1][1] == [5, 2]
+    assert bg_server._bg._gameinfo.board.checker[1][1] == [5, 2]
     # 100 で割ったプレーヤー 1 の別の checker は変わらない
-    assert bg_server._bg._gameinfo['board']['checker'][1][0] == before1
+    assert bg_server._bg._gameinfo.board.checker[1][0] == before1
     # プレーヤー 0 側は変わらない
-    assert bg_server._bg._gameinfo['board']['checker'][0][0] == [6, 0]
+    assert bg_server._bg._gameinfo.board.checker[0][0] == [6, 0]
 
 
 async def test_put_checker_sends_gameinfo_with_last_op(
@@ -98,7 +99,7 @@ async def test_cube_updates_gameinfo(bg_server, req):
     msg = {'type': 'cube', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['board']['cube'] == data
+    assert bg_server._bg._gameinfo.board.cube == CubeState(**data)
 
 
 async def test_dice_updates_only_target_player(bg_server, req):
@@ -112,8 +113,8 @@ async def test_dice_updates_only_target_player(bg_server, req):
     msg = {'type': 'dice', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['board']['dice'][1] == [3, 4, 0, 0]
-    assert bg_server._bg._gameinfo['board']['dice'][0] == [0, 0, 0, 0]
+    assert bg_server._bg._gameinfo.board.dice[1] == [3, 4, 0, 0]
+    assert bg_server._bg._gameinfo.board.dice[0] == [0, 0, 0, 0]
 
 
 async def test_set_turn_updates_turn_and_resign(bg_server, req):
@@ -122,8 +123,8 @@ async def test_set_turn_updates_turn_and_resign(bg_server, req):
     msg = {'type': 'set_turn', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['turn'] == 1
-    assert bg_server._bg._gameinfo['resign'] == 0
+    assert bg_server._bg._gameinfo.turn == 1
+    assert bg_server._bg._gameinfo.resign == 0
 
 
 async def test_set_playername_updates_only_target_player(bg_server, req):
@@ -135,8 +136,8 @@ async def test_set_playername_updates_only_target_player(bg_server, req):
     msg = {'type': 'set_playername', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['board']['playername'][1] == 'Alice'
-    assert bg_server._bg._gameinfo['board']['playername'][0] == ''
+    assert bg_server._bg._gameinfo.board.playername[1] == 'Alice'
+    assert bg_server._bg._gameinfo.board.playername[0] == ''
 
 
 async def test_set_score_updates_only_target_player(bg_server, req):
@@ -148,8 +149,8 @@ async def test_set_score_updates_only_target_player(bg_server, req):
     msg = {'type': 'set_score', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['score'][1] == 5
-    assert bg_server._bg._gameinfo['score'][0] == 0
+    assert bg_server._bg._gameinfo.score[1] == 5
+    assert bg_server._bg._gameinfo.score[0] == 0
 
 
 async def test_resign_updates_resign(bg_server, req):
@@ -158,7 +159,7 @@ async def test_resign_updates_resign(bg_server, req):
     msg = {'type': 'resign', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['resign'] == 1
+    assert bg_server._bg._gameinfo.resign == 1
 
 
 async def test_set_clock_limit_updates_only_target_index(bg_server, req):
@@ -166,27 +167,35 @@ async def test_set_clock_limit_updates_only_target_index(bg_server, req):
     set_clock_limit は data.index で指定した index だけを変える。
     index: 1 を渡して確かめる (index: 0 だと固定と区別が付かない)。
     初期値 [120, 12] は要素ごとに値が違うので、index 0 が変わっていない
-    ことを初期値のべた書きで見られる
+    ことを初期値のべた書きで見られる。
+
+    限度は gameinfo ではなく Clock が持つ (TODO-024)。
     """
     data = {'index': 1, 'clock_limit': 60}
     msg = {'type': 'set_clock_limit', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['clock_limit'][1] == 60
-    assert bg_server._bg._gameinfo['clock_limit'][0] == 120
+    assert bg_server._clock.limit[1] == 60
+    assert bg_server._clock.limit[0] == 120
 
 
 async def test_set_player_clock_updates_only_target_player(bg_server, req):
     """
-    set_player_clock は data.player で指定したプレーヤーの clock だけを
+    set_player_clock は data.player で指定したプレーヤーの残り時間だけを
     変える。player: 1 を渡して確かめる (player: 0 だと固定と区別が付かない)
     """
     data = {'player': 1, 'clock': [90, 5]}
     msg = {'type': 'set_player_clock', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['board']['clock'][1] == [90, 5]
-    assert bg_server._bg._gameinfo['board']['clock'][0] == [120, 12]
+    assert bg_server._clock.clock[1] == [90, 5]
+    assert bg_server._clock.clock[0] == [120, 12]
+
+
+def no_clock_keys(gameinfo):
+    """gameinfo にクロックのキーが無いこと (TODO-024)"""
+    return ('clock_limit' not in gameinfo
+            and 'clock' not in gameinfo['board'])
 
 
 @pytest.mark.parametrize(
@@ -207,19 +216,20 @@ async def test_set_player_clock_updates_only_target_player(bg_server, req):
          lambda g: g['score'][1], 2),
         ('resign', {'player': 0},
          lambda g: g['resign'], 0),
-        ('set_clock_limit', {'index': 1, 'clock_limit': 30},
-         lambda g: g['clock_limit'][1], 30),
-        ('set_player_clock', {'player': 1, 'clock': [60, 3]},
-         lambda g: g['board']['clock'][1], [60, 3]),
-        # クロックの動作そのものの 3 つ。gameinfo 側は変わらないので、
-        # 変わらないことを見る (状態は clock_state で送られる。
+        # クロック系の 5 つ。クロックは gameinfo の外に出した
+        # (TODO-024) ので、gameinfo にクロックのキーは戻ってこない。
+        # それを見る (状態は clock_state で送られる。
         # そちらは tests/test_clock.py)
+        ('set_clock_limit', {'index': 1, 'clock_limit': 30},
+         no_clock_keys, True),
+        ('set_player_clock', {'player': 1, 'clock': [60, 3]},
+         no_clock_keys, True),
         ('set_clock_switch', {'switch': False},
-         lambda g: g['clock_limit'], [120, 12]),
+         no_clock_keys, True),
         ('resume_clock', {'player': 1},
-         lambda g: g['board']['clock'][1], [120, 12]),
+         no_clock_keys, True),
         ('reset_clock', {'player': 1},
-         lambda g: g['board']['clock'][1], [120, 12]),
+         no_clock_keys, True),
     ],
 )
 async def test_fallthrough_types_send_gameinfo_with_last_op(
@@ -273,7 +283,8 @@ async def test_returning_types_do_not_broadcast_original_msg(
     emitted.clear()
 
     data = {'n': 1} if msg_type in ('back', 'fwd') else \
-        (bg_server._bg._gameinfo if msg_type == 'set_gameinfo' else {})
+        (bg_server._bg._gameinfo.to_dict()
+         if msg_type == 'set_gameinfo' else {})
     msg = {'type': msg_type, 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
     # 連続再生 (n == 0) だけは Task として走るので、あれば完了を待つ
@@ -434,12 +445,12 @@ async def test_clear_hist_keeps_board(bg_server, req):
     await bg_server.on_json(
         req, {'type': 'put_checker',
               'data': {'ch': 101, 'p': 5, 'idx': 2}, 'history': True})
-    before = copy.deepcopy(bg_server._bg._gameinfo['board'])
+    before = copy.deepcopy(bg_server._bg._gameinfo.board)
 
     msg = {'type': 'clear_hist', 'data': {}, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert bg_server._bg._gameinfo['board'] == before
+    assert bg_server._bg._gameinfo.board == before
 
 
 async def test_clear_hist_stops_running_replay(bg_server, req):
@@ -471,12 +482,17 @@ async def test_clear_hist_stops_running_replay(bg_server, req):
     assert len(bg_server._history) == 1
 
 
-async def test_new_keeps_score_playername_clock_limit_and_resets_board(
+async def test_new_keeps_score_playername_limit_and_resets_board(
         bg_server, req, emitted):
-    """new は score / playername / clock_limit を引き継ぎ、盤面を初期配置に戻す"""
-    bg_server._bg._gameinfo['score'] = [3, 5]
-    bg_server._bg._gameinfo['board']['playername'] = ['Alice', 'Bob']
-    bg_server._bg._gameinfo['clock_limit'] = [60, 6]
+    """
+    new は score / playername / game_num / match_score を引き継ぎ、
+    盤面を初期配置に戻す。クロックの limit も残る (TODO-024)
+    """
+    bg_server._bg._gameinfo.score = [3, 5]
+    bg_server._bg._gameinfo.board.playername = ['Alice', 'Bob']
+    bg_server._bg._gameinfo.game_num = 2
+    bg_server._bg._gameinfo.match_score = 7
+    bg_server._clock.limit = [60, 6]
     bg_server._bg.put_checker(0, 1, 0)
     hist_len0 = len(bg_server._history)
 
@@ -484,15 +500,18 @@ async def test_new_keeps_score_playername_clock_limit_and_resets_board(
     await bg_server.on_json(req, msg)
 
     gameinfo = bg_server._bg._gameinfo
-    assert gameinfo['score'] == [3, 5]
-    assert gameinfo['board']['playername'] == ['Alice', 'Bob']
-    assert gameinfo['clock_limit'] == [60, 6]
+    assert gameinfo.score == [3, 5]
+    assert gameinfo.board.playername == ['Alice', 'Bob']
+    assert gameinfo.game_num == 2
+    assert gameinfo.match_score == 7
+    assert bg_server._clock.limit == [60, 6]
 
     fresh = ytBackgammon(svr_ver='test')
-    assert gameinfo['board']['checker'] == fresh._gameinfo['board']['checker']
-    assert gameinfo['board']['dice'] == fresh._gameinfo['board']['dice']
-    assert gameinfo['board']['cube'] == fresh._gameinfo['board']['cube']
-    assert gameinfo['turn'] == fresh._gameinfo['turn']
+    assert gameinfo.board.checker == fresh._gameinfo.board.checker
+    assert gameinfo.board.dice == fresh._gameinfo.board.dice
+    assert gameinfo.board.cube == fresh._gameinfo.board.cube
+    assert gameinfo.turn == fresh._gameinfo.turn
+    assert gameinfo.resign == fresh._gameinfo.resign
 
     assert len(bg_server._history) == hist_len0 + 1
 
@@ -505,13 +524,14 @@ async def test_new_keeps_score_playername_clock_limit_and_resets_board(
 
 async def test_set_gameinfo_replaces_gameinfo(bg_server, req, emitted):
     """
-    set_gameinfo は gameinfo (board 以下を含む) を渡したもので丸ごと
-    置き換え、履歴に積む。渡した dict とは縁を切る (copy.deepcopy) ので、
-    渡した後に元の dict を書き換えても gameinfo は変わらない。
+    set_gameinfo は gameinfo (board 以下を含む) を渡した dict で丸ごと
+    置き換え、履歴に積む。GameInfo.from_dict() が作り直すので渡した
+    dict とは縁が切れ、渡した後に元の dict を書き換えても
+    gameinfo は変わらない。
     """
     hist_len0 = len(bg_server._history)
 
-    new_gameinfo = copy.deepcopy(bg_server._bg._gameinfo)
+    new_gameinfo = bg_server._bg._gameinfo.to_dict()
     new_gameinfo['score'] = [9, 9]
     new_gameinfo['board']['playername'] = ['Alice', 'Bob']
 
@@ -522,8 +542,8 @@ async def test_set_gameinfo_replaces_gameinfo(bg_server, req, emitted):
     new_gameinfo['score'] = [0, 0]
     new_gameinfo['board']['playername'] = ['changed', 'changed']
 
-    assert bg_server._bg._gameinfo['score'] == [9, 9]
-    assert bg_server._bg._gameinfo['board']['playername'] == ['Alice', 'Bob']
+    assert bg_server._bg._gameinfo.score == [9, 9]
+    assert bg_server._bg._gameinfo.board.playername == ['Alice', 'Bob']
     assert len(bg_server._history) == hist_len0 + 1
     assert emitted.last['type'] == 'gameinfo'
 
@@ -549,7 +569,8 @@ async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
     assert set(data.keys()) == {
         'gameinfo', 'sec', 'hist_i', 'hist_n', 'history_flag', 'clock_state',
         'last_op'}
-    assert set(data['clock_state'].keys()) == {'sw', 'active', 'clock'}
+    assert set(data['clock_state'].keys()) == {
+        'sw', 'active', 'clock', 'limit'}
     # 操作に紐づかない送信では last_op は None (TODO-015)
     assert data['last_op'] is None
 

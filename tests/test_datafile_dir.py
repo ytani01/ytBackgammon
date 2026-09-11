@@ -70,11 +70,11 @@ def test_empty_ytbg_data_dir(datafile_dir):
 
 
 def test_datafile_path(datafile_dir, tmp_path):
-    """保存先のパスが YTBG_DATA_DIR の下になる"""
+    """保存先のパスが YTBG_DATA_DIR の下になる (JSON Lines)"""
     datafile_dir(YTBG_DATA_DIR=str(tmp_path))
 
     svr = server_module.ytBackgammonServer(
         svr_name='test', svr_ver='test', svr_id='test',
         image_dir='images1a')
 
-    assert svr._datafile_path == f'{tmp_path}/ytbg-test.json'
+    assert svr._datafile_path == f'{tmp_path}/ytbg-test.jsonl'

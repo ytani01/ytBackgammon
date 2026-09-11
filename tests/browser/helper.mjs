@@ -55,7 +55,7 @@ export function free_port() {
  * ytbg サーバを実プロセスとして起動する。
  *
  * 保存先は YTBG_DATA_DIR で一時ディレクトリへ逃がすので、
- * 利用者の ~/ytbg-*.json は読み書きされない (TODO-021)。
+ * 利用者の ~/ytbg-* は読み書きされない (TODO-021)。
  *
  * @param {{server_id?: string, image_dir?: string}} [opts]
  * @return {Promise<{url: string, port: number, data_dir: string,

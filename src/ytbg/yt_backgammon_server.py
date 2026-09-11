@@ -8,17 +8,15 @@ __author__ = 'Yoichi Tanibayashi'
 __date__   = '2020/05'
 
 import asyncio
-import copy
-import json
 import os
-import time
-from pathlib import Path
 
 from starlette.templating import Jinja2Templates
 from starlette.websockets import WebSocket
 
 from . import WEBROOT
+from .clock import Clock
 from .mylog import getLogger
+from .storage import Storage
 from .yt_backgammon import ytBackgammon
 
 templates = Jinja2Templates(directory=str(WEBROOT / 'templates'))
@@ -43,9 +41,12 @@ class ytBackgammonServer:
         self._svr_id = svr_id
         self._image_dir = image_dir
 
+        # 保存は JSON Lines (TODO-024)。旧形式 (.json) は、これが
+        # 無いときだけ Storage が読む
         self._datafile_path = (
-            f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.json')
+            f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
         self.__log.debug('_datafile_path={}', self._datafile_path)
+        self._storage = Storage(self._datafile_path)
 
         # 接続中の WebSocket と、ログ用の識別名 (TODO-009)。
         # socket.io の sid に当たるものは無いので、自前の連番を振る
@@ -63,18 +64,12 @@ class ytBackgammonServer:
         self._replay_task: asyncio.Task | None = None
         self._replay_lock = asyncio.Lock()
 
-        # クロックの状態 (TODO-016)。gameinfo には入れない。
+        # クロック (TODO-016、TODO-024)。gameinfo には入れない。
         # 入れると履歴に載り、back / fwd でクロックの発着まで戻ってしまう。
-        # _clock_start は動作の基準になる時刻で、残り時間はここからの
-        # 経過分を引いて求める (_cur_clock())
-        # _clock_sw の初期値は index.html の Clock のチェックボックス
-        # (既定で checked) に合わせる。False にすると、つないだ画面が
-        # clock_state を受けてチェックを外し、既定が反転する
-        self._clock_sw = True
-        self._clock_active = [False, False]
-        self._clock_start = [time.monotonic(), time.monotonic()]
+        # 保存したものがあれば load_data() が差し替える
+        self._clock = Clock()
 
-        [hist_len, _fwd_hist_len] = self.load_data(self._datafile_path)
+        [hist_len, _fwd_hist_len] = self.load_data()
         if hist_len < 1:
             self.__log.warning('load_data({}): error', self._datafile_path)
             self.add_history(self._bg._gameinfo)
@@ -85,27 +80,13 @@ class ytBackgammonServer:
         """
         self.__log.debug('')
 
-        score0 = self._bg._gameinfo['score'][0]
-        score1 = self._bg._gameinfo['score'][1]
-        player0_name = self._bg._gameinfo['board']['playername'][0]
-        player1_name = self._bg._gameinfo['board']['playername'][1]
-        clock_limit0 = self._bg._gameinfo['clock_limit'][0]
-        clock_limit1 = self._bg._gameinfo['clock_limit'][1]
+        # board を作り直し、turn と resign を戻すだけ (TODO-024)。
+        # score / playername / game_num / match_score は残る
+        self._bg.new_game()
 
-        self._bg.init_gameinfo()
-
-        self._bg._gameinfo['score'][0] = score0;
-        self._bg._gameinfo['score'][1] = score1;
-        self._bg._gameinfo['clock_limit'][0] = clock_limit0
-        self._bg._gameinfo['clock_limit'][1] = clock_limit1
-        self._bg._gameinfo['board']['playername'][0] = player0_name
-        self._bg._gameinfo['board']['playername'][1] = player1_name
-
-        # クロックは clock_limit に戻し、止まった状態で始める (TODO-016)。
-        # init_gameinfo() が入れるのは固定値なので、clock_limit を
-        # 変えてあると食い違う
-        self._reset_clock(0)
-        self._reset_clock(1)
+        # クロックは limit に戻し、止まった状態で始める (TODO-016)
+        self._clock.reset(0)
+        self._clock.reset(1)
 
         self.add_history(self._bg._gameinfo)
 
@@ -117,11 +98,11 @@ class ytBackgammonServer:
             if len(self._history) == 0:
                 self._cur_sn = 1
             else:
-                self._cur_sn = self._history[-1]['sn'] + 1
+                self._cur_sn = self._history[-1].sn + 1
 
-            gameinfo['sn'] = self._cur_sn
-            self._history.append(copy.deepcopy(gameinfo))
-            self.save_data(self._datafile_path)
+            gameinfo.sn = self._cur_sn
+            self._history.append(gameinfo.copy())
+            self.save_data()
             self.__log.debug('history=({})', len(self._history))
 
     async def clear_history(self):
@@ -140,9 +121,9 @@ class ytBackgammonServer:
 
         self._fwd_hist = []
         self._cur_sn = 1
-        self._bg._gameinfo['sn'] = self._cur_sn
-        self._history = [copy.deepcopy(self._bg._gameinfo)]
-        self.save_data(self._datafile_path)
+        self._bg._gameinfo.sn = self._cur_sn
+        self._history = [self._bg._gameinfo.copy()]
+        self.save_data()
 
         self.__log.debug('_history=({}), _fwd_hist=({})',
                          len(self._history), len(self._fwd_hist))
@@ -175,60 +156,12 @@ class ytBackgammonServer:
 
     def _load_hist_ent(self, hist_ent):
         """
-        履歴のエントリを、いまの gameinfo にする (TODO-016)
+        履歴のエントリを、いまの gameinfo にする。
 
-        **クロックの残り時間だけは引き継ぎ、巻き戻さない。** クロックは
-        履歴の対象外で (TODO-010 で決めた)、戻すと動いているクロックが
-        昔の値から数え直しになる。しかもその値は次の gameinfo に
-        clock_state として乗り、全員の画面が飛ぶ。ytbg.js も
-        history_flag が真のときはクロックに触らないので、そちらとも揃う。
+        クロックは gameinfo の外に出したので (TODO-024)、
+        「残り時間だけは引き継ぐ」という例外は要らなくなった。
         """
-        clock = self._bg._gameinfo['board']['clock']
-        self._bg._gameinfo = copy.deepcopy(hist_ent)
-        self._bg._gameinfo['board']['clock'] = clock
-
-    def _cur_clock(self, player):
-        """
-        いま表示されているはずの残り時間 [持ち時間, 猶予] を返す (TODO-016)
-
-        動作中なら、_clock_start からの経過分を猶予から引き、猶予で足りない
-        分を持ち時間から引く。ytbg.js の PlayerClock.update() と同じ計算で、
-        持ち時間はマイナスも許す（JS 側も止めていない）。
-        クロックが止まっているときと clock_sw が off のときは進めない。
-        """
-        [sec0, sec1] = self._bg._gameinfo['board']['clock'][player]
-
-        if not self._clock_sw or not self._clock_active[player]:
-            return [sec0, sec1]
-
-        sec1 -= time.monotonic() - self._clock_start[player]
-        if sec1 < 0:
-            sec0 += sec1
-            sec1 = 0
-
-        return [round(sec0, 1), round(sec1, 1)]
-
-    def _freeze_clock(self, player):
-        """
-        進んだ分を gameinfo に書き戻し、基準の時刻を打ち直す (TODO-016)
-
-        クロックの動き方が変わる直前に呼ぶ。呼んだ時点の残り時間が
-        gameinfo['board']['clock'] に入るので、そこから先は新しい状態で
-        数え直せる。
-        """
-        self._bg._gameinfo['board']['clock'][player] = self._cur_clock(player)
-        self._clock_start[player] = time.monotonic()
-
-    def _reset_clock(self, player):
-        """
-        残り時間を clock_limit に戻して止める (TODO-016)
-
-        ytbg.js の PlayerClock.reset() に対応する。
-        """
-        self._bg._gameinfo['board']['clock'][player] = list(
-            self._bg._gameinfo['clock_limit'])
-        self._clock_active[player] = False
-        self._clock_start[player] = time.monotonic()
+        self._bg._gameinfo = hist_ent.copy()
 
     async def emit_gameinfo(self, sec=0, history_flag=False, last_op=None):
         """
@@ -248,20 +181,16 @@ class ytBackgammonServer:
             {
                 'src': 'server', 'dst': 'all', 'type': 'gameinfo',
                 'data': {
-                    'gameinfo': self._bg._gameinfo,
+                    'gameinfo': self._bg._gameinfo.to_dict(),
                     'sec': sec,
                     'hist_i': len(self._history),
                     'hist_n': len(self._history) + len(self._fwd_hist),
                     'history_flag': history_flag,
                     'last_op': last_op,
-                    # クロックの状態 (TODO-016)。gameinfo['board']['clock']
-                    # は最後に止まった時点の値なので、動作中の残り時間は
-                    # こちらで送る
-                    'clock_state': {
-                        'sw': self._clock_sw,
-                        'active': list(self._clock_active),
-                        'clock': [self._cur_clock(0), self._cur_clock(1)],
-                    }
+                    # クロックは gameinfo の外にあるので、
+                    # clock_state として添えて送る (TODO-016、TODO-024)。
+                    # クライアントはクロック関連をすべてここから読む
+                    'clock_state': self._clock.state(),
                 }
             })
 
@@ -300,7 +229,7 @@ class ytBackgammonServer:
                 await asyncio.sleep(sleep_sec)
         finally:
             # 途中で cancel されても、そこまでの結果は保存する
-            self.save_data(self._datafile_path)
+            self.save_data()
 
     async def forward_hist(self, n=1, sleep_sec=0.1):
         """
@@ -337,83 +266,24 @@ class ytBackgammonServer:
                 await asyncio.sleep(sleep_sec)
         finally:
             # 途中で cancel されても、そこまでの結果は保存する
-            self.save_data(self._datafile_path)
+            self.save_data()
 
-    def hist_ent2str(self, h):
-        board = h['board']
-        cube = board['cube']
-        name0 = json.dumps(board['playername'][0])
-        name1 = json.dumps(board['playername'][1])
-        accepted = json.dumps(cube['accepted'])
-
-        j_str = ''
-        j_str += '    {\n'
-        j_str += f'      "sn": {h["sn"]:d},\n'
-        j_str += f'      "server_version": "{h["server_version"]}",\n'
-        j_str += f'      "game_num": {h["game_num"]:d},\n'
-        j_str += f'      "match_score": {h["match_score"]:d},\n'
-        j_str += f'      "score": {h["score"]},\n'
-        j_str += f'      "turn": {h["turn"]:d},\n'
-        j_str += f'      "resign": {h["resign"]},\n'
-        j_str += f'      "clock_limit": {h["clock_limit"]},\n'
-        j_str += '      "board": {\n'
-        j_str += '        "playername": [\n'
-        j_str += f'          {name0},\n'
-        j_str += f'          {name1}\n'
-        j_str += '        ],\n'
-        j_str += f'        "clock": {board["clock"]},\n'
-        j_str += f'        "cube": {{ "side": {cube["side"]:d}, '
-        j_str += f'"value": {cube["value"]:d}, '
-        j_str += f'"accepted": {accepted} }},\n'
-        j_str += f'        "dice": {board["dice"]},\n'
-        j_str += '        "checker": [\n'
-        j_str += f'          {board["checker"][0]},\n'
-        j_str += f'          {board["checker"][1]} \n'
-        j_str += '        ]\n'
-        j_str += '      }\n'
-        j_str += '    },\n'
-        return j_str
-
-    def save_data(self, path_name):
+    def save_data(self):
         """
-        Parameters
-        ----------
-        path_name: str
-            full path name of json data file
+        履歴とクロックを JSON Lines へ保存する (TODO-024)。
+
+        書式は storage.py の Storage が持つ。
         """
-        self.__log.debug('path_name={}', path_name)
+        self.__log.debug('path={}', self._datafile_path)
 
-        j_str = '{\n'
-        j_str += '  "history": [\n'
+        self._storage.save(self._history, self._fwd_hist, self._clock)
 
-        for h in self._history:
-            j_str += self.hist_ent2str(h)
-
-        j_str = j_str.rstrip(',\n') + '\n'
-        j_str += '  ],\n'
-        j_str += '  "fwd_hist": [\n'
-
-        for h in self._fwd_hist:
-            j_str += self.hist_ent2str(h)
-
-        j_str = j_str.rstrip(',\n') + '\n'
-        j_str += '  ]\n'
-        j_str += '}\n'
-
-        try:
-            with Path(path_name).open("w") as f:
-                f.write(j_str)
-        except OSError as e:
-            # 書き込みの失敗だけを拾う (TODO-011)。hist_ent2str() は try の
-            # 外で呼んでいるので、その例外はここには来ない
-            self.__log.warning('{}:{}.', type(e).__name__, e)
-
-    def load_data(self, path_name):
+    def load_data(self):
         """
-        Parameters
-        ----------
-        path_name: str
-            full path name of json data file
+        保存したものを読む (TODO-024)。
+
+        .jsonl が無ければ旧形式 (.json) を読む。読めなければ何も
+        書き換えずに (0, 0) を返す。初回起動もそこを通る。
 
         Returns
         -------
@@ -422,28 +292,21 @@ class ytBackgammonServer:
         fwd_hist_length: int
             len(self._fwd_hist)
         """
-        self.__log.debug('path_name={}', path_name)
+        self.__log.debug('path={}', self._datafile_path)
 
-        try:
-            with Path(path_name).open() as f:
-                data = json.load(f)
-            history = data['history']
-            fwd_hist = data['fwd_hist']
-        except (OSError, UnicodeDecodeError,
-                json.JSONDecodeError, KeyError) as e:
-            # 読めない・壊れている・キーが足りないファイルは、空の履歴として
-            # 始める (TODO-011)。初回起動もここを通る (FileNotFoundError)。
-            # 局所変数へ受けてから代入するので、途中で失敗しても
-            # _history だけ書き換わった状態にはならない
-            self.__log.warning('{}:{}.', type(e).__name__, e)
+        history, fwd_hist, clock = self._storage.load()
+        if clock is None:
+            # 読めない・壊れている・ファイルが無い。空の履歴として始める
             return 0, 0
 
         self._history = history
         self._fwd_hist = fwd_hist
+        # 保存に active は入れていないので、読み込んだ直後は止まっている
+        self._clock = clock
         self.__log.debug('_history=({}), _fwd_hist=({})',
                          len(self._history), len(self._fwd_hist))
         if len(self._history) > 0:
-            self._bg._gameinfo = copy.deepcopy(self._history[-1])
+            self._bg._gameinfo = self._history[-1].copy()
         return len(self._history), len(self._fwd_hist)
 
     def client_name(self, ws):
@@ -610,8 +473,7 @@ class ytBackgammonServer:
             # data: gameinfo
             self._bg.set_gameinfo(msg['data'])
             # 盤面ごと入れ替わるので、クロックは止まった状態にする (TODO-016)
-            self._clock_active = [False, False]
-            self._clock_start = [time.monotonic(), time.monotonic()]
+            self._clock.stop_all()
             self.add_history(self._bg._gameinfo)
             await self.emit_gameinfo(0)
             return
@@ -651,18 +513,17 @@ class ytBackgammonServer:
 
         if msg['type'] == 'set_clock_limit':
             # data: {'index': int, 'clock_limit': int}
-            self._bg.set_clock_limit(msg['data'])
-            # 両方のクロックを clock_limit に戻して止める。TODO-015 より前は
+            self._clock.set_limit(msg['data']['index'],
+                                  msg['data']['clock_limit'])
+            # 両方のクロックを limit に戻して止める。TODO-015 より前は
             # ytbg.js の受信側がこうしていた。今はクライアントが
             # clock_state に従うので、ここが唯一の決め手になる
-            self._reset_clock(0)
-            self._reset_clock(1)
+            self._clock.reset(0)
+            self._clock.reset(1)
 
         if msg['type'] == 'set_player_clock':
             # data: {'player': int, 'clock': [int(sec), int(sec)]}
-            self._bg.set_player_clock(msg['data'])
-            # 残り時間が入れ替わったので、数え直しの基準も打ち直す
-            self._clock_start[msg['data']['player']] = time.monotonic()
+            self._clock.set_clock(msg['data']['player'], msg['data']['clock'])
 
         # ここから 5 つはクロックの動作そのもの (TODO-016)。TODO-012 で
         # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
@@ -670,35 +531,29 @@ class ytBackgammonServer:
         # いる画面も、ここで作った状態を clock_state で受け取って合わせる
         if msg['type'] == 'set_clock_switch':
             # data: {'switch': bool}
-            # off の間は進まないので、切り替える前に進んだ分を確定させる
-            self._freeze_clock(0)
-            self._freeze_clock(1)
-            self._clock_sw = msg['data']['switch']
+            self._clock.set_switch(msg['data']['switch'])
+            # ytbg.js の apply_clock_sw() は history: false で送るので、
+            # ここで保存しないと sw が残らない (TODO-024)。
+            # start/stop/resume/reset_clock はターンのたびに走るので
+            # 保存しない (I/O が増えすぎる)
+            self.save_data()
 
         if msg['type'] == 'start_clock':
             # data: {'player': int}
             # ytbg.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
-            player = msg['data']['player']
-            self._freeze_clock(player)
-            self._bg._gameinfo['board']['clock'][player][1] = (
-                self._bg._gameinfo['clock_limit'][1])
-            self._clock_active[player] = True
+            self._clock.start(msg['data']['player'])
 
         if msg['type'] == 'resume_clock':
             # data: {'player': int}
-            player = msg['data']['player']
-            self._freeze_clock(player)
-            self._clock_active[player] = True
+            self._clock.resume(msg['data']['player'])
 
         if msg['type'] == 'stop_clock':
             # data: {'player': int}
-            player = msg['data']['player']
-            self._freeze_clock(player)
-            self._clock_active[player] = False
+            self._clock.stop(msg['data']['player'])
 
         if msg['type'] == 'reset_clock':
             # data: {'player': int}
-            self._reset_clock(msg['data']['player'])
+            self._clock.reset(msg['data']['player'])
 
         # append history or not
         if msg['history']:

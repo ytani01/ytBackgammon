@@ -156,13 +156,17 @@ def no_sleep(monkeypatch):
 
 
 @pytest.fixture
-def bg_server(tmp_path, monkeypatch, emitted):
+def make_bg_server(tmp_path, monkeypatch, emitted):
     """
-    ytBackgammonServer のインスタンス。
+    ytBackgammonServer を、呼んだときに作るフィクスチャ。
 
     - DATAFILE_DIR を tmp_path に差し替え、利用者の
-      ~/ytbg-*.json を読み書きしないようにする
+      ~/ytbg-* を読み書きしないようにする
     - broadcast() を差し替え、全員へ送られた msg を emitted へ積む
+
+    保存したファイルを先に置いてから起動するテスト (TODO-024) は、
+    作る時点を自分で決める必要があるので、bg_server ではなく
+    こちらを使う。
     """
     monkeypatch.setattr(
         ytBackgammonServer, 'DATAFILE_DIR', str(tmp_path))
@@ -172,9 +176,18 @@ def bg_server(tmp_path, monkeypatch, emitted):
 
     monkeypatch.setattr(ytBackgammonServer, 'broadcast', fake_broadcast)
 
-    return ytBackgammonServer(
-        svr_name='test', svr_ver='test', svr_id='test',
-        image_dir='images1a')
+    def make(svr_id='test'):
+        return ytBackgammonServer(
+            svr_name='test', svr_ver='test', svr_id=svr_id,
+            image_dir='images1a')
+
+    return make
+
+
+@pytest.fixture
+def bg_server(make_bg_server):
+    """ytBackgammonServer のインスタンス"""
+    return make_bg_server()
 
 
 @pytest.fixture

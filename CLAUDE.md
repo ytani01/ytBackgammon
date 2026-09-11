@@ -121,8 +121,9 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 ## 構成
 
 **これから作る構成は [`docs/design.md`](docs/design.md) にある**（TODO-020 で
-決めた）。モジュール分割、`gameinfo` の dataclass 化、保存形式、JS の
-ES Modules 化、ルール層の切り出しは、そちらが正。以下はいまの実装。
+決めた）。モジュール分割、JS の ES Modules 化、ルール層の切り出しは、
+そちらが正。`gameinfo` の dataclass 化・クロックの切り出し・保存形式は
+TODO-024 で実装済み。以下はいまの実装。
 
 Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/` と
 `static/` は `src/ytbg/webroot/` の下。
@@ -141,10 +142,18 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   イベントハンドラの例外で切断はしなかった）。
   `svr` はグローバルで、`main()` の中で生成される
 - `src/ytbg/yt_backgammon_server.py` — サーバ側の中心。クライアントから届いた
-  メッセージの分岐、履歴の管理、`~/ytbg-{server_id}.json` への保存・読み込み、
+  メッセージの分岐、履歴の管理、保存・読み込みの呼び出し、
   全クライアントへの broadcast
-- `src/ytbg/yt_backgammon.py` — `gameinfo`（盤面の状態そのもの）を保持し、
+- `src/ytbg/yt_backgammon.py` — `gameinfo`（`GameInfo`）を保持し、
   更新するだけのクラス。ルール判定は持たない
+- `src/ytbg/gameinfo.py` — `GameInfo` / `BoardState` / `CubeState`（TODO-024）。
+  盤面の状態そのものを表す dataclass。`to_dict()` は
+  `dataclasses.asdict()`、`from_dict()` は自前。**ファイルから読むときだけは
+  必須キーの欠落を例外にする**（黙って初期配置になると、壊れたファイルが
+  「初期配置の N 手」として読まれてしまう）
+- `src/ytbg/clock.py` — `Clock`（TODO-024）。クロックは `gameinfo` の外に置く
+- `src/ytbg/storage.py` — `Storage`（TODO-024）。
+  `~/ytbg-{server_id}.jsonl` への保存・読み込みと、旧形式の変換
 - `src/ytbg/webroot/static/ytbg.js`（4000 行超）— クライアントのほぼ全て。
   ファイル先頭のコメントにクラス階層図がある
   （`BgBase` → `BgText`/`BgImage` → 各表示要素、`Board`）
@@ -159,9 +168,10 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 
 ### 状態と通信
 
-`gameinfo` が唯一の状態（`ytBackgammon.init_gameinfo()` に構造がある）。
-`turn`（-1 以下:操作不可、0/1:各プレーヤー、2 以上:両方可）、`resign`、`score`、
-`clock_limit`、`board`（`playername` / `clock` / `cube` / `dice` / `checker`）。
+盤面の状態は `GameInfo`（`gameinfo.py`）。`sn`、`server_version`、`game_num`、
+`match_score`、`score`、`turn`（-1 以下:操作不可、0/1:各プレーヤー、
+2 以上:両方可）、`resign`、`board`（`playername` / `cube` / `dice` / `checker`）。
+**クロックはここに入っていない**（TODO-024。下の「クロック」を見ること）。
 
 チェッカーは `checker[player][i] = [point, idx]` の配列で、**ID は
 `player * 100 + i`**（例: 012, 101）。サーバ側の `put_checker()` はこの ID を
@@ -196,33 +206,39 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 `reset_clock` の分岐があり、いずれも return せず、末尾の `add_history` と
 `emit_gameinfo()` へ落ちる。
 
-サーバが `gameinfo` とは別に持つのは次の 3 つ。**`gameinfo` には入れない。**
-入れると履歴に載り、`back` / `fwd` でクロックの発着まで巻き戻ってしまう。
+**クロックは `Clock`（`clock.py`）が持ち、`gameinfo` には入れない**
+（TODO-024）。入れると履歴に載り、`back` / `fwd` でクロックの発着まで
+巻き戻ってしまう。`Clock` が持つのは `limit`（持ち時間と猶予）、
+`sw`（機能そのものの ON/OFF）、`active`（プレーヤーごとの動作中かどうか）、
+`clock`（最後に止まった時点の残り時間）、基準の時刻（`time.monotonic()`）。
 
-- `_clock_sw` — クロック機能そのものの ON/OFF
-- `_clock_active` — プレーヤーごとの動作中かどうか
-- `_clock_start` — 数え始めた時刻（`time.monotonic()`）
+残り時間は `clock` の値から基準の時刻の経過分を引いて求める（`Clock.cur()`。
+計算は `ytbg.js` の `PlayerClock.update()` と同じで、持ち時間はマイナスも
+許す）。動き方が変わる直前に `Clock.freeze()` でそこまでの分を `clock` へ
+書き戻し、時刻を打ち直す。`emit_gameinfo()` は `Clock.state()`
+（`sw` / `active` / `clock` / `limit`）を `clock_state` として添えるので、
+**あとからつないだクライアントも動作中の表示に戻せる**。
+**クライアントはクロック関連をすべて `clock_state` から読む**
+（`gameinfo` に `clock_limit` と `board.clock` は無い）。
 
-残り時間は `gameinfo['board']['clock']` に入っている値から
-`_clock_start` の経過分を引いて求める（`_cur_clock()`。計算は `ytbg.js` の
-`PlayerClock.update()` と同じで、持ち時間はマイナスも許す）。動き方が変わる
-直前に `_freeze_clock()` でそこまでの分を `gameinfo` へ書き戻し、時刻を
-打ち直す。`emit_gameinfo()` は `_cur_clock()` の値を `clock_state`
-（`sw` / `active` / `clock`）として添えるので、**あとからつないだ
-クライアントも動作中の表示に戻せる**。`gameinfo['board']['clock']` の側は
-最後に止まった時点の値なので、動作中の残り時間はそちらではなく
-`clock_state` を見る。
-
-`_clock_sw` の初期値は `True`。`index.html` の Clock のチェックボックスが
+`sw` の初期値は `True`。`index.html` の Clock のチェックボックスが
 既定で checked なので、`False` にすると、つないだ画面が `clock_state` を
 受けてチェックを外してしまう。
+
+クロックの状態はファイルの 1 行目に書かれる（下の「履歴」）。保存するのは
+`limit` / `sw` / 残り時間で、**`active` は保存しない**。サーバが落ちている
+間の時間は数えられないので、読み込んだときは必ず止まった状態で始める。
+`set_clock_switch` だけは、`history: false` で届いても保存する
+（`ytbg.js` の `apply_clock_sw()` がそう送るので、そこで保存しないと
+切ったまま再起動しても `sw` が戻ってしまう）。
 
 ### 履歴（戻す・進める）
 
 `_history` と `_fwd_hist` の 2 つのスタック。戻すと `_history` から pop して
 `_fwd_hist` へ積む。gameinfo を履歴のもので置き換えるのは `_load_hist_ent()`
-で、**クロックの残り時間だけは引き継ぐ**（TODO-016。クロックは履歴の対象外
-なので、戻すと動いているクロックが昔の値から数え直しになる）。
+で、履歴のエントリをそのまま入れるだけ。**クロックは `gameinfo` の外に
+あるので、戻しても動いているクロックは巻き戻らない**（TODO-024。
+TODO-016 では「残り時間だけは引き継ぐ」という例外で塞いでいた）。
 
 連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
 `await asyncio.sleep()` を挟みながら 1 手ずつ送る。**再生中に別の再生要求が
@@ -249,9 +265,17 @@ n = 1 しか送らないので、待たされるのは 1 手分だけ）。
 New Game も `confirm()` で確認を取る。共有ボードなので、全員の盤面が
 戻ってしまう。
 
-保存は `save_data()` が JSON を文字列連結で組み立てている（`json.dump` ではない）。
-1 手 1 行に近い読みやすい形にするためで、`gameinfo` にキーを足したときは
-`hist_ent2str()` も直さないと保存されずに落ちる。
+保存は `~/ytbg-{server_id}.jsonl` に JSON Lines で書く（TODO-024）。
+1 行目がメタ（形式のバージョンとクロック）、以降が履歴で、`h` が `_history`、
+`f` が `_fwd_hist`。**書かれた順がスタックの順。** 1 行 1 手なので読みやすく、
+`json.dumps()` を 1 行につき 1 回呼ぶだけなので、`gameinfo` にキーを足した
+ときに保存側を直し忘れて落ちることが無い。日本語のプレーヤー名はそのまま
+書く（`ensure_ascii=False`。そのぶん `open()` には `encoding='utf-8'` が要る）。
+
+旧形式（`~/ytbg-{server_id}.json`）は **`.jsonl` が無いときだけ**読む。
+`clock_limit` と `board.clock` は最後のエントリの値を `Clock` の初期値に
+する。**書き戻しは常に `.jsonl` で、旧ファイルは消さない**（消すのは
+TODO-031）。
 
 ### 画像ディレクトリ
 
