@@ -72,7 +72,7 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
   リビジョンが playwright 1.63.0 の要求と合わないため。
   `npx playwright install` で落とし直さない
 - 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
-  `ytBackgammonServer.DATAFILE_DIR` が見ており、無ければ `$HOME`。
+  `BackgammonServer.DATAFILE_DIR` が見ており、無ければ `$HOME`。
   利用者の `~/ytbg-*.json` は読み書きされない
 - ポートは固定せず、空いているものを OS に選ばせる。サーバは
   `detached` で起動してプロセスグループごと kill する（`uv run` の下に
@@ -94,17 +94,24 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
   他の Task へ制御を渡す必要がある。本物の `asyncio.sleep(0)` を呼ぶ）
 - 連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
   `on_json()` は待たずに返る。**完了を待つテストは
-  `await bg_server._replay_task`**（TODO-009）
-- `ytBackgammonServer` はコンストラクタの中で `load_data()` を呼び、
+  `await bg_server._replayer._task`**（TODO-009、TODO-025）
+- `BackgammonServer` はコンストラクタの中で `load_data()` を呼び、
   保存先を `DATAFILE_DIR`（`$HOME`）から組み立てる。`conftest.py` の
   `bg_server` フィクスチャが `DATAFILE_DIR` を `tmp_path` に差し替えている
   ので、利用者の `~/ytbg-*.json` は読み書きされない。**このとき履歴が
   1 件積まれる**ので、件数を数えるテストはそれを前提に書く
-- 同じフィクスチャが `broadcast()` を丸ごと差し替え、送られたメッセージを
-  `emitted`（`EmittedMessages`）へ積む。テストは**送られたメッセージの列**を
-  見る（`messages` / `types` / `last`）。**この差し替えのせいで
-  `broadcast()` の中身は動かない**ので、送信そのものを見るテストは
+- 同じフィクスチャが `ClientHub.broadcast()` を丸ごと差し替え、送られた
+  メッセージを `emitted`（`EmittedMessages`）へ積む。テストは**送られた
+  メッセージの列**を見る（`messages` / `types` / `last`）。**この差し替えの
+  せいで `broadcast()` の中身は動かない**ので、送信そのものを見るテストは
   差し替えていない `bg_server_raw` を使う（`tests/test_broadcast.py`）
+- **WebSocket 経路そのもののテストは `tests/test_ws.py`**（TODO-025）。
+  `create_app()` で作ったアプリに Starlette の `TestClient` で直接つなぐ
+  （dev 依存の `httpx2` が要る。`httpx` はこの版の starlette が非推奨に
+  していて、入れると警告が出る）。`TestClient` は同期なので、ここだけ
+  `async def` ではない。**`receive_json()` には待ち時間の上限が無く、
+  接続が切れる壊し方をすると永久に待つ**ので、テスト側の `recv_json()`
+  が daemon のスレッドで受けて 5 秒で打ち切る
 - `on_json(ws, msg)` の第 1 引数は `req` フィクスチャ（WebSocket のスタブ）。
   **`request` は pytest の予約語**なので、その名前のフィクスチャは作れない
 - クロックのテスト（`tests/test_clock.py`）は `time.monotonic()` を
@@ -121,37 +128,55 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 ## 構成
 
 **これから作る構成は [`docs/design.md`](docs/design.md) にある**（TODO-020 で
-決めた）。モジュール分割、JS の ES Modules 化、ルール層の切り出しは、
-そちらが正。`gameinfo` の dataclass 化・クロックの切り出し・保存形式は
-TODO-024 で実装済み。以下はいまの実装。
+決めた）。JS の ES Modules 化、ルール層の切り出し、メッセージの型付けと
+`on_json()` のディスパッチ表は、そちらが正。`gameinfo` の dataclass 化・
+クロックの切り出し・保存形式は TODO-024 で、Python のモジュール分割は
+TODO-025 で実装済み。以下はいまの実装。
 
 Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/` と
 `static/` は `src/ytbg/webroot/` の下。
 
 - `src/ytbg/__init__.py` — パッケージの定数。`webroot/` の絶対パス（`WEBROOT`）は
-  ここにあり、`__main__.py` と `yt_backgammon_server.py` の両方が使う。
+  ここにあり、`app.py` が `templates/` と `static/` の両方に使う。
   `__file__` から組み立てるので、どこから起動しても解決する
 - `src/ytbg/__main__.py` — エントリポイント（`[project.scripts]` の `ytbg`）。
+  click の `main()` **だけ**（TODO-025）。`create_app()` を呼んで
+  `uvicorn.run()` に渡す
+- `src/ytbg/app.py` — `create_app(svr_name, svr_ver, svr_id, image_dir)`。
   Starlette のルーティング（`/`, `/p1`, `/p2` はすべて同じ `index.html`、
   `/static`、WebSocket は `/ws`）と、**WebSocket の受信ループ**を持つ。
-  受け取ったメッセージの処理は `svr` に委譲するが、**例外のときに接続を
-  続けるか切るかはこのループが決めている**（TODO-009）。
+  受け取ったメッセージの処理は `BackgammonServer` に委譲するが、**例外の
+  ときに接続を続けるか切るかはこのループが決めている**（TODO-009）。
   `WebSocketDisconnect` と、受信そのもののその他の例外では抜ける。
   JSON として読めないときと、`on_json()` の中で例外が起きたときは、
   ログに出して**接続を保ったまま続ける**（移行前の Flask-SocketIO も
   イベントハンドラの例外で切断はしなかった）。
-  `svr` はグローバルで、`main()` の中で生成される
-- `src/ytbg/yt_backgammon_server.py` — サーバ側の中心。クライアントから届いた
-  メッセージの分岐、履歴の管理、保存・読み込みの呼び出し、
-  全クライアントへの broadcast
-- `src/ytbg/yt_backgammon.py` — `gameinfo`（`GameInfo`）を保持し、
-  更新するだけのクラス。ルール判定は持たない
+  **モジュールのグローバルだった `svr` と `app` は無い**（TODO-025）。
+  `BackgammonServer` は `create_app()` の中で作り、テストから触れるように
+  `app.state.svr` にも入れてある。`index.html` を返すのもここ
+  （`svr_name` と `image_dir` は表示のためだけの値なので、
+  `BackgammonServer` は持たない）
+- `src/ytbg/server.py` — `BackgammonServer`。サーバ側の中心（TODO-025）。
+  クライアントから届いたメッセージの分岐（`on_json()`）と、盤面・履歴・
+  クロック・保存・配信のとりまとめ。HTTP の応答は持たない
 - `src/ytbg/gameinfo.py` — `GameInfo` / `BoardState` / `CubeState`（TODO-024）。
-  盤面の状態そのものを表す dataclass。`to_dict()` は
+  盤面の状態そのものを表す dataclass。`put_checker()` / `cube()` /
+  `dice()` / `set_turn()` / `set_playername()` / `set_score()` /
+  `resign_game()` / `new_game()` という更新のメソッドもここが持つ
+  （TODO-025 で `ytBackgammon` を吸収した。`resign` は dataclass の
+  フィールド名なので、メソッドは `resign_game()`）。`to_dict()` は
   `dataclasses.asdict()`、`from_dict()` は自前。**ファイルから読むときだけは
   必須キーの欠落を例外にする**（黙って初期配置になると、壊れたファイルが
   「初期配置の N 手」として読まれてしまう）
 - `src/ytbg/clock.py` — `Clock`（TODO-024）。クロックは `gameinfo` の外に置く
+- `src/ytbg/history.py` — `History`（TODO-025）。戻す側（`_history`）と
+  進む側（`_fwd_hist`）の 2 つのスタックと通し番号。**保存は持たない**
+  （保存には `Storage` とクロックが要るので `BackgammonServer` の担当）
+- `src/ytbg/hub.py` — `ClientHub`（TODO-025）。接続中の WebSocket と、
+  全員への送信（`broadcast()`）。**`BackgammonServer` に素通しは無い**
+- `src/ytbg/replay.py` — `Replayer`（TODO-025）。連続再生の Task を
+  1 本だけ持つ。`start()` は Task にして投げ、`run()` はロックを
+  握ったまま走り切る
 - `src/ytbg/storage.py` — `Storage`（TODO-024）。
   `~/ytbg-{server_id}.jsonl` への保存・読み込みと、旧形式の変換
 - `src/ytbg/webroot/static/ytbg.js`（4000 行超）— クライアントのほぼ全て。
@@ -234,7 +259,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 
 ### 履歴（戻す・進める）
 
-`_history` と `_fwd_hist` の 2 つのスタック。戻すと `_history` から pop して
+`_history` と `_fwd_hist` の 2 つのスタック（`history.py` の `History`）。
+戻すと `_history` から pop して
 `_fwd_hist` へ積む。gameinfo を履歴のもので置き換えるのは `_load_hist_ent()`
 で、履歴のエントリをそのまま入れるだけ。**クロックは `gameinfo` の外に
 あるので、戻しても動いているクロックは巻き戻らない**（TODO-024。
@@ -242,8 +268,9 @@ TODO-016 では「残り時間だけは引き継ぐ」という例外で塞い�
 
 連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
 `await asyncio.sleep()` を挟みながら 1 手ずつ送る。**再生中に別の再生要求が
-来ると、前の Task を cancel してから始める**（TODO-009）。cancel と Task の
-差し替えは `_replay_lock` の中でまとめて行う。**そうしないと、cancel を待つ
+来ると、前の Task を cancel してから始める**（TODO-009）。Task を持つのは
+`replay.py` の `Replayer` で、cancel と Task の
+差し替えはその中のロックでまとめて行う。**そうしないと、cancel を待つ
 間に別の要求が入り込み、どこからも辿れない再生 Task が残る**（実際に起きた。
 逆方向の 2 本が打ち消し合って止まらなくなる）。
 
@@ -256,7 +283,7 @@ n = 1 しか送らないので、待たされるのは 1 手分だけ）。
 `_fwd_hist` を空にし、`_history` を今の `gameinfo` 1 件だけにして `sn` を 1 に
 振り直す。**盤面そのものは変えない。** 消すと全員の履歴が消えて元に戻せないので、
 `ytbg.js` の `clear_hist()` が押した人の画面で `confirm()` を出す。
-`on_json()` の `clear_hist` は、`back` と同じく `_run_replay()` に渡す
+`on_json()` の `clear_hist` は、`back` と同じく `Replayer.run()` に渡す
 （走っている連続再生を止めてから消す）。止めずに消すと、再生の Task が
 差し替えたあとの `_history` を pop し続ける。**連続再生の途中で押すと、
 止まった時点の盤面がそのまま残る**（`back` と同じで、キャンセルした

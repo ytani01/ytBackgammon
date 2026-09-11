@@ -25,6 +25,10 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    # WebSocket 経路のテスト (Starlette の TestClient) が使う
+    # (TODO-025)。httpx ではなく httpx2 なのは、この版の starlette が
+    # httpx を非推奨にしていて、入れると警告が出るため
+    "httpx2>=2.12.0",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.3.0",

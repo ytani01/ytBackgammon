@@ -20,6 +20,8 @@ import copy
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .mylog import getLogger
+
 
 def init_checker() -> list[list[list[int]]]:
     """
@@ -113,7 +115,13 @@ class GameInfo:
 
     turn は <=-1:操作不可、0|1:各プレーヤー、>=2:両方可。
     resign は <0:なし、0|1:プレーヤー。
+
+    盤面を更新するメソッド (put_checker() など) もここが持つ
+    (TODO-025)。
     """
+
+    # 注釈を付けないので dataclass のフィールドにはならない
+    __log = getLogger(__qualname__)
 
     sn: int = 0
     server_version: str = ''
@@ -127,6 +135,100 @@ class GameInfo:
     def to_dict(self) -> dict[str, Any]:
         """JSON にできる dict にする"""
         return asdict(self)
+
+    def new_game(self, server_version: str) -> None:
+        """
+        board を作り直し、turn と resign を戻す (TODO-024)。
+
+        score / playername / game_num / match_score は残す。
+        server_version は入れ直す (TODO-024 より前の new_game() が
+        init_gameinfo() 経由でそうしていた。古いファイルから読んだ値が
+        New Game のあとも残らないように)。省くと黙って '' に
+        なってしまうので、既定値は持たせない (TODO-025)。
+        クロックは gameinfo の外なので、ここでは触らない。
+        """
+        self.__log.debug('server_version={!a}', server_version)
+
+        playername = list(self.board.playername)
+        self.board = BoardState(playername=playername)
+        self.turn = 2
+        self.resign = -1
+        self.server_version = server_version
+
+    def put_checker(self, ch_id: int, p: int, idx: int) -> None:
+        """
+        Parameters
+        ----------
+        ch_id: int
+            checker ID number (ex. 012, 101 ..)
+        p: int
+            point index
+        idx: int
+            position index
+        """
+        self.__log.debug('ch_id={}, p={}, idx={}', ch_id, p, idx)
+        player = int(ch_id / 100)
+        ch_i = ch_id % 100
+        self.board.checker[player][ch_i] = [p, idx]
+        self.__log.debug('board.checker[{}][{}]=[{},{}]',
+                         player, ch_i, p, idx)
+
+    def cube(self, data: dict[str, Any]) -> None:
+        """
+        data = {'side': int, 'value': int, 'accepted': bool}
+        """
+        self.__log.debug('data={}', data)
+
+        self.board.cube = CubeState.from_dict(data)
+
+        self.__log.debug('board.cube={}', self.board.cube)
+
+    def dice(self, data: dict[str, Any]) -> None:
+        """
+        data = {
+            'player': player,
+            'dice': [d1, d2, d3, d4]
+        }
+        """
+        self.__log.debug('data={}', data)
+        self.board.dice[data['player']] = list(data['dice'])
+
+    def set_turn(self, data: dict[str, Any]) -> None:
+        """
+        data = {'turn': int, resign: int}
+        """
+        self.__log.debug('data={}', data)
+        self.turn = data['turn']
+        self.resign = data['resign']
+
+    def set_playername(self, data: dict[str, Any]) -> None:
+        """
+        data = {'player': int, 'name': str}
+        """
+        self.__log.debug('data={}', data)
+        self.board.playername[data['player']] = data['name']
+
+    def set_score(self, data: dict[str, Any]) -> None:
+        """
+        data = {'player': int, 'score': int}
+        """
+        self.__log.debug('data={}', data)
+        self.score[data['player']] = data['score']
+
+    def resign_game(self, data: dict[str, Any]) -> None:
+        """
+        resign game
+
+        resign という名前は dataclass のフィールドが使っているので、
+        メソッド名は resign_game にしてある (TODO-025)。
+
+        Parameters
+        ----------
+        data: {'player': int}
+        """
+        self.__log.debug('data={}', data)
+        self.resign = data['player']
+        self.__log.debug('resign={}', self.resign)
 
     def copy(self) -> GameInfo:
         """独立した複製を返す"""

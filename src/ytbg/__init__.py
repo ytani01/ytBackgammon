@@ -11,8 +11,7 @@ from pathlib import Path
 __author__ = 'Yoichi Tanibayashi'
 
 # パッケージに同梱した webroot (templates/, static/)。
-# __main__.py が static/、yt_backgammon_server.py が templates/ を使う
-# ので、1 箇所にまとめてある (TODO-009)
+# app.py が両方を使う (TODO-009、TODO-025)
 WEBROOT = Path(__file__).absolute().parent / 'webroot'
 
 if __package__:

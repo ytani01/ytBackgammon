@@ -270,7 +270,7 @@ async def test_set_gameinfo_stops_the_clock(fake_time, bg_server, req):
     await clock_on(bg_server, req)
     await send(bg_server, req, 'start_clock', 0)
 
-    gameinfo = bg_server._bg._gameinfo.to_dict()
+    gameinfo = bg_server._gameinfo.to_dict()
     await bg_server.on_json(req, {'type': 'set_gameinfo', 'data': gameinfo,
                                   'history': False})
     fake_time.advance(30)
@@ -287,9 +287,9 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
     """
     await clock_on(bg_server, req)
     await send(bg_server, req, 'start_clock', 0)
-    bg_server.add_history(bg_server._bg._gameinfo)
+    bg_server.add_history(bg_server._gameinfo)
 
-    ent = bg_server._history[-1].to_dict()
+    ent = bg_server._hist.entries[-1].to_dict()
     assert 'clock_limit' not in ent
     assert 'clock_sw' not in ent
     assert 'clock_active' not in ent
@@ -426,7 +426,7 @@ async def test_back_does_not_rewind_running_clock(
                                   'history': False})
 
     # 盤面は 1 手戻るが、クロックは戻らずそのまま進み続ける
-    assert bg_server._bg._gameinfo.board.checker[0][0] == [5, 0]
+    assert bg_server._gameinfo.board.checker[0][0] == [5, 0]
     assert bg_server._clock.cur(0) == [100, 7]
     fake_time.advance(3)
     assert bg_server._clock.cur(0) == [100, 4]
@@ -452,7 +452,7 @@ async def test_fwd_does_not_rewind_running_clock(
     await bg_server.on_json(req, {'type': 'fwd', 'data': {'n': 1},
                                   'history': False})
 
-    assert bg_server._bg._gameinfo.board.checker[0][0] == [5, 0]
+    assert bg_server._gameinfo.board.checker[0][0] == [5, 0]
     assert bg_server._clock.cur(0) == [100, 7]
 
 

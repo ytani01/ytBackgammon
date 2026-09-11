@@ -77,19 +77,19 @@ async def test_save_and_load_roundtrip(bg_server, make_bg_server, req):
               'data': {'ch': 1, 'p': 4, 'idx': 0}, 'history': True})
     await bg_server.backward_hist(1, sleep_sec=0)
 
-    assert len(bg_server._history) == 2
-    assert len(bg_server._fwd_hist) == 1
+    assert len(bg_server._hist.entries) == 2
+    assert len(bg_server._hist.fwd_entries) == 1
 
     svr = make_bg_server()
 
-    assert [h.sn for h in svr._history] == \
-        [h.sn for h in bg_server._history]
-    assert [h.to_dict() for h in svr._history] == \
-        [h.to_dict() for h in bg_server._history]
-    assert [h.to_dict() for h in svr._fwd_hist] == \
-        [h.to_dict() for h in bg_server._fwd_hist]
+    assert [h.sn for h in svr._hist.entries] == \
+        [h.sn for h in bg_server._hist.entries]
+    assert [h.to_dict() for h in svr._hist.entries] == \
+        [h.to_dict() for h in bg_server._hist.entries]
+    assert [h.to_dict() for h in svr._hist.fwd_entries] == \
+        [h.to_dict() for h in bg_server._hist.fwd_entries]
     # いまの盤面は履歴の最後
-    assert svr._bg._gameinfo.to_dict() == svr._history[-1].to_dict()
+    assert svr._gameinfo.to_dict() == svr._hist.entries[-1].to_dict()
     # クロックも戻る
     assert svr._clock.limit == [90, 12]
     assert svr._clock.clock == bg_server._clock.clock
@@ -255,10 +255,10 @@ def test_jsonl_misspelled_key_is_broken_file(tmp_path):
 def test_load_data_keeps_history_when_broken(bg_server):
     """読み込みに失敗したときは、サーバの履歴を書き換えない"""
     bg_server._storage.path.write_text('{')
-    before = [h.to_dict() for h in bg_server._history]
+    before = [h.to_dict() for h in bg_server._hist.entries]
 
     assert bg_server.load_data() == (0, 0)
-    assert [h.to_dict() for h in bg_server._history] == before
+    assert [h.to_dict() for h in bg_server._hist.entries] == before
 
 
 # ---------------------------------------------------------------------
@@ -332,8 +332,8 @@ async def test_server_starts_from_old_format(make_bg_server, tmp_path):
 
     svr = make_bg_server('old')
 
-    assert len(svr._history) == 1
-    assert svr._bg._gameinfo.board.playername == ['Alice', 'Bob']
+    assert len(svr._hist.entries) == 1
+    assert svr._gameinfo.board.playername == ['Alice', 'Bob']
     assert svr._clock.limit == [90, 9]
     assert svr._clock.clock == [[50, 3], [40, 2]]
 ##

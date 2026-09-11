@@ -10,9 +10,10 @@ import asyncio
 
 import pytest
 
+from ytbg.gameinfo import GameInfo
+from ytbg.hub import ClientHub
 from ytbg.mylog import loggerInit
-from ytbg.yt_backgammon import ytBackgammon
-from ytbg.yt_backgammon_server import ytBackgammonServer
+from ytbg.server import BackgammonServer
 
 # テストでも loggerInit() を 1 度だけ呼ぶ (TODO-005)。呼ばないと loguru の
 # 既定ハンドラ (DEBUG) が残り、テスト中の DEBUG がすべて stderr に出る
@@ -21,8 +22,8 @@ loggerInit(False)
 
 @pytest.fixture
 def bg():
-    """ytBackgammon のインスタンス"""
-    return ytBackgammon(svr_ver='test')
+    """GameInfo のインスタンス (盤面そのもの)"""
+    return GameInfo(server_version='test')
 
 
 class EmittedMessages:
@@ -32,9 +33,9 @@ class EmittedMessages:
     テストが確かめたいのは「どの msg が何通、どんな順で全員へ
     送られたか」。TODO-009 で通信層が Flask-SocketIO から
     Starlette + 素の WebSocket へ入れ替わり、
-    emit('json', msg, broadcast=True) が
-    ytBackgammonServer.broadcast(msg) になったので、差し替える対象は
-    そちらへ移した。messages / types / last / clear の見方は
+    emit('json', msg, broadcast=True) が broadcast(msg) になった。
+    TODO-025 で broadcast() は ClientHub へ移ったので、差し替える
+    対象もそちらになった。messages / types / last / clear の見方は
     変えていない。
 
     broadcast() は全員へ送るメソッドそのものなので、ここに積まれた
@@ -158,51 +159,49 @@ def no_sleep(monkeypatch):
 @pytest.fixture
 def make_bg_server(tmp_path, monkeypatch, emitted):
     """
-    ytBackgammonServer を、呼んだときに作るフィクスチャ。
+    BackgammonServer を、呼んだときに作るフィクスチャ。
 
     - DATAFILE_DIR を tmp_path に差し替え、利用者の
       ~/ytbg-* を読み書きしないようにする
-    - broadcast() を差し替え、全員へ送られた msg を emitted へ積む
+    - ClientHub.broadcast() を差し替え、全員へ送られた msg を
+      emitted へ積む。**クラスごと差し替える**ので、同じテストで
+      create_app() を使うと、TestClient 側の送信まで止まる
 
     保存したファイルを先に置いてから起動するテスト (TODO-024) は、
     作る時点を自分で決める必要があるので、bg_server ではなく
     こちらを使う。
     """
     monkeypatch.setattr(
-        ytBackgammonServer, 'DATAFILE_DIR', str(tmp_path))
+        BackgammonServer, 'DATAFILE_DIR', str(tmp_path))
 
     async def fake_broadcast(_self, msg):
         emitted.append(msg)
 
-    monkeypatch.setattr(ytBackgammonServer, 'broadcast', fake_broadcast)
+    monkeypatch.setattr(ClientHub, 'broadcast', fake_broadcast)
 
     def make(svr_id='test'):
-        return ytBackgammonServer(
-            svr_name='test', svr_ver='test', svr_id=svr_id,
-            image_dir='images1a')
+        return BackgammonServer(svr_ver='test', svr_id=svr_id)
 
     return make
 
 
 @pytest.fixture
 def bg_server(make_bg_server):
-    """ytBackgammonServer のインスタンス"""
+    """BackgammonServer のインスタンス"""
     return make_bg_server()
 
 
 @pytest.fixture
 def bg_server_raw(tmp_path, monkeypatch):
     """
-    broadcast() を差し替えていない ytBackgammonServer。
+    broadcast() を差し替えていない BackgammonServer。
 
     broadcast() の中身と、接続の出入り (on_connect / on_disconnect) を
-    確かめるテスト用 (TODO-009)。送信先は FakeClient を _clients へ
-    直接入れて用意する。DATAFILE_DIR を tmp_path に差し替えるのは
+    確かめるテスト用 (TODO-009)。送信先は FakeClient を _hub._clients
+    へ直接入れて用意する。DATAFILE_DIR を tmp_path に差し替えるのは
     bg_server と同じ。
     """
     monkeypatch.setattr(
-        ytBackgammonServer, 'DATAFILE_DIR', str(tmp_path))
+        BackgammonServer, 'DATAFILE_DIR', str(tmp_path))
 
-    return ytBackgammonServer(
-        svr_name='test', svr_ver='test', svr_id='test',
-        image_dir='images1a')
+    return BackgammonServer(svr_ver='test', svr_id='test')

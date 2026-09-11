@@ -1,52 +1,13 @@
 # TODO
 
-**残っている項目: TODO-025〜032 の 8 件。** これまでに 24 件を決着させた。
+**残っている項目: TODO-026〜032 の 7 件。** これまでに 25 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-033` から。**
 
-**着手順は `025 → 026 → 028 → 029 → 027 → 030`。**
+**着手順は `026 → 028 → 029 → 027 → 030`。**
 TODO-032 は TODO-026 のあと（ディスパッチ表に乗せられる）。
 TODO-031 は、手元のボードが新しい保存形式に移るのを待つので最後。
 未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
 順番と着手順は一致しない。
-
----
-
-## TODO-025. サーバを分割する（hub / history / storage / replay / app）
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `hub.py`（`ClientHub`）、`history.py`（`History`）、
-      `replay.py`（`Replayer`）を切り出す
-- [ ] `app.py` に `create_app()` を置き、モジュールのグローバルだった
-      `svr` と `app` を無くす
-- [ ] `ytBackgammonServer` を `BackgammonServer` に、`ytBackgammon` は
-      `GameInfo` に吸収して無くす
-- [ ] WebSocket 経路そのもののテストを足す（Starlette の `TestClient`）
-- [ ] `src/` をわざと壊して狙ったテストが落ちることを確かめる
-
-### きっかけ
-
-`ytBackgammonServer`（722 行）が 7 つの責務を抱えている（接続管理・配信・
-履歴・永続化・クロック・メッセージ分岐・HTTP 応答）。分割の一覧は
-[`docs/design.md`](docs/design.md) の「モジュール構成」にある。
-`storage.py` と `clock.py` は TODO-024 で作るので、ここは残りの分割。
-
-**挙動は変えない。**
-
-### 決めたこと
-
-**WebSocket 経路のテストは Starlette の `TestClient` で書く。**
-`create_app()` に直接つなぐのでプロセスを起こさずに済む。
-dev 依存に `httpx` が 1 つ増える。
-
-### 分担
-
-- **implementer** — 複数のファイルにまたがる
-- **verifier** — 4 つのテストと、`src/` を壊して落ちること
-- **reviewer** — 責務の移し替えで取りこぼしが出やすい。特に `_replay_lock`
-  の扱い（TODO-009 で、どこからも辿れない再生 Task が残る問題が起きている）
 
 ---
 
@@ -301,6 +262,7 @@ TODO-024 で `clock_limit` を `gameinfo` から出したあと、reviewer が
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-025.** サーバを分割する（hub / history / storage / replay / app）](archives/todo/TODO-025.%20サーバを分割する（hub%20_%20history%20_%20storage%20_%20replay%20_%20app）.md)
 - [**TODO-024.** gameinfo を dataclass にし、クロックを外し、保存を JSON Lines へ移す](archives/todo/TODO-024.%20gameinfo%20を%20dataclass%20にし、クロックを外し、保存を%20JSON%20Lines%20へ移す.md)
 - [**TODO-022.** favicon が無く、初回ロードで 404 になる](archives/todo/TODO-022.%20favicon%20が無く、初回ロードで%20404%20になる.md)
 - [**TODO-023.** デッドコードを消す](archives/todo/TODO-023.%20デッドコードを消す.md)

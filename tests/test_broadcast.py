@@ -20,10 +20,10 @@ async def test_broadcast_reaches_all_clients_even_if_one_fails(
     c1 = make_client('c1', fail=True)
     c2 = make_client('c2')
     for i, c in enumerate([c0, c1, c2]):
-        bg_server_raw._clients[c] = f'c{i}'
+        bg_server_raw._hub._clients[c] = f'c{i}'
 
     msg = {'src': 'server', 'type': 'gameinfo', 'data': {}}
-    await bg_server_raw.broadcast(msg)
+    await bg_server_raw._hub.broadcast(msg)
 
     assert c0.sent == [msg]
     assert c2.sent == [msg]
@@ -39,16 +39,16 @@ async def test_broadcast_keeps_failed_client(bg_server_raw, make_client):
     """
     c0 = make_client('c0')
     c1 = make_client('c1', fail=True)
-    bg_server_raw._clients[c0] = 'c0'
-    bg_server_raw._clients[c1] = 'c1'
+    bg_server_raw._hub._clients[c0] = 'c0'
+    bg_server_raw._hub._clients[c1] = 'c1'
 
     msg = {'type': 'gameinfo', 'data': {}}
-    await bg_server_raw.broadcast(msg)
+    await bg_server_raw._hub.broadcast(msg)
 
     # 送信が試みられて、片方だけが失敗したこと
     assert c0.sent == [msg]
     assert c1.sent == []
-    assert set(bg_server_raw._clients) == {c0, c1}
+    assert set(bg_server_raw._hub._clients) == {c0, c1}
 
 
 async def test_broadcast_keeps_order_per_client(bg_server_raw, make_client):
@@ -63,11 +63,11 @@ async def test_broadcast_keeps_order_per_client(bg_server_raw, make_client):
     """
     c0 = make_client('c0')
     c1 = make_client('c1')
-    bg_server_raw._clients[c0] = 'c0'
-    bg_server_raw._clients[c1] = 'c1'
+    bg_server_raw._hub._clients[c0] = 'c0'
+    bg_server_raw._hub._clients[c1] = 'c1'
 
     for i in range(5):
-        await bg_server_raw.broadcast({'type': f'msg{i}', 'data': {}})
+        await bg_server_raw._hub.broadcast({'type': f'msg{i}', 'data': {}})
 
     expected = [f'msg{i}' for i in range(5)]
     assert c0.types == expected
@@ -82,12 +82,12 @@ async def test_on_connect_registers_and_sends_gameinfo_to_all(
     送信元だけに送る実装に変えると、先にいた c0 に届かず落ちる。
     """
     c0 = make_client('c0')
-    bg_server_raw._clients[c0] = 'c0'
+    bg_server_raw._hub._clients[c0] = 'c0'
 
     newcomer = make_client('new')
     await bg_server_raw.on_connect(newcomer)
 
-    assert newcomer in bg_server_raw._clients
+    assert newcomer in bg_server_raw._hub._clients
     assert newcomer.types == ['gameinfo']
     # 先につないでいたクライアントにも届く
     assert c0.types == ['gameinfo']
@@ -99,15 +99,15 @@ async def test_on_disconnect_removes_client(bg_server_raw, make_client):
     c1 = make_client('c1')
     await bg_server_raw.on_connect(c0)
     await bg_server_raw.on_connect(c1)
-    assert len(bg_server_raw._clients) == 2
+    assert len(bg_server_raw._hub._clients) == 2
 
     await bg_server_raw.on_disconnect(c0)
 
-    assert c0 not in bg_server_raw._clients
-    assert set(bg_server_raw._clients) == {c1}
+    assert c0 not in bg_server_raw._hub._clients
+    assert set(bg_server_raw._hub._clients) == {c1}
 
     n0 = len(c0.sent)
-    await bg_server_raw.broadcast({'type': 'gameinfo', 'data': {}})
+    await bg_server_raw._hub.broadcast({'type': 'gameinfo', 'data': {}})
     assert len(c0.sent) == n0
 
 
@@ -118,4 +118,4 @@ async def test_on_disconnect_unknown_client_is_ignored(bg_server_raw, make_clien
 
     await bg_server_raw.on_disconnect(make_client('other'))
 
-    assert set(bg_server_raw._clients) == {c0}
+    assert set(bg_server_raw._hub._clients) == {c0}
