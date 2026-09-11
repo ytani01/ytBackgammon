@@ -36,6 +36,8 @@ uv run pytest              # Python のテスト
 uv run ruff check .
 uv run mypy src
 
+node --test tests/js/      # JS のルール層のテスト（npm は要らない）
+
 npm install                # 最初の 1 回だけ（playwright を入れる）
 node --test tests/browser/ # ブラウザでの動作確認（JS のテスト）
 ```
@@ -62,12 +64,28 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 見ている（TODO-013）。
 
 **Python のテストは pytest、JS のテストは node で走らせる**（TODO-021）。
+走らせ方は 3 つある。
+
+| 対象 | 手段 |
+|------|------|
+| Python | `uv run pytest` |
+| JS のルール層 | `node --test tests/js/` |
+| ブラウザでの動作 | `node --test tests/browser/` |
+
+`tests/js/` は `rules/` の純粋関数だけを見る（TODO-027）。`node --test` は
+Node の標準機能なので、**npm パッケージは要らない**（playwright が要るのは
+`tests/browser/` だけ）。DOM を触るクラスは単体テストせず、ブラウザの確認で見る。
+
 ブラウザでの動作確認は `tests/browser/` にあり、`node --test tests/browser/`
 で走る。サーバを実プロセスとして起動し、playwright の chromium で
 ページを開いて見る。
 
 - `board.test.mjs` — 盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
   コンソールエラー
+- `rules.test.mjs` — **`Board` がルール層につながっているか**（TODO-027）。
+  `board.position()` / `pip_count()` / `winner_is()` / `closeout()` /
+  `get_dst_points()` をページの中で呼ぶ。ほかの 2 つはドラッグを
+  free move で行うので、ルール判定を通らない
 - `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
   ボタン・バナーを実際に押し、**送られたメッセージの `type` / `data` /
   `history`** と、変わった `board` の属性を見る（TODO-028）。
@@ -127,6 +145,11 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
   **`request` は pytest の予約語**なので、その名前のフィクスチャは作れない
 - クロックのテスト（`tests/test_clock.py`）は `time.monotonic()` を
   差し替えて時間を進める。実時間を待たない
+- **`tests/js/helper.mjs` の初期配置は `src/ytbg/gameinfo.py` の写し**
+  （TODO-027）。手で写したものなので、**片方だけ変えても誰も気づかない**。
+  ルール層のテストは「初期配置の PIP は 167」のようにこの値を前提に
+  しているので、ずれると誤った値を正解として固定してしまう。
+  初期配置を変えるときは両方を直すこと
 - **テストが通ることだけを見ない。** `src/` をわざと壊して、狙ったテストが
   落ちることを確かめる（TODO-013）。最初に書いた 55 件のうち、
   `broadcast=True` を全部外しても `history_flag` を反転しても
@@ -214,12 +237,20 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
       `build_dom()` を `window.onload` の中へ移すと前者の保護が消えるので、
       備えとして残してある
     **どちらもテストでは守られない。** `wait_images()` を外しても
-    `tests/browser/` は 32 件とも通る（no-op なので当然）。
+    `tests/browser/` は全件通る（no-op なので当然）。
     この順序を変えるときは、画像の応答を遅らせて配置を実測すること
   - `ws.js`（接続・再接続・送信）、`log.js`、`layout.js`（盤面の座標）、
     `settings.js`（Cookie / QueryString と、`<body>` の `data-*` から読む
     `get_image_dir()` / `get_server_id()`）、`sound.js`
   - `board.js` — `Board`
+  - `rules/` — ルール層（TODO-027）。`position.js` に `Position` と
+    `goal_point()` / `bar_point()` / `get_pip()`、`move.js` に
+    `calc_dst_point()`、`judge.js` に `pip_count()` / `calc_gammon()` /
+    `winner_is()` / `closeout()`。**DOM も `Board` も見ず、値を返すだけ**で、
+    import してよいのは `rules/` の中だけ。表示の更新
+    （`pip[player].set()`）と状態の書き換え（`resign = -1`）は
+    `Board` の側で行う。`Board.position()` が `this.point[]` から
+    `Position` を作って渡す
   - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
     ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
     `label.js` / `button.js`。`board` と `player` は基底のコンストラクタの

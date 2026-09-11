@@ -1,6 +1,8 @@
 import { log } from "../log.js";
 import { emit_msg } from "../ws.js";
 import { BgImage } from "./base.js";
+import { bar_point,
+         get_pip as rule_get_pip } from "../rules/position.js";
 
 /**
  *
@@ -60,7 +62,7 @@ export class Checker extends BgImage {
      * @return {number} - pip count
      */
     get_pip() {
-        return super.get_pip(this.player, this.cur_point);
+        return rule_get_pip(this.player, this.cur_point);
     } // Checker.get_pip()
 
     /**
@@ -208,7 +210,7 @@ export class Checker extends BgImage {
             }
 
             // ヒットされている場合は、バーのポイントしか動かせない
-            const bar_p = this.bar_point(this.player);
+            const bar_p = bar_point(this.player);
             if ( this.board.point[bar_p].checkers.length > 0 ) {
                 if ( this.cur_point != bar_p ) {
                     return;

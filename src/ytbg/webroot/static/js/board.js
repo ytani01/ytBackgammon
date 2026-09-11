@@ -6,6 +6,11 @@ import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
          SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
 import { BgImage } from "./ui/base.js";
+import { Position } from "./rules/position.js";
+import { calc_dst_point } from "./rules/move.js";
+import { closeout as rule_closeout,
+         pip_count as rule_pip_count,
+         winner_is as rule_winner_is } from "./rules/judge.js";
 import { InverseButton, ResignButton, EmitButton, ScoreButton,
          BannerButton } from "./ui/button.js";
 import { ClockLimit, PlayerClock } from "./ui/clock.js";
@@ -628,86 +633,53 @@ export class Board extends BgImage {
     } // Board.set_turn()
 
     /**
-     * calcurate pip count
+     * 今の盤面を Position にする (TODO-027)
+     *
+     * ルール層は DOM を見ないので、this.point[] の中身をここで写す。
+     *
+     * @return {Position}
+     */
+    position() {
+        return Position.from_points(
+            this.point.map((pt) => pt.checkers.map((ch) => ch.player)));
+    } // Board.position()
+
+    /**
+     * PIP カウントを計算して、表示も更新する。
+     *
+     * 計算そのものは rules/judge.js にあり、表示を変えるのはここだけ
+     * (TODO-027)。
      *
      * @param {number} player
+     * @return {number|undefined} - pip count
      */
     pip_count(player) {
-        let count = 0;
-        for (let ch of this.checker[player]) {
-            count += ch.get_pip();
-            // log(`count=${count}`);
-            if ( isNaN(count) ) {
-                count = undefined;
-                break;
-            }
-        } // for(ch)
-        // log(`Board.pip_count>count=${count}`);
-
+        const count = rule_pip_count(this.position(), player);
         this.pip[player].set(count);
         return count;
     } // Board.pip_count()
 
     /**
-     * plyaer の勝利が確定していることが前提で、
-     * ノーマル/ギャモン/バックギャモン の判定
-     * Cubeのポイントも掛けた結果を返す
+     * player の勝ちなら、その点数を返す。
+     *
+     * 判定は rules/judge.js。投了による勝ちだったときに
+     * this.resign を戻すのはここ (TODO-027)。
      *
      * @param {number} player
-     * @return {number} point - 1:normal, 2:gammon, 3:backgammon
-     */
-    calc_gammon(player) {
-        let cube_val = this.cube.value;
-        if ( ! this.cube.accepted ) {
-            // ダブルを掛けられて、受理してない場合
-            cube_val /= 2;
-        }
-
-        const g_checkers = this.point[this.goal_point(1 - player)].checkers;
-        if ( ! this.cube.accepted || g_checkers.length > 0 ) {
-            log(`Board.calc_gammon(${player})>${cube_val}`);
-            return cube_val;
-        }
-
-        let points = [];
-        if ( 1 - player == 0 ) {
-            points = [19, 20, 21, 22, 23, 24, this.bar_point(0)];
-        } else {
-            points = [1, 2, 3, 4, 5, 6, this.bar_point(1)];
-        }
-        for (let p of points) {
-            const checkers = this.point[p].checkers;
-            if ( checkers.length > 0 && checkers[0].player == 1 - player) {
-                // backgammon !
-                log(`Board.calc_gammon(${player})>p=${p},${cube_val * 3}`);
-                return (cube_val * 3);
-            }
-        } // for (p)
-
-        // gammon !
-        log(`Board.calc_gammon(${player})>${cube_val*2}`);
-        return (cube_val * 2);
-    } // Board.calc_gammon()
-
-    /**
-     * @param {number} player
-     * @return {number} points
+     * @return {number} points - 0 なら勝ちではない
      */
     winner_is(player) {
-        // log(`Board.winner_is>resign=${this.resign}`);
-        if ( this.resign == 1 - player ) {
+        const result = rule_winner_is(this.position(), player, {
+            resign: this.resign,
+            cube_value: this.cube.value,
+            cube_accepted: this.cube.accepted,
+        });
+        if ( result.by_resign ) {
             this.resign = -1;
-            return this.calc_gammon(player);
         }
-
-        const pip_count = this.pip_count(player);
-        // log(`Board.winner_is>pip_count=${pip_count}`);
-        if ( pip_count == 0 ) {
-            return this.calc_gammon(player);
-        }
-        return 0;
+        return result.score;
     } // Board.winner_is()
-    
+
     /**
      * @param {number} player
      * @return {boolean}
@@ -724,35 +696,13 @@ export class Board extends BgImage {
     /**
      * クローズアウトしている？
      *
+     * 判定は rules/judge.js (TODO-027)
+     *
      * @param {number} player
+     * @return {boolean}
      */
     closeout(player) {
-        // log(`Board.closeout(player=${player})`);
-        if ( player != 0 && player != 1 ) {
-            return false;
-        }
-        if (this.point[this.bar_point(1-player)].checkers.length == 0) {
-            return false;
-        }
-
-        let [from_p, to_p] = [1, 6];
-        if ( player == 1 ) {
-            [from_p, to_p] = [19, 24];
-        }
-
-        for (let p=from_p; p <= to_p; p++) {
-            const checkers = this.point[p].checkers;
-            if ( checkers.length < 2 ) {
-                log(`Board.closeout(player=${player}) ==> false`);
-                return false;
-            }
-            if ( checkers[0].player != player ) {
-                log(`Board.closeout(player=${player}) ==> false`);
-                return false;
-            }
-        }
-        log(`Board.closeout(player=${player}) ==> true`);
-        return true;
+        return rule_closeout(this.position(), player);
     } // Board.closeout()
 
     /**
@@ -848,7 +798,7 @@ export class Board extends BgImage {
      *
      */
     get_dst_point1(player, src_p, dice_val) {
-        let dst_p1 = this.calc_dst_point(player, src_p, dice_val);
+        let dst_p1 = calc_dst_point(player, src_p, dice_val);
         // log(`Board.get_dst_point1>dst_p1=${dst_p1}`);
 
         let checkers;

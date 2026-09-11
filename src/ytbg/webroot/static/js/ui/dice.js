@@ -1,6 +1,7 @@
 import { log } from "../log.js";
 import { emit_msg } from "../ws.js";
 import { BgImage } from "./base.js";
+import { bar_point } from "../rules/position.js";
 import { BannerButton } from "./button.js";
 
 /**
@@ -384,7 +385,7 @@ export class RollButton extends BannerButton {
         let modified = false;
         const board = this.board;
         const player = this.player;
-        const bar_p = this.bar_point(player);
+        const bar_p = bar_point(player);
         const active_d = this.get_active_dice();
         
         if ( this.board.point[bar_p].checkers.length > 0 ) {

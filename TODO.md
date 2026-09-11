@@ -1,56 +1,13 @@
 # TODO
 
-**残っている項目: TODO-027、030〜032 の 4 件。** これまでに 28 件を決着させた。
+**残っている項目: TODO-030〜032 の 3 件。** これまでに 29 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-033` から。**
 
-**着手順は `027 → 030`。**
+**着手順は `030`。**
 TODO-032 は TODO-026 が済んだので、いつでも着手できる。
 TODO-031 は、手元のボードが新しい保存形式に移るのを待つので最後。
 未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
 順番と着手順は一致しない。
-
----
-
-## TODO-027. JS のルール層を純粋関数として切り出し、node --test を足す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `rules/position.js` に `Position`（`from_gameinfo()` / `owner()` /
-      `count()` / `with_move()`）を作る
-- [ ] `rules/move.js`（行き先の計算）と `rules/judge.js`（盤面の判定）に
-      ルール判定を移す
-- [ ] `BgBase` の `goal_point()` / `bar_point()` / `calc_dst_point()` /
-      `get_pip()` をルール層へ移す
-- [ ] 判定が表示を変えないようにする（`winner_is()` の `this.resign = -1`、
-      `pip_count()` の `this.pip[player].set()`）
-- [ ] `tests/js/` を足し、`node --test tests/js/` で走らせる
-- [ ] `src/` をわざと壊して狙ったテストが落ちることを確かめる
-
-### きっかけ
-
-**ルール計算が全 UI 部品の基底クラス `BgBase` に入っている。** テキスト表示も
-ボタンもチェッカーも、全部それを継承している。判定は
-`this.point[p].checkers`（DOM を持つ `Checker` の配列）を見ているため、
-盤面だけを渡して呼べない。**JS のテストが 0 件なのは、ここが
-切り離せていないことが大きい。**
-
-`Position` は TODO-024 の `gameinfo` から作るので、その後に着手する。
-**さらに TODO-028・029 のあとにする。** 非モジュールの `ytbg.js` からは
-ES Modules の `rules/` を import できず、先に切り出すと同じ判定が
-2 つ存在する期間ができるため。
-
-`node --test` は Node の標準機能なので、npm パッケージは要らない。
-テストは `tests/js/*.test.mjs` に置く（`tests/browser/` と揃える）。
-
-### 分担
-
-- **implementer** — ルール層の切り出しと、新しいテスト
-- **verifier** — `node --test tests/js/` と `tests/browser/`、
-  `src/` を壊して落ちること
-- **reviewer** — **判定の中身を移す。** 表示の副作用を外すときに
-  判定そのものの意味を変えていないか
 
 ---
 
@@ -152,6 +109,7 @@ TODO-024 で `clock_limit` を `gameinfo` から出したあと、reviewer が
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-027.** JS のルール層を純粋関数として切り出し、node --test を足す](archives/todo/TODO-027.%20JS%20のルール層を純粋関数として切り出し、node%20--test%20を足す.md)
 - [**TODO-029.** DOM 生成を JS へ移し、onClick 属性をやめる](archives/todo/TODO-029.%20DOM%20生成を%20JS%20へ移し、onClick%20属性をやめる.md)
 - [**TODO-028.** JS を ES Modules に分割し、継承階層を組み直す](archives/todo/TODO-028.%20JS%20を%20ES%20Modules%20に分割し、継承階層を組み直す.md)
 - [**TODO-026.** メッセージを型付けし、on_json をディスパッチ表にする](archives/todo/TODO-026.%20メッセージを型付けし、on_json%20をディスパッチ表にする.md)

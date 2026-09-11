@@ -175,12 +175,17 @@ static/js/
 
 ```js
 export class Position {
-    // pt[p] = { player: 0|1|null, n: 枚数 }   p = 0..27
+    // pt[p] = そのポイントのチェッカーの player を積んだ順に並べた配列
     static from_gameinfo(gameinfo) { ... }
     owner(p) / count(p)
     with_move(from_p, to_p, player)   // 動かした後の Position を返す
 }
 ```
+
+**`{ player, n }`（所有者と枚数）では表せない。** free move では
+1 つのポイントに両プレーヤーのチェッカーが乗るので、枚数を分けられず
+PIP カウントがずれる。いまの判定が `checkers[0].player`（いちばん下の
+チェッカー）を見ていることも、積んだ順でないと表せない（TODO-027）。
 
 `rules/` の関数はすべて `Position` と `player` と出目だけを受け取り、
 DOM も `Board` も見ない。**`BgBase` にある `goal_point()` / `bar_point()` /
