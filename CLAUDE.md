@@ -172,11 +172,12 @@ basedpyright は落ちる**（mypy には int の引数へ float を渡せる特
 
 ## 構成
 
-**これから作る構成は [`docs/design.md`](docs/design.md) にある**（TODO-020 で
-決めた）。JS の ES Modules 化、ルール層の切り出し、メッセージの型付けと
-`on_json()` のディスパッチ表は、そちらが正。`gameinfo` の dataclass 化・
-クロックの切り出し・保存形式は TODO-024 で、Python のモジュール分割は
-TODO-025 で実装済み。以下はいまの実装。
+**TODO-020 で決めた構成は、TODO-023〜030 ですべて実装した。**
+当時の設計そのものは `archives/docs/design.md` に移してある（TODO-033）。
+**現行仕様ではないので、実装の根拠として引かないこと。**
+
+人が読む説明は [`docs/Developer.md`](docs/Developer.md)（TODO-033）。
+以下はいまの実装で、Claude 向けの細かい注意も含む。
 
 Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/` と
 `static/` は `src/ytbg/webroot/` の下。

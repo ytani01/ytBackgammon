@@ -38,6 +38,15 @@
 * ボードのデザインを変えることができます。
 
 
+## ドキュメント
+
+| 文書 | 誰向けか |
+|------|----------|
+| [docs/Player.md](docs/Player.md) | ブラウザでボードを触ってプレーする人 |
+| [docs/Admin.md](docs/Admin.md) | サーバを立てて動かす人 |
+| [docs/Developer.md](docs/Developer.md) | 中の作りを知りたい人・直したい人 |
+
+
 ## 動作環境
 
 ### クライアント: Webアプリ
@@ -97,47 +106,28 @@
 
 [uv](https://docs.astral.sh/uv/) を使います。
 
-1. git クローンを作成
 ```bash
-user@host:~$ git clone https://www.github.com/ytani01/ytBackgammon.git
+git clone https://www.github.com/ytani01/ytBackgammon.git
+cd ytBackgammon
+uv sync
 ```
 
-2. 依存パッケージをインストール
-```bash
-user@host:~$ cd ytBackgammon
-user@host:~/ytBackgammon$ uv sync
-```
+`uv sync` が Python 3.14 の仮想環境 (`.venv`) を作り、必要なパッケージを
+入れます。**タグごと clone して下さい**(バージョンを git のタグから
+取っているため)。
 
-`uv sync` が Python 3.14 の仮想環境 (``.venv``) を作り、必要なパッケージを
-入れます。
-
-### 2. ytBackgammon server usage
+### 2. 起動
 
 リポジトリのディレクトリの中で実行します。
 
 ```bash
-user@host:~/ytBackgammon$ ./ytbg.sh -p {ポート番号} -i {画像ディレクトリ名} {サーバID}
+./ytbg.sh -d -p 5001 -i images1a 1     # ポート 5001、サーバID 1
+./ytbg-boot.sh                         # 4 面まとめて起動 (5001〜5004)
+./ytbg-stop.sh                         # 停止
 ```
 
-ポート番号: デフォルトは 5001
-画像ディレクトリ名: ``static`` からの相対パス名
-サーバID: 複数のサーバを立ち上げたときに、区別するための文字列
-
-``-d`` を付けるとログが DEBUG レベルになります。
-
-``uv run ytbg`` でも同じように起動できます。
-
-```bash
-user@host:~/ytBackgammon$ uv run ytbg --help
-```
-
-4 面を同時に立ち上げるスクリプトもあります (ポート 5001〜5004)。
-
-```bash
-user@host:~/ytBackgammon$ ./ytbg-boot.sh   # 起動
-user@host:~/ytBackgammon$ ./ytbg-stop.sh   # 停止
-```
-
+オプションの意味、複数ボードの立て方、状態ファイルの置き場所、
+困ったときの対処は **[docs/Admin.md](docs/Admin.md)** にあります。
 
 ### 3. Board Design
 
@@ -146,7 +136,12 @@ user@host:~/ytBackgammon$ ./ytbg-stop.sh   # 停止
 
 * [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
 
-画像ファイルの保存先: ``src/ytbg/webroot/static/`` ディレクトリ直下
+画像ファイルの保存先: `src/ytbg/webroot/static/` ディレクトリ直下
+
+
+## ライセンス
+
+Apache License 2.0 ([LICENSE](LICENSE))
 
 
 ## A. References 

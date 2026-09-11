@@ -24,7 +24,7 @@
 
 `ytBackgammonServer`（722 行）が 7 つの責務を抱えていた（接続管理・配信・
 履歴・永続化・クロック・メッセージ分岐・HTTP 応答）。分割の一覧は
-[`docs/design.md`](../../docs/design.md) の「モジュール構成」にある。
+[`docs/design.md`](../docs/design.md) の「モジュール構成」にある。
 `storage.py` と `clock.py` は TODO-024 で作ったので、ここは残りの分割。
 
 **挙動は変えない。**

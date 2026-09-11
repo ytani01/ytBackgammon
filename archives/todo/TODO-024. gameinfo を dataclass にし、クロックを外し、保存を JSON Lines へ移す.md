@@ -24,7 +24,7 @@ TODO-020 で決めた構成の中心。**構造・クロック・保存形式の
 ので 1 項目にまとめた（`GameInfo` が変われば `asdict` / `from_dict` も
 保存形式も変わり、クロックを外すこと自体が `GameInfo` の構造変更）。
 
-型と構造は [`docs/design.md`](../../docs/design.md) の「GameInfo」「クロックは
+型と構造は [`docs/design.md`](../docs/design.md) の「GameInfo」「クロックは
 gameinfo の外」「保存は JSON Lines」にある。
 
 ### 決めたこと

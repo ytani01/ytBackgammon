@@ -25,7 +25,7 @@
 ## やったこと
 
 **設計を決めただけで、`src/` は触っていない。** 決めた構成は
-[`docs/design.md`](../../docs/design.md) にある。実装は TODO-022 以降に分けた。
+[`docs/design.md`](../docs/design.md) にある。実装は TODO-022 以降に分けた。
 
 設計文書を `archives/` ではなく `docs/` に置いたのは、**これが
 これから参照し続ける現行の指針だから**。`archives/` は決着した項目の記録で、
@@ -92,7 +92,7 @@ JavaScript 側（`ytbg.js` 4,351 行が 1 ファイル）:
 | 盤面のファイル保存・読み込み | 消す |
 | `ytbg.html` | 対象外 |
 
-理由は [`docs/design.md`](../../docs/design.md) の「採らなかった案」にある。
+理由は [`docs/design.md`](../docs/design.md) の「採らなかった案」にある。
 
 ## やらないと決めたこと
 
@@ -128,7 +128,7 @@ JavaScript 側（`ytbg.js` 4,351 行が 1 ファイル）:
 **実際に立てた番号は 1 つずれた。** この表を書いたあと、favicon の項目が
 TODO-022 として先に立ったので、実装項目は TODO-023〜030 になった
 （TODO-021 だけは表のとおり）。**表は当時の記録なので直していない。**
-現行の並びは `TODO.md` と [`docs/design.md`](../../docs/design.md) を見ること。
+現行の並びは `TODO.md` と [`docs/design.md`](../docs/design.md) を見ること。
 
 順番の理由:
 
