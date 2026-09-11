@@ -57,6 +57,17 @@ TODO-024 で保存を JSON Lines（`~/ytbg-{server_id}.jsonl`）へ移した。
 docs/design.md は、実装前の設計として、実装が終わったら、アーカイブする。
 Developer.mdには、改めて、開発プロジェクトに新規加入した人向けに、実装に合わせて、わかりやすく作り直す。このとき、コードの細かい内容は、コードを読めばわかるので省いて良い。主にモジュール構成、クラス構成、それぞれの関係について、mermaid図を入れて説明する。
 
+### 決めたこと
+
+- **置き場所**: `README.md` だけリポジトリのトップ。残りは
+  `docs/Player.md` / `docs/Admin.md` / `docs/Developer.md`
+- **スクリーンショット**: `tests/browser/` と同じ仕組み（playwright ＋
+  システムの chromium）でサーバを起動し、**番号バッジや矢印を DOM で
+  重ねてから撮る**。盤面が変わっても作り直せるようにする
+- **言語**: 日本語のみ。`CLAUDE.md` や `TODO.md` と揃える
+- **`docs/design.md`**: `archives/docs/design.md` へ移す。現行仕様ではない
+  ことをはっきりさせ、`Developer.md` を新しい正にする
+
 ---
 
 ## 完了済み
