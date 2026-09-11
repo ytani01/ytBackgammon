@@ -129,7 +129,7 @@ JSON 化は `dataclasses.asdict()`、読み込みは `from_dict()` を自前で�
 `type` を見て組み立てる。`data` のキーが足りなければそこで例外になるので、
 `msg['data']['n']` が奥で `KeyError` を出すことがなくなる。
 
-`on_json()` の 20 個の `if` は登録表に置き換える。今の分岐は
+`on_json()` の 23 個の `if` は登録表に置き換える。今の分岐は
 「前半は return し、後半は末尾の `add_history` と `emit_gameinfo` へ落ちる」
 という 2 段構造なので、**ハンドラの戻り値でそれを表す**。
 

@@ -215,8 +215,34 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 `data` に直前の操作が `last_op`（受け取った msg そのまま。操作に紐づかない
 送信では `None`）として入る。クライアントは `gameinfo` で盤面を作り直し、
 **音と dice の回転だけを `last_op` から出す**（`Board.load_gameinfo()`）。
-`type` を足すときは `on_json()` に分岐を足し、演出が要るときだけ
-`load_gameinfo()` にも足す。
+
+届いたメッセージは `message.py` の `parse()` が型を付ける（TODO-026）。
+`type` ごとの frozen dataclass に組み立てるので、**`data` のキーが
+足りなければ入口で `KeyError` になる**（奥の `msg['data']['n']` まで
+持ち越さない）。`parse()` が返す `Message` は
+`{type, data, history, raw}` で、`raw` が `last_op` に要る受け取った
+msg そのもの。**`data` と `history` は全ての `type` で必須**になった。
+`back` や `clear_hist` のように中身を使わない `type` でも、キーが
+無ければ `parse()` で `KeyError` になる（旧 `on_json()` は読まずに
+`return` していた）。
+
+`on_json()` は 2 つの登録表で動く。`message.py` の `DATA_TYPES`
+（`type` → dataclass）と、`server.py` の `self._handlers`
+（`type` → ハンドラ）。**キーの集合が一致していること**を
+`tests/test_message.py` が見ているので、片方だけに足すと落ちる。
+**登録表に無い `type` は、警告をログに出して無視する**（履歴に積まず、
+`gameinfo` も送り返さない。接続は保つ）。文字列でない `type` も
+同じ扱い。
+
+ハンドラは全て `async def` で、戻り値で共通の後処理を分ける。
+`None` は「自分で送信済み」（`back` / `back2` / `back_all` / `fwd` /
+`fwd2` / `fwd_all` / `clear_hist` / `new` / `set_gameinfo` の 9 つ）、
+`float` は「アニメーションの秒数。`history` フラグを見て履歴へ積み、
+`emit_gameinfo()`」（盤面とクロックを変える 14 個）。秒数を返すのは
+`put_checker`（`SEC_CHECKER_MOVE`）だけで、残りは `0`。
+
+`type` を足すときは、`DATA_TYPES` に dataclass を、`_handlers` に
+ハンドラを足す。演出が要るときだけ `load_gameinfo()` にも足す。
 
 全員への送信（`broadcast()`）は `asyncio.gather()` で並行に送るが、
 **いちばん遅いクライアントを待つ**（全員へ送り終わるまで次へ進まない）。

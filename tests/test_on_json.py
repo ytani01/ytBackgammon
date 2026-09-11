@@ -600,3 +600,41 @@ async def test_back_moves_hist_i_by_n(bg_server, req, emitted, no_sleep):
     assert sent['type'] == 'gameinfo'
     assert sent['data']['hist_i'] == 2
     assert sent['data']['hist_n'] == 3
+
+
+# ---------------------------------------------------------------------
+# 登録表に無い type (TODO-026)
+# ---------------------------------------------------------------------
+
+async def test_unknown_type_is_ignored(bg_server, req, emitted):
+    """
+    登録表に無い type は無視する (TODO-026)。
+
+    履歴に積まず、gameinfo も送り返さず、例外も投げない
+    (投げないので、受信ループは接続を保ったまま次のメッセージへ進む)。
+    TODO-026 より前は、どの if にも当たらないまま末尾へ落ち、
+    history フラグ次第で履歴に積まれて gameinfo が返っていた。
+    """
+    hist_len0 = len(bg_server._hist.entries)
+    before = copy.deepcopy(bg_server._gameinfo)
+
+    msg = {'type': 'no_such_type', 'data': {}, 'history': True}
+    await bg_server.on_json(req, msg)
+
+    assert emitted.messages == []
+    assert len(bg_server._hist.entries) == hist_len0
+    assert bg_server._gameinfo == before
+
+
+async def test_unknown_type_does_not_block_next_msg(
+        bg_server, req, emitted):
+    """無視したあとも、次のメッセージは普通に処理される"""
+    await bg_server.on_json(
+        req, {'type': 'no_such_type', 'data': {}, 'history': False})
+
+    await bg_server.on_json(
+        req, {'type': 'set_score', 'data': {'player': 1, 'score': 3},
+              'history': False})
+
+    assert bg_server._gameinfo.score[1] == 3
+    assert emitted.types == ['gameinfo']

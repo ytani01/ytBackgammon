@@ -181,4 +181,27 @@ def test_disconnect_removes_client(client):
     with client.websocket_connect('/ws') as ws2:
         recv_json(ws2)
         assert svr._hub.count() == 1
+
+
+def test_unknown_type_keeps_connection(client):
+    """
+    登録表に無い type を送っても、無視されるだけで接続は切れない
+    (TODO-026)。
+
+    無視されたメッセージには何も返らないので、そのあとに送った
+    put_checker の gameinfo が最初に届く。
+    """
+    with client.websocket_connect('/ws') as ws:
+        recv_json(ws)
+
+        ws.send_json({'src': 'test', 'type': 'no_such_type',
+                      'data': {}, 'history': True})
+
+        ws.send_json(put_checker_msg(ch=3, p=7, idx=0))
+        msg = recv_json(ws)
+
+        assert msg['type'] == 'gameinfo'
+        assert msg['data']['last_op']['type'] == 'put_checker'
+        checker = msg['data']['gameinfo']['board']['checker']
+        assert checker[0][3] == [7, 0]
 ##

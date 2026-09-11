@@ -17,11 +17,29 @@ __date__ = '2020/05'
 
 import asyncio
 import os
+from dataclasses import asdict
 
 from .clock import Clock
 from .gameinfo import GameInfo
 from .history import History
 from .hub import ClientHub
+from .message import (
+    ClockLimitData,
+    ClockSwitchData,
+    CubeData,
+    DiceData,
+    GameInfoData,
+    HistStepData,
+    Message,
+    PlayerClockData,
+    PlayerData,
+    PlayerNameData,
+    PutCheckerData,
+    ScoreData,
+    TurnData,
+    UnknownMessageType,
+    parse,
+)
 from .mylog import getLogger
 from .replay import Replayer
 from .storage import Storage
@@ -63,6 +81,37 @@ class BackgammonServer:
         # 入れると履歴に載り、back / fwd でクロックの発着まで戻ってしまう。
         # 保存したものがあれば load_data() が差し替える
         self._clock = Clock()
+
+        # type → ハンドラの登録表 (TODO-026)。message.py の
+        # DATA_TYPES と、キーの集合が一致すること
+        self._handlers = {
+            # 履歴 (自分で送信するもの)
+            'back': self._on_back,
+            'back2': self._on_back2,
+            'back_all': self._on_back_all,
+            'fwd': self._on_fwd,
+            'fwd2': self._on_fwd2,
+            'fwd_all': self._on_fwd_all,
+            'clear_hist': self._on_clear_hist,
+            'new': self._on_new,
+            'set_gameinfo': self._on_set_gameinfo,
+            # 盤面
+            'put_checker': self._on_put_checker,
+            'cube': self._on_cube,
+            'dice': self._on_dice,
+            'set_turn': self._on_set_turn,
+            'set_playername': self._on_set_playername,
+            'set_score': self._on_set_score,
+            'resign': self._on_resign,
+            # クロック
+            'set_clock_limit': self._on_set_clock_limit,
+            'set_player_clock': self._on_set_player_clock,
+            'set_clock_switch': self._on_set_clock_switch,
+            'start_clock': self._on_start_clock,
+            'resume_clock': self._on_resume_clock,
+            'stop_clock': self._on_stop_clock,
+            'reset_clock': self._on_reset_clock,
+        }
 
         [hist_len, _fwd_hist_len] = self.load_data()
         if hist_len < 1:
@@ -286,154 +335,218 @@ class BackgammonServer:
                          self._hub.name(ws), type(e).__name__, e)
         self.__log.error('msg={!a}', msg)
 
+    # -----------------------------------------------------------------
+    # type ごとのハンドラ (TODO-026)
+    #
+    # 戻り値で共通の後処理を分ける。
+    #   None  : 自分で送信済み。後処理をしない
+    #   float : アニメーションの秒数。history フラグを見て履歴へ積み、
+    #           emit_gameinfo() する
+    # -----------------------------------------------------------------
+
+    async def _on_back(self, m: Message) -> float | None:
+        """n 手ぶん戻す。Task にせず、その場で走り切る (TODO-009)"""
+        data: HistStepData = m.data
+        await self._replayer.run(self.backward_hist, data.n)
+        return None
+
+    async def _on_back2(self, m: Message) -> float | None:
+        """ゆっくり最初まで戻す (連続再生)"""
+        await self._replayer.start(self.backward_hist, 0, sleep_sec=.5)
+        return None
+
+    async def _on_back_all(self, m: Message) -> float | None:
+        """最初まで戻す (連続再生)"""
+        await self._replayer.start(self.backward_hist, 0)
+        return None
+
+    async def _on_fwd(self, m: Message) -> float | None:
+        """n 手ぶん進める。Task にせず、その場で走り切る (TODO-009)"""
+        data: HistStepData = m.data
+        await self._replayer.run(self.forward_hist, data.n)
+        return None
+
+    async def _on_fwd2(self, m: Message) -> float | None:
+        """ゆっくり最後まで進める (連続再生)"""
+        await self._replayer.start(self.forward_hist, 0, sleep_sec=.5)
+        return None
+
+    async def _on_fwd_all(self, m: Message) -> float | None:
+        """最後まで進める (連続再生)"""
+        await self._replayer.start(self.forward_hist, 0)
+        return None
+
+    async def _on_clear_hist(self, m: Message) -> float | None:
+        """
+        履歴を消す (TODO-019)。
+
+        back と同じく、走っている連続再生を止めてから消す。
+        """
+        await self._replayer.run(self.clear_history)
+        await self.emit_gameinfo(0)
+        return None
+
+    async def _on_new(self, m: Message) -> float | None:
+        """New game"""
+        self.new_game()
+        await self.emit_gameinfo(3, False)
+        return None
+
+    async def _on_set_gameinfo(self, m: Message) -> float | None:
+        """gameinfo を丸ごと入れ替える"""
+        data: GameInfoData = m.data
+        self._gameinfo = GameInfo.from_dict(data.gameinfo)
+        # 盤面ごと入れ替わるので、クロックは止まった状態にする (TODO-016)
+        self._clock.stop_all()
+        self.add_history(self._gameinfo)
+        await self.emit_gameinfo(0)
+        return None
+
+    async def _on_put_checker(self, m: Message) -> float | None:
+        """
+        checker を動かす。
+
+        唯一、アニメーションの秒数 (SEC_CHECKER_MOVE) を返す
+        (TODO-015)。
+        """
+        data: PutCheckerData = m.data
+        self._gameinfo.put_checker(data.ch, data.p, data.idx)
+        if data.p >= 26:
+            self.__log.debug('hit')
+        return self.SEC_CHECKER_MOVE
+
+    async def _on_cube(self, m: Message) -> float | None:
+        """cube"""
+        data: CubeData = m.data
+        self._gameinfo.cube(asdict(data))
+        return 0
+
+    async def _on_dice(self, m: Message) -> float | None:
+        """dice"""
+        data: DiceData = m.data
+        self._gameinfo.dice(asdict(data))
+        return 0
+
+    async def _on_set_turn(self, m: Message) -> float | None:
+        """turn と resign"""
+        data: TurnData = m.data
+        self._gameinfo.set_turn(asdict(data))
+        return 0
+
+    async def _on_set_playername(self, m: Message) -> float | None:
+        """プレーヤー名"""
+        data: PlayerNameData = m.data
+        self._gameinfo.set_playername(asdict(data))
+        return 0
+
+    async def _on_set_score(self, m: Message) -> float | None:
+        """得点"""
+        data: ScoreData = m.data
+        self._gameinfo.set_score(asdict(data))
+        return 0
+
+    async def _on_resign(self, m: Message) -> float | None:
+        """降参"""
+        data: PlayerData = m.data
+        self._gameinfo.resign_game(asdict(data))
+        return 0
+
+    async def _on_set_clock_limit(self, m: Message) -> float | None:
+        """
+        持ち時間・猶予の限度を変える。
+
+        両方のクロックを limit に戻して止める。TODO-015 より前は
+        ytbg.js の受信側がこうしていた。今はクライアントが
+        clock_state に従うので、ここが唯一の決め手になる。
+        """
+        data: ClockLimitData = m.data
+        self._clock.set_limit(data.index, data.clock_limit)
+        self._clock.reset(0)
+        self._clock.reset(1)
+        return 0
+
+    async def _on_set_player_clock(self, m: Message) -> float | None:
+        """残り時間を入れ替える"""
+        data: PlayerClockData = m.data
+        self._clock.set_clock(data.player, data.clock)
+        return 0
+
+    # ここから 5 つはクロックの動作そのもの (TODO-016)。TODO-012 で
+    # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
+    # 返せるように戻した。TODO-015 で転送をやめたので、すでに開いて
+    # いる画面も、ここで作った状態を clock_state で受け取って合わせる
+
+    async def _on_set_clock_switch(self, m: Message) -> float | None:
+        """
+        クロック機能そのものの ON/OFF。
+
+        ytbg.js の apply_clock_sw() は history: false で送るので、
+        ここで保存しないと sw が残らない (TODO-024)。
+        start/stop/resume/reset_clock はターンのたびに走るので
+        保存しない (I/O が増えすぎる)。
+        """
+        data: ClockSwitchData = m.data
+        self._clock.set_switch(data.switch)
+        self.save_data()
+        return 0
+
+    async def _on_start_clock(self, m: Message) -> float | None:
+        """
+        ytbg.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
+        """
+        data: PlayerData = m.data
+        self._clock.start(data.player)
+        return 0
+
+    async def _on_resume_clock(self, m: Message) -> float | None:
+        """猶予を戻さずに再開する"""
+        data: PlayerData = m.data
+        self._clock.resume(data.player)
+        return 0
+
+    async def _on_stop_clock(self, m: Message) -> float | None:
+        """止める"""
+        data: PlayerData = m.data
+        self._clock.stop(data.player)
+        return 0
+
+    async def _on_reset_clock(self, m: Message) -> float | None:
+        """limit に戻して止める"""
+        data: PlayerData = m.data
+        self._clock.reset(data.player)
+        return 0
+
     async def on_json(self, ws, msg):
         """
-        msg := {'type': str, 'data': object}
+        msg := {'type': str, 'data': object, 'history': bool}
+
+        parse() で型を付けてから、登録表のハンドラへ渡す (TODO-026)。
+        data のキーが足りなければ parse() で例外になり、受信ループの
+        受け皿 (app.py) が拾う。
         """
         self.__log.info('client={}', self._hub.name(ws))
         self.__log.info('msg={}', msg)
 
-        if msg['type'] == 'back':
-            # data: {n: n}
-            await self._replayer.run(
-                self.backward_hist, msg['data']['n'])
+        try:
+            m = parse(msg)
+        except UnknownMessageType as e:
+            # 登録表に無い type は、警告を出して無視する (TODO-026)。
+            # 履歴にも積まず、gameinfo も送り返さない。接続は保つ
+            self.__log.warning('{}: ignored', e)
             return
 
-        if msg['type'] == 'back2':
-            # data: {}
-            await self._replayer.start(
-                self.backward_hist, 0, sleep_sec=.5)
+        sec = await self._handlers[m.type](m)
+        if sec is None:
+            # ハンドラが自分で送信済み
             return
-
-        if msg['type'] == 'back_all':
-            # data: {}
-            await self._replayer.start(self.backward_hist, 0)
-            return
-
-        if msg['type'] == 'fwd':
-            # data: {n: n}
-            await self._replayer.run(
-                self.forward_hist, msg['data']['n'])
-            return
-
-        if msg['type'] == 'fwd2':
-            # data: {}
-            await self._replayer.start(
-                self.forward_hist, 0, sleep_sec=.5)
-            return
-
-        if msg['type'] == 'fwd_all':
-            # data: {}
-            await self._replayer.start(self.forward_hist, 0)
-            return
-
-        if msg['type'] == 'clear_hist':
-            # data: {}
-            # back と同じく、走っている連続再生を止めてから消す
-            await self._replayer.run(self.clear_history)
-            await self.emit_gameinfo(0)
-            return
-
-        if msg['type'] == 'new':
-            # data: {}
-            self.new_game()
-            await self.emit_gameinfo(3, False)
-            return
-
-        if msg['type'] == 'set_gameinfo':
-            # data: gameinfo
-            self._gameinfo = GameInfo.from_dict(msg['data'])
-            # 盤面ごと入れ替わるので、クロックは止まった状態にする (TODO-016)
-            self._clock.stop_all()
-            self.add_history(self._gameinfo)
-            await self.emit_gameinfo(0)
-            return
-
-        # ここから下は return せず、末尾の add_history と
-        # emit_gameinfo まで落ちる (TODO-015)
-        if msg['type'] == 'put_checker':
-            # data: {'ch': int, 'p': int, 'idx': int}
-            self._gameinfo.put_checker(msg['data']['ch'],
-                                       msg['data']['p'], msg['data']['idx'])
-            if msg['data']['p'] >= 26:
-                self.__log.debug('hit')
-
-        if msg['type'] == 'cube':
-            # data: {'side': int, 'value': int, 'accepted': bool}
-            self._gameinfo.cube(msg['data'])
-
-        if msg['type'] == 'dice':
-            # data: {'player': int, 'dice': [int, int, int, int]
-            self._gameinfo.dice(msg['data'])
-
-        if msg['type'] == 'set_turn':
-            # data: {'turn': int, resign: int}
-            self._gameinfo.set_turn(msg['data'])
-
-        if msg['type'] == 'set_playername':
-            # data: {'player': int, 'name': str}
-            self._gameinfo.set_playername(msg['data'])
-
-        if msg['type'] == 'set_score':
-            # data: {'player': int, 'score': int}
-            self._gameinfo.set_score(msg['data'])
-
-        if msg['type'] == 'resign':
-            # data: {'player': int}
-            self._gameinfo.resign_game(msg['data'])
-
-        if msg['type'] == 'set_clock_limit':
-            # data: {'index': int, 'clock_limit': int}
-            self._clock.set_limit(msg['data']['index'],
-                                  msg['data']['clock_limit'])
-            # 両方のクロックを limit に戻して止める。TODO-015 より前は
-            # ytbg.js の受信側がこうしていた。今はクライアントが
-            # clock_state に従うので、ここが唯一の決め手になる
-            self._clock.reset(0)
-            self._clock.reset(1)
-
-        if msg['type'] == 'set_player_clock':
-            # data: {'player': int, 'clock': [int(sec), int(sec)]}
-            self._clock.set_clock(msg['data']['player'], msg['data']['clock'])
-
-        # ここから 5 つはクロックの動作そのもの (TODO-016)。TODO-012 で
-        # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
-        # 返せるように戻した。TODO-015 で転送をやめたので、すでに開いて
-        # いる画面も、ここで作った状態を clock_state で受け取って合わせる
-        if msg['type'] == 'set_clock_switch':
-            # data: {'switch': bool}
-            self._clock.set_switch(msg['data']['switch'])
-            # ytbg.js の apply_clock_sw() は history: false で送るので、
-            # ここで保存しないと sw が残らない (TODO-024)。
-            # start/stop/resume/reset_clock はターンのたびに走るので
-            # 保存しない (I/O が増えすぎる)
-            self.save_data()
-
-        if msg['type'] == 'start_clock':
-            # data: {'player': int}
-            # ytbg.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
-            self._clock.start(msg['data']['player'])
-
-        if msg['type'] == 'resume_clock':
-            # data: {'player': int}
-            self._clock.resume(msg['data']['player'])
-
-        if msg['type'] == 'stop_clock':
-            # data: {'player': int}
-            self._clock.stop(msg['data']['player'])
-
-        if msg['type'] == 'reset_clock':
-            # data: {'player': int}
-            self._clock.reset(msg['data']['player'])
 
         # append history or not
-        if msg['history']:
+        if m.history:
             self.add_history(self._gameinfo)
 
         # 受け取った msg をそのまま転送するのではなく、gameinfo に
         # 直前の操作を添えて返す (TODO-015)。クライアントは gameinfo で
         # 盤面を作り直し、音と dice の回転だけを last_op から出す。
         # チェッカーが動くときだけアニメーションの時間を渡す
-        sec = self.SEC_CHECKER_MOVE if msg['type'] == 'put_checker' else 0
-        await self.emit_gameinfo(sec, history_flag=False, last_op=msg)
+        await self.emit_gameinfo(sec, history_flag=False, last_op=m.raw)
 ##
