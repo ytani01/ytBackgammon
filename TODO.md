@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-031, TODO-032, TODO-033 の 3 件。** これまでに 30 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-034` から。**
+**残っている項目: TODO-031, TODO-032, TODO-033, TODO-034 の 4 件。** これまでに 30 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-035` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 TODO-032 は TODO-026 が済んだので、いつでも着手できる。
@@ -86,6 +86,56 @@ TODO-024 で `clock_limit` を `gameinfo` から出したあと、reviewer が
 ### design.md と Developer.md の関係
 docs/design.md は、実装前の設計として、実装が終わったら、アーカイブする。
 Developer.mdには、改めて、開発プロジェクトに新規加入した人向けに、実装に合わせて、わかりやすく作り直す。このとき、コードの細かい内容は、コードを読めばわかるので省いて良い。主にモジュール構成、クラス構成、それぞれの関係について、mermaid図を入れて説明する。
+
+---
+
+## TODO-034. basedpyright の型チェックの水準を揃える
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | main + verifier |
+
+- [ ] `pyproject.toml` に `[tool.basedpyright]` を足し、
+      `typeCheckingMode = "standard"` にする
+- [ ] `standard` でも残る 3 件（`emit_gameinfo()` の `sec` に float を
+      渡している）の型注釈を直す
+- [ ] `CLAUDE.md` に basedpyright の水準を書く
+
+### きっかけ
+
+Emacs の eglot が Python のバッファで `reportUnknownMemberType` を出す。
+言語サーバが basedpyright で、その既定の `typeCheckingMode` が
+`recommended` になっているため。本家 pyright の `standard` には無い
+`reportUnknownMemberType` / `reportAny` / `reportMissingParameterType`
+などが全部 ON になる。
+
+`src/` で実測すると error 4 件・warning 504 件。このプロジェクトの
+型チェックは mypy（`check_untyped_defs` のみ）で指摘 0 件なので、
+**mypy の基準と basedpyright の既定がずれているだけ**で、コードが
+壊れているわけではない。
+
+`typeCheckingMode = "standard"` で試すと warning は 0 件になり、
+error が 3 件だけ残る。
+
+```
+server.py:225 / 262 / 551
+  reportArgumentType: 型 "float" の引数を "emit_gameinfo" の
+  "sec: int" に割り当てられない
+```
+
+mypy は int の引数に float を渡すのを許す（数値の特例）ので見逃すが、
+実際に `SEC_CHECKER_MOVE` のような float を渡している。注釈を
+`float` にすれば済む。
+
+### 決めたこと
+
+- **水準は `standard` にする。** `basedpyright` の設定は
+  `pyproject.toml` に書けば eglot（LSP）でも `basedpyright` コマンドでも
+  効く。Emacs 側（`eglot-workspace-configuration`）で全プロジェクト
+  共通にする案もあったが、プロジェクトごとに変えられるほうを採った
+- **basedpyright を検証の手順に足すかどうかは、着手時に決める。**
+  いまは `uv run ruff check .` と `uv run mypy src` だけで、
+  basedpyright は dev の依存に入っていない
 
 ---
 
