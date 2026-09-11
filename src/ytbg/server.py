@@ -22,6 +22,7 @@ from .gameinfo import GameInfo
 from .history import History
 from .hub import ClientHub
 from .message import (
+    NO_HISTORY_TYPES,
     ClockLimitData,
     ClockSwitchData,
     CubeData,
@@ -131,6 +132,11 @@ class BackgammonServer:
         self._clock.reset(1)
 
         self.add_history(self._gameinfo)
+        # 盤面が既に初期配置のときは add_history() が積まないことがあり、
+        # そのときは save_data() が呼ばれない。クロックのリセットを
+        # 取りこぼさないよう、New Game はまれな操作と割り切って
+        # add_history() と二重になっても必ず保存する (TODO-032)
+        self.save_data()
 
     def add_history(self, gameinfo=None):
         # gameinfo のログは History.add() 側で出す (TODO-025)
@@ -457,11 +463,16 @@ class BackgammonServer:
         両方のクロックを limit に戻して止める。TODO-015 より前は
         ytbg.js の受信側がこうしていた。今はクライアントが
         clock_state に従うので、ここが唯一の決め手になる。
+
+        set_clock_limit は history: false で送られる (TODO-032) ので、
+        ここで保存しないと limit が残らない。_on_set_clock_switch() と
+        同じ理由
         """
         data: ClockLimitData = m.data
         self._clock.set_limit(data.index, data.clock_limit)
         self._clock.reset(0)
         self._clock.reset(1)
+        self.save_data()
         return 0
 
     async def _on_set_player_clock(self, m: Message) -> float | None:
@@ -539,8 +550,9 @@ class BackgammonServer:
             # ハンドラが自分で送信済み
             return
 
-        # append history or not
-        if m.history:
+        # append history or not。クロック系は gameinfo を書き換えないので
+        # history: true で届いても積まない (TODO-032)
+        if m.history and m.type not in NO_HISTORY_TYPES:
             self.add_history(self._gameinfo)
 
         # 受け取った msg をそのまま転送するのではなく、gameinfo に

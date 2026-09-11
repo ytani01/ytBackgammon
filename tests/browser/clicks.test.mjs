@@ -303,7 +303,7 @@ describe('クリックでの操作', () => {
            await page.locator('#clock_limit0').fill('3');
            await page.locator('#clock_limit0').blur();
            await assert_sent(page, 'set_clock_limit',
-                             { index: 0, clock_limit: 180 }, true);
+                             { index: 0, clock_limit: 180 }, false);
            await wait_for(
                () => page.evaluate(() => board.clock_limit.limit[0]),
                v => v === 180, { msg: 'clock_limit[0]' });
@@ -315,7 +315,7 @@ describe('クリックでの操作', () => {
            await page.locator('#clock_limit1').fill('15');
            await page.locator('#clock_limit1').blur();
            await assert_sent(page, 'set_clock_limit',
-                             { index: 1, clock_limit: 15 }, true);
+                             { index: 1, clock_limit: 15 }, false);
            await wait_for(
                () => page.evaluate(() => board.clock_limit.limit[1]),
                v => v === 15, { msg: 'clock_limit[1]' });

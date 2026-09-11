@@ -267,10 +267,10 @@ async def test_fallthrough_types_send_gameinfo_with_last_op(
      'new', 'set_gameinfo'],
 )
 async def test_returning_types_do_not_broadcast_original_msg(
-        bg_server, req, emitted, no_sleep, msg_type):
+        bg_server, req, emitted, no_sleep, msg_type, add_history):
     """return する 8 つの type では、元の msg の type は送られない"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
 
     if msg_type in ('fwd', 'fwd2', 'fwd_all'):
         # fwd 系は _fwd_hist に積まれていないと forward_hist() の
@@ -298,10 +298,10 @@ async def test_returning_types_do_not_broadcast_original_msg(
     assert all(m['data']['last_op'] is None for m in emitted.messages)
 
 
-async def test_back_moves_history_by_n(bg_server, req, no_sleep):
+async def test_back_moves_history_by_n(bg_server, req, no_sleep, add_history):
     """back は data.n の数だけ履歴を戻す"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
     hist_len0 = len(bg_server._hist.entries)
     fwd_len0 = len(bg_server._hist.fwd_entries)
 
@@ -312,10 +312,10 @@ async def test_back_moves_history_by_n(bg_server, req, no_sleep):
     assert len(bg_server._hist.fwd_entries) == fwd_len0 + 2
 
 
-async def test_back_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep):
+async def test_back_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep, add_history):
     """back (n > 0) で送られる sec は SEC_CHECKER_MOVE の 0.2 (べた書き)"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
 
     msg = {'type': 'back', 'data': {'n': 1}, 'history': False}
     await bg_server.on_json(req, msg)
@@ -324,10 +324,10 @@ async def test_back_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep
     assert emitted.last['data']['history_flag'] is True
 
 
-async def test_fwd_moves_history_by_n(bg_server, req, no_sleep):
+async def test_fwd_moves_history_by_n(bg_server, req, no_sleep, add_history):
     """fwd は data.n の数だけ履歴を進める"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
     await bg_server.backward_hist(2, sleep_sec=0)
     hist_len0 = len(bg_server._hist.entries)
     fwd_len0 = len(bg_server._hist.fwd_entries)
@@ -339,10 +339,10 @@ async def test_fwd_moves_history_by_n(bg_server, req, no_sleep):
     assert len(bg_server._hist.fwd_entries) == fwd_len0 - 2
 
 
-async def test_fwd_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep):
+async def test_fwd_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep, add_history):
     """fwd (n > 0) で送られる sec は SEC_CHECKER_MOVE の 0.2 (べた書き)"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
     await bg_server.backward_hist(2, sleep_sec=0)
 
     msg = {'type': 'fwd', 'data': {'n': 1}, 'history': False}
@@ -352,10 +352,11 @@ async def test_fwd_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep)
     assert emitted.last['data']['history_flag'] is True
 
 
-async def test_back_all_leaves_one_entry(bg_server, req, emitted, no_sleep):
+async def test_back_all_leaves_one_entry(
+        bg_server, req, emitted, no_sleep, add_history):
     """back_all は履歴の先頭 1 件を残して全部戻り、sec は 0.1 で history_flag は真"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
 
     msg = {'type': 'back_all', 'data': {}, 'history': False}
     await bg_server.on_json(req, msg)
@@ -368,10 +369,10 @@ async def test_back_all_leaves_one_entry(bg_server, req, emitted, no_sleep):
     assert emitted.last['data']['history_flag'] is True
 
 
-async def test_fwd_all_moves_history_to_the_end(bg_server, req, emitted, no_sleep):
+async def test_fwd_all_moves_history_to_the_end(bg_server, req, emitted, no_sleep, add_history):
     """fwd_all は履歴の末尾まで全部進め、sec は 0.1 で history_flag は真"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
     await bg_server.backward_hist(-1, sleep_sec=0)
 
     msg = {'type': 'fwd_all', 'data': {}, 'history': False}
@@ -386,10 +387,11 @@ async def test_fwd_all_moves_history_to_the_end(bg_server, req, emitted, no_slee
     assert emitted.last['data']['history_flag'] is True
 
 
-async def test_back2_behaves_like_back_all(bg_server, req, no_sleep):
+async def test_back2_behaves_like_back_all(
+        bg_server, req, no_sleep, add_history):
     """back2 は back_all と同じ動きになる (違いは sleep_sec だけ)"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
 
     msg = {'type': 'back2', 'data': {}, 'history': False}
     await bg_server.on_json(req, msg)
@@ -400,10 +402,11 @@ async def test_back2_behaves_like_back_all(bg_server, req, no_sleep):
     assert len(bg_server._hist.entries) == 1
 
 
-async def test_fwd2_behaves_like_fwd_all(bg_server, req, no_sleep):
+async def test_fwd2_behaves_like_fwd_all(
+        bg_server, req, no_sleep, add_history):
     """fwd2 は fwd_all と同じ動きになる (違いは sleep_sec だけ)"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
     await bg_server.backward_hist(-1, sleep_sec=0)
 
     msg = {'type': 'fwd2', 'data': {}, 'history': False}
@@ -416,10 +419,11 @@ async def test_fwd2_behaves_like_fwd_all(bg_server, req, no_sleep):
     assert len(bg_server._hist.entries) == 3
 
 
-async def test_clear_hist_leaves_one_entry(bg_server, req, emitted, no_sleep):
+async def test_clear_hist_leaves_one_entry(
+        bg_server, req, emitted, no_sleep, add_history):
     """clear_hist は履歴を 1 件だけにし、hist_i / hist_n を 1 / 1 で返す"""
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
     await bg_server.backward_hist(1, sleep_sec=0)
     emitted.clear()
 
@@ -452,7 +456,7 @@ async def test_clear_hist_keeps_board(bg_server, req):
     assert bg_server._gameinfo.board == before
 
 
-async def test_clear_hist_stops_running_replay(bg_server, req):
+async def test_clear_hist_stops_running_replay(bg_server, req, add_history):
     """
     走っている連続再生を止めてから消す。
 
@@ -461,7 +465,7 @@ async def test_clear_hist_stops_running_replay(bg_server, req):
     clear_hist を割り込ませる。
     """
     for _ in range(20):
-        bg_server.add_history(bg_server._gameinfo)
+        add_history(bg_server)
 
     await bg_server.on_json(
         req, {'type': 'back_all', 'data': {}, 'history': False})
@@ -523,6 +527,43 @@ async def test_new_keeps_score_playername_limit_and_resets_board(
     assert len(emitted.messages) == 1
 
 
+async def test_new_after_back_all_clears_fwd_hist(
+        bg_server, req, add_history, no_sleep):
+    """
+    盤面が既に初期配置のときに New Game を送っても、進む側は必ず
+    捨てる (TODO-032 のレビューで見つかった不具合)。
+
+    new_game() は score / playername / game_num / match_score を残す
+    ので、盤面がすでに初期配置なら New Game 後の gameinfo は直前の
+    エントリと sn 以外すべて同じになり、History.add() は積まない。
+    それでも _fwd_hist は必ず捨てないと、New Game のあとに
+    「進む」を押すと捨てたはずの前のゲームの手が復活してしまう。
+    """
+    bg_server._gameinfo.put_checker(101, 5, 2)
+    add_history(bg_server)
+
+    await bg_server.on_json(
+        req, {'type': 'back_all', 'data': {}, 'history': False})
+    await bg_server._replayer._task
+    assert len(bg_server._hist.fwd_entries) > 0
+
+    await bg_server.on_json(req, {'type': 'new', 'data': {}, 'history': False})
+
+    # 積まれていないこと。ここが 1 件でなくなったら、この筋書きは
+    # 「積まないのに進む側を捨てる」分岐を見ていない
+    assert len(bg_server._hist.entries) == 1
+    assert bg_server._hist.fwd_entries == []
+
+    await bg_server.on_json(
+        req, {'type': 'fwd_all', 'data': {}, 'history': False})
+    if bg_server._replayer._task is not None:
+        await bg_server._replayer._task
+
+    fresh = GameInfo(server_version='test')
+    assert bg_server._hist.fwd_entries == []
+    assert bg_server._gameinfo.board.checker == fresh.board.checker
+
+
 async def test_set_gameinfo_replaces_gameinfo(bg_server, req, emitted):
     """
     set_gameinfo は gameinfo (board 以下を含む) を渡した dict で丸ごと
@@ -576,7 +617,8 @@ async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
     assert data['last_op'] is None
 
 
-async def test_back_moves_hist_i_by_n(bg_server, req, emitted, no_sleep):
+async def test_back_moves_hist_i_by_n(
+        bg_server, req, emitted, no_sleep, add_history):
     """
     hist_i / hist_n をべた書きの絶対値で固定する。
 
@@ -584,8 +626,8 @@ async def test_back_moves_hist_i_by_n(bg_server, req, emitted, no_sleep):
     add_history() を 2 回呼ぶと履歴は 3 件になる。back を 1 回したら
     hist_i は 3 から 2 に減り、hist_n は 3 のまま変わらない。
     """
-    bg_server.add_history(bg_server._gameinfo)
-    bg_server.add_history(bg_server._gameinfo)
+    add_history(bg_server)
+    add_history(bg_server)
 
     await bg_server.emit_gameinfo()
     sent = emitted.last

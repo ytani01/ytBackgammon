@@ -49,19 +49,41 @@ class History:
         """
         gameinfo を履歴に積む。
 
-        進む側は捨て、sn を振り直してから複製を積む。
+        1 つ前のエントリと sn 以外が同じなら積まない (TODO-032)。
+        set_clock_limit のように gameinfo を書き換えない type が
+        history: true で届いても、無駄なエントリが増えないようにする
+        ため。積む・積まないに関わらず、**進む側 (_fwd_hist) は必ず
+        捨てる。** New Game のように、いまの盤面がたまたま直前と同じ
+        エントリになる操作でも、利用者の意図は「進む側を捨てる」こと
+        (TODO-032 のレビューで見つかった不具合)。
+
+        積んだときは sn を振り直してから複製を積む。積まなかった
+        ときは sn を振り直さない。
 
         Returns
         -------
         bool
-            積んだかどうか (gameinfo が None なら False)
+            履歴が変わったかどうか (保存が要るかどうか)。gameinfo が
+            None なら False。積んだとき、または積まなくても
+            _fwd_hist を捨てた (空でなかった) ときは True
         """
         self.__log.debug('gameinfo={}', gameinfo)
 
         if gameinfo is None:
             return False
 
+        fwd_hist_had_entries = len(self._fwd_hist) > 0
         self._fwd_hist = []
+
+        if len(self._history) > 0:
+            prev = self._history[-1].to_dict()
+            cur = gameinfo.to_dict()
+            del prev['sn']
+            del cur['sn']
+            if prev == cur:
+                self.__log.debug('same as previous entry: not added')
+                return fwd_hist_had_entries
+
         if len(self._history) == 0:
             self._cur_sn = 1
         else:

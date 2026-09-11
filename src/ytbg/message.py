@@ -190,6 +190,22 @@ class ClockSwitchData:
         return cls(switch=data['switch'])
 
 
+# history: true で届いても履歴に積まない type (TODO-032)。
+#
+# クロックは gameinfo の外 (clock.py の Clock) にあるので、これらの
+# type は gameinfo を書き換えない。積むと sn 以外すべて 1 つ前と
+# 同じエントリになり、back を押しても盤面が変わらない手が挟まる。
+NO_HISTORY_TYPES: frozenset[str] = frozenset({
+    'set_clock_limit',
+    'set_player_clock',
+    'set_clock_switch',
+    'start_clock',
+    'resume_clock',
+    'stop_clock',
+    'reset_clock',
+})
+
+
 # type → data の dataclass。server.py のハンドラの表と
 # キーの集合が一致すること (TODO-026)
 DATA_TYPES: dict[str, Callable[[dict[str, Any]], Any]] = {

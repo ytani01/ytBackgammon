@@ -120,6 +120,58 @@ async def test_saved_file_is_jsonl(bg_server, req):
     assert 'clock' not in lines[1]['h']['board']
 
 
+async def test_set_clock_limit_is_saved(bg_server, req):
+    """
+    set_clock_limit はファイルに保存される (TODO-032)。
+
+    クロック系は history: true で届いても履歴に積まない
+    (NO_HISTORY_TYPES) ので、add_history() 経由の保存が効かない。
+    _on_set_clock_limit() が自分で save_data() を呼んでいること
+    (_on_set_clock_switch() と同じ理由)
+    """
+    await bg_server.on_json(
+        req, {'type': 'set_clock_limit',
+              'data': {'index': 0, 'clock_limit': 111}, 'history': True})
+
+    lines = read_lines(bg_server._storage.path)
+
+    assert lines[0]['clock']['limit'] == [111, bg_server._clock.limit[1]]
+
+
+async def test_new_game_saves_clock_reset(bg_server, req):
+    """
+    New Game でのクロックのリセットもファイルに保存される (TODO-032)。
+
+    盤面が既に初期配置のときは add_history() が積まないことがあり、
+    そのときも new_game() 自身が保存すること。
+
+    board を変えずに [10.0, 2.0] をファイルへ保存してから New Game を
+    送る。board が初期配置のまま変わらないので、add_history() は
+    積まない (履歴もまだ 1 件だけで進む側も空)。それでも New Game の
+    あとは、ファイルの clock が limit に戻っていること
+    """
+    await bg_server.on_json(
+        req, {'type': 'set_player_clock',
+              'data': {'player': 0, 'clock': [10.0, 2.0]}, 'history': False})
+    await bg_server.on_json(
+        req, {'type': 'set_player_clock',
+              'data': {'player': 1, 'clock': [10.0, 2.0]}, 'history': False})
+    # board を変えずに、いまの clock ([10.0, 2.0]) をファイルへ保存する。
+    # back (n=1) は、戻る先が無くても finally で必ず save_data() を呼ぶ
+    await bg_server.on_json(
+        req, {'type': 'back', 'data': {'n': 1}, 'history': False})
+
+    lines = read_lines(bg_server._storage.path)
+    assert lines[0]['clock']['clock'] == [[10.0, 2.0], [10.0, 2.0]]
+
+    await bg_server.on_json(req, {'type': 'new', 'data': {}, 'history': False})
+
+    lines = read_lines(bg_server._storage.path)
+    limit = bg_server._clock.limit
+
+    assert lines[0]['clock']['clock'] == [limit, limit]
+
+
 async def test_running_clock_is_saved_stopped(
         bg_server, make_bg_server, req):
     """

@@ -485,7 +485,7 @@ export class Board extends BgImage {
         this.player_clock[0].emit_stop();
         this.player_clock[1].emit_stop();
 
-        this.clock_limit.emit_set(index, limit, true);
+        this.clock_limit.emit_set(index, limit);
     } // Board.apply_clock_limit()
 
     /**

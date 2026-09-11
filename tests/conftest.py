@@ -192,6 +192,23 @@ def bg_server(make_bg_server):
 
 
 @pytest.fixture
+def add_history():
+    """
+    bg_server.add_history() の代わりに使うヘルパー (TODO-032)。
+
+    History.add() は、直前のエントリと sn 以外が同じなら積まなく
+    なった。テストで「同じ盤面のまま繰り返し積む」のはもうできない
+    ので、呼ぶたびに game_num を 1 増やしてから add_history() を呼ぶ。
+    game_num は履歴の件数を増やすためだけの目印で、中身は他のテストの
+    判定に使っていない。
+    """
+    def fn(bg_server):
+        bg_server._gameinfo.game_num += 1
+        bg_server.add_history(bg_server._gameinfo)
+    return fn
+
+
+@pytest.fixture
 def bg_server_raw(tmp_path, monkeypatch):
     """
     broadcast() を差し替えていない BackgammonServer。

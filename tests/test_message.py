@@ -21,6 +21,7 @@ import pytest
 
 from ytbg.message import (
     DATA_TYPES,
+    NO_HISTORY_TYPES,
     ClockLimitData,
     ClockSwitchData,
     CubeData,
@@ -195,3 +196,13 @@ def test_tables_have_same_keys(bg_server):
     片方にだけ type を足すと、ここで落ちる。
     """
     assert set(DATA_TYPES) == set(bg_server._handlers)
+
+
+def test_no_history_types_are_known_types():
+    """
+    NO_HISTORY_TYPES は DATA_TYPES の部分集合であること (TODO-032)。
+
+    知らない type を挙げても on_json() の分岐 (_handlers) に届く前の
+    parse() で弾かれるので、ここで確かめておく。
+    """
+    assert set(DATA_TYPES) >= NO_HISTORY_TYPES

@@ -287,6 +287,10 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
     """
     await clock_on(bg_server, req)
     await send(bg_server, req, 'start_clock', 0)
+    # クロックの操作は gameinfo を書き換えないので、直前と同じなら
+    # 積まれない (TODO-032)。積んだ実物を確かめるため、1 手ぶん変えてから
+    # 積む
+    bg_server._gameinfo.game_num += 1
     bg_server.add_history(bg_server._gameinfo)
 
     ent = bg_server._hist.entries[-1].to_dict()
@@ -294,6 +298,69 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
     assert 'clock_sw' not in ent
     assert 'clock_active' not in ent
     assert 'clock' not in ent['board']
+
+
+@pytest.mark.parametrize(
+    'msg_type, data',
+    [
+        ('set_clock_limit', {'index': 0, 'clock_limit': 300}),
+        ('set_player_clock', {'player': 0, 'clock': [100.0, 5.0]}),
+        ('set_clock_switch', {'switch': True}),
+        ('start_clock', {'player': 0}),
+        ('resume_clock', {'player': 0}),
+        ('stop_clock', {'player': 0}),
+        ('reset_clock', {'player': 0}),
+    ],
+)
+async def test_clock_types_do_not_append_history(
+        fake_time, bg_server, req, msg_type, data):
+    """
+    クロック系の 7 つの type は、history: true で届いても積まない
+    (TODO-032)。
+
+    gameinfo を書き換えないので、積むと sn 以外すべて 1 つ前と
+    同じエントリになってしまう。
+    """
+    hist_len0 = len(bg_server._hist.entries)
+
+    await bg_server.on_json(
+        req, {'type': msg_type, 'data': data, 'history': True})
+
+    assert len(bg_server._hist.entries) == hist_len0
+
+
+@pytest.mark.parametrize(
+    'msg_type, data',
+    [
+        ('set_clock_limit', {'index': 0, 'clock_limit': 300}),
+        ('set_player_clock', {'player': 0, 'clock': [100.0, 5.0]}),
+        ('set_clock_switch', {'switch': True}),
+        ('start_clock', {'player': 0}),
+        ('resume_clock', {'player': 0}),
+        ('stop_clock', {'player': 0}),
+        ('reset_clock', {'player': 0}),
+    ],
+)
+async def test_clock_types_skip_add_history_call(
+        fake_time, bg_server, req, monkeypatch, msg_type, data):
+    """
+    on_json() が NO_HISTORY_TYPES を見て、add_history() 自体を
+    呼ばないこと (TODO-032)。
+
+    History.add() 自身も同じ盤面なら積まないので (前のテスト)、
+    ここでは add_history() を呼んだかどうかを直接見る。
+    """
+    called = []
+
+    def fake_add_history(gameinfo=None):
+        called.append(gameinfo)
+
+    monkeypatch.setattr(bg_server, 'add_history', fake_add_history)
+
+    await bg_server.on_json(
+        req, {'type': msg_type, 'data': data, 'history': True})
+
+    assert called == []
 
 
 # ---------------------------------------------------------------------

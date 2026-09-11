@@ -299,6 +299,11 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
 `{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
 `history: true` を付けたメッセージだけが履歴に 1 手として積まれる。
+ただし、クロック系の 7 つの type（`set_clock_limit` / `set_player_clock` /
+`set_clock_switch` / `start_clock` / `resume_clock` / `stop_clock` /
+`reset_clock`）は `gameinfo` を書き換えないので、`history: true` で届いても
+積まない（`message.py` の `NO_HISTORY_TYPES`）。1 つ前のエントリと `sn` 以外が
+同じ場合も積まない（TODO-032）。
 
 **`type` を書くのはクライアント → サーバの向きだけ**で、分岐はサーバの
 `on_json()` にしかない（TODO-015）。サーバが返すのは `gameinfo` 1 本で、
@@ -412,6 +417,12 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 で、履歴のエントリをそのまま入れるだけ。**クロックは `gameinfo` の外に
 あるので、戻しても動いているクロックは巻き戻らない**（TODO-024。
 TODO-016 では「残り時間だけは引き継ぐ」という例外で塞いでいた）。
+
+`History.add()` は、直前のエントリと `sn` 以外が同じなら積まないが、
+**積まなかったときも `_fwd_hist` は必ず捨てる**（TODO-032）。New Game の
+ように、いまの盤面がたまたま直前のエントリと同じになる操作でも、
+利用者の意図は「進む側を捨てる」ことなので、盤面が変わったかどうかとは
+別に扱う。
 
 連続再生（`back2` / `back_all` / `fwd2` / `fwd_all`）は Task で走り、
 `await asyncio.sleep()` を挟みながら 1 手ずつ送る。**再生中に別の再生要求が

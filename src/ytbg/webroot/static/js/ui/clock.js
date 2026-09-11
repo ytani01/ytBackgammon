@@ -37,14 +37,17 @@ export class ClockLimit extends BgText {
     } // ClockLimit.set()
 
     /**
+     * サーバは set_clock_limit を履歴に積まない (TODO-032)。
+     * clock_limit は gameinfo の外にあり、history: true で送っても
+     * 積まれるエントリが sn 以外すべて同じになるだけなので、常に false
+     *
      * @param {number} index
      * @param {number} limit - sec
-     * @param {boolean} [add_hist=true]
      */
-    emit_set(index, limit, add_hist=true) {
+    emit_set(index, limit) {
         emit_msg("set_clock_limit",
                  { index: index, clock_limit: limit },
-                 add_hist);
+                 false);
     } // ClockLimit.emit_set()
 } // class ClockLimit
 

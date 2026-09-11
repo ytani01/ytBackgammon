@@ -21,8 +21,14 @@ FWD_ALL = {'type': 'fwd_all', 'data': {}, 'history': False}
 
 
 def make_history(bg_server, n):
-    """履歴を n 件増やす"""
+    """
+    履歴を n 件増やす。
+
+    直前と同じ盤面は積まなくなったので (TODO-032)、呼ぶたびに
+    game_num を 1 増やしてから積む
+    """
     for _ in range(n):
+        bg_server._gameinfo.game_num += 1
         bg_server.add_history(bg_server._gameinfo)
 
 
