@@ -28,6 +28,7 @@ dev = [
     # WebSocket 経路のテスト (Starlette の TestClient) が使う
     # (TODO-025)。httpx ではなく httpx2 なのは、この版の starlette が
     # httpx を非推奨にしていて、入れると警告が出るため
+    "basedpyright>=1.40.1",
     "httpx2>=2.12.0",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
@@ -84,3 +85,10 @@ check_untyped_defs = true
 module = "click"
 ignore_missing_imports = true
 follow_untyped_imports = true
+
+[tool.basedpyright]
+# 既定の recommended は mypy よりずっと厳しく、reportUnknownMemberType や
+# reportAny が src/ だけで 500 件以上出る（TODO-034）。mypy と同じ水準に
+# 揃える。この設定は eglot（basedpyright-langserver）にも効く
+typeCheckingMode = "standard"
+

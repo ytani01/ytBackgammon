@@ -35,6 +35,7 @@ uv run ytbg --help                     # ytbg.sh は uv run ytbg を呼ぶだけ
 uv run pytest              # Python のテスト
 uv run ruff check .
 uv run mypy src
+uv run basedpyright        # Emacs の eglot と同じ型チェック（TODO-034）
 
 node --test tests/js/      # JS のルール層のテスト（npm は要らない）
 
@@ -158,6 +159,16 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 
 `uv run ruff check .` と `uv run mypy src` の指摘は 0 件（TODO-011、TODO-009）。
 `mypy src` は `tests/` を見ていない。
+
+型チェックは basedpyright でも見る（TODO-034）。Emacs の eglot が使う
+言語サーバと同じものなので、**エディタに出る指摘と `uv run basedpyright` の
+出力が揃う**。水準は `pyproject.toml` の `[tool.basedpyright]` で
+`standard` にしてある（既定の `recommended` は mypy よりずっと厳しく、
+`reportUnknownMemberType` や `reportAny` が `src/` だけで 500 件以上出る）。
+引数なしで走らせると `tests/` も見て、指摘は 0 件。
+
+`sec` のように float を渡す引数に `int` と書くと、**mypy は通すが
+basedpyright は落ちる**（mypy には int の引数へ float を渡せる特例がある）。
 
 ## 構成
 

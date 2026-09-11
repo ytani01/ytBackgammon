@@ -165,14 +165,15 @@ class BackgammonServer:
         """
         self._gameinfo = hist_ent.copy()
 
-    async def emit_gameinfo(self, sec=0, history_flag=False, last_op=None):
+    async def emit_gameinfo(
+            self, sec: float = 0, history_flag=False, last_op=None):
         """
         send game information to all clients
 
         Parameters
         ----------
-        sec: int
-            for animation
+        sec: float
+            for animation。SEC_CHECKER_MOVE は float なので int にしない
         last_op: dict | None
             直前の操作 (クライアントから届いた msg そのまま) (TODO-015)。
             盤面は gameinfo だけで復元できるが、音と dice の回転は
