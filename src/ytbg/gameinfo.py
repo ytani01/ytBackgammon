@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 gameinfo.py
@@ -13,8 +13,6 @@ frozen にはしない。
 クロックは履歴の対象外なので、clock.py の Clock が持つ
 (TODO-016、TODO-024)。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 import copy
 from dataclasses import asdict, dataclass, field

@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 app.py
@@ -11,8 +11,6 @@ create_app() が BackgammonServer を作り、ルートはそれを閉じ込め�
 テストから触れるように、作った BackgammonServer は app.state.svr に
 入れてある。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 import json
 

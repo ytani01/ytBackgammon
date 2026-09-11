@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 test_ws.py

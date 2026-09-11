@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 hub.py
@@ -10,8 +10,6 @@ hub.py
 ここへ移した。BackgammonServer には素通しのメソッドを残さないので、
 全員へ送るのは ClientHub.broadcast() だけになる。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 import asyncio
 

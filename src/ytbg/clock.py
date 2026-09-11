@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 clock.py
@@ -15,8 +15,6 @@ freeze() でそこまでの分を clock へ書き戻し、時刻を打ち直す�
 計算は ui/clock.js の PlayerClock.update() と同じで、持ち時間は
 マイナスも許す。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 import time
 from typing import Any, ClassVar

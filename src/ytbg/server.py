@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 server.py
@@ -12,8 +12,6 @@ History、連続再生の Task は Replayer、保存は Storage が持つ。
 
 HTTP の応答 (index.html) はここには無い。app.py の担当。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2020/05'
 
 import asyncio
 import os

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 __main__.py
@@ -8,8 +8,6 @@ __main__.py
 エントリポイント (click の main() だけ)。
 ルーティングと WebSocket の受信ループは app.py の create_app()。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__   = '2020/05'
 
 import click
 import uvicorn

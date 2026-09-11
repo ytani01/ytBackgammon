@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 storage.py
@@ -21,8 +21,6 @@ h が _history、f が _fwd_hist で、**書かれた順がスタックの順**�
 **旧ファイルは消さない。書き戻しは常に .jsonl。**
 消すのは別項目 (TODO-031)。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 import json
 from pathlib import Path

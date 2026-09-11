@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 replay.py
@@ -11,8 +11,6 @@ replay.py
 待つと、待っている間に別の要求が新しい Task を作り、_task から
 辿れない再生が残る (逆方向の 2 本が打ち消し合って止まらなくなる)。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 import asyncio
 

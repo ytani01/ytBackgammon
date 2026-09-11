@@ -1,5 +1,5 @@
 #
-# (c) 2026 Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """mylog.py
 

@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 message.py
@@ -14,8 +14,6 @@ dataclass に組み立てる。**キーが足りなければここで例外に�
 `type` → ハンドラの表と、**キーの集合が一致していること**
 (tests/test_message.py が見ている)。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 from collections.abc import Callable
 from dataclasses import dataclass

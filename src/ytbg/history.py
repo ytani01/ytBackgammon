@@ -1,5 +1,5 @@
 #
-# (c) Yoichi Tanibayashi
+# (c) 2020 Yoichi Tanibayashi
 #
 """
 history.py
@@ -13,8 +13,6 @@ history.py
 保存するのは BackgammonServer。1 手ごとに全員へ送る backward_hist() /
 forward_hist() も、履歴だけでは閉じないので BackgammonServer に残す。
 """
-__author__ = 'Yoichi Tanibayashi'
-__date__ = '2026/09'
 
 from .gameinfo import GameInfo
 from .mylog import getLogger
