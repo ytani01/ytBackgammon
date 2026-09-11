@@ -330,6 +330,54 @@ describe('クリックでの操作', () => {
                           { player: 0, name: 'Alice' }, true);
     });
 
+    // 名前の <input> は focusout と change の両方から emit_playername() を
+    // 呼んでいる。上の fill() → blur() はどちらか片方でも通ってしまうので、
+    // 片方ずつしか通らない操作で 2 本に分けて見る (TODO-029)。
+    //
+    // プレーヤー 1 の名前は settle() の目印なので、ここでは触らない
+
+    it('名前の入力: 打たずにフォーカスを外す → set_playername を送る'
+       + ' (focusout)',
+       async () => {
+           // 値を決めておく。ここまでの送信は捨てる
+           await page.locator('#p0name-input').fill('Bob');
+           await page.locator('#p0name-input').blur();
+           await settle(page);
+           await take_sent(page);
+
+           // 打たないので change は起きない。focusout だけが残る
+           await page.locator('#p0name-input').focus();
+           await page.locator('#p0name-input').blur();
+
+           await assert_sent(page, 'set_playername',
+                             { player: 0, name: 'Bob' }, true);
+       });
+
+    it('名前の入力: 打って Enter → フォーカスを外す前に set_playername を'
+       + '送る (change)',
+       async () => {
+           await settle(page);
+           await take_sent(page);
+
+           // Enter を押すだけ。フォーカスは外さないので focusout は起きない
+           await page.locator('#p0name-input').focus();
+           await page.keyboard.press('Control+a');
+           await page.keyboard.type('Carol');
+           await page.keyboard.press('Enter');
+
+           assert.equal(
+               await page.evaluate(
+                   () => document.activeElement && document.activeElement.id),
+               'p0name-input', 'フォーカスが外れている');
+
+           await assert_sent(page, 'set_playername',
+                             { player: 0, name: 'Carol' }, true);
+
+           // 次の項目のためにフォーカスを戻しておく
+           await page.locator('#p0name-input').blur();
+           await settle(page);
+       });
+
     // --- 盤面のボタン ---
 
     it('盤面の戻すボタン → back {n: 1} を送る', async () => {

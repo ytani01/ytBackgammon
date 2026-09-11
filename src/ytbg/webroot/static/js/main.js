@@ -2,7 +2,13 @@ import { log } from "./log.js";
 import { emit_msg, ws_connect } from "./ws.js";
 import { QueryStringBase } from "./settings.js";
 import { set_global_sound_switch } from "./sound.js";
+import { build_dom, wait_images } from "./dom.js";
 import { Board } from "./board.js";
+
+// 盤面の要素を作る (TODO-029)。
+// ES Modules は defer と同じ扱いなので、この時点で <body> はできている。
+// ここで作った <img> の読み込みは window.onload の中で待つ。
+build_dom();
 
 // メニュー (ハンバーガー) のチェックボックス。項目を押したら閉じる
 const nav = document.getElementById("nav-input");
@@ -220,8 +226,12 @@ document.body.onkeydown = e => {
  *
  * ES Modules は defer と同じ扱いなので、この時点で DOM はできている。
  */
-window.onload = () => {
+window.onload = async () => {
     log(`window.onload()>start`);
+
+    // BgImage は <img> の width / height を読んで大きさを決めるので、
+    // 読み込みが終わる前に Board を組むと配置が崩れる (TODO-029)
+    await wait_images();
 
     // sound switch
     const q_str = new QueryStringBase();
@@ -263,26 +273,42 @@ window.onload = () => {
 }; // window.onload
 
 //
-// index.html の onClick / onChange 属性から呼ばれる関数を window に載せる。
-// ES Modules はスコープが閉じるので、この橋渡しが無いとヘッダのボタンと
-// メニューの項目が効かなくなる。
+// index.html に書いていた onClick / onChange / onFocusOut 属性の
+// 付け替え先 (TODO-029)。ES Modules はスコープが閉じるので、
+// HTML の属性からはこれらの関数が見えない。
 //
-// TODO-029 で addEventListener に移したら、この橋渡しごと消す。
+// メニューの <a href="#"> は preventDefault() しない
+// (押すと URL に "#" が付く。属性で呼んでいたときと同じ)。
 //
-Object.assign(window, {
-    apply_clock_limit,
-    apply_clock_sw,
-    apply_disp_pip,
-    apply_free_move,
-    apply_sound_switch,
-    back2,
-    back_all,
-    backward_hist,
-    board_inverse,
-    clear_hist,
-    emit_playername,
-    forward_hist,
-    fwd2,
-    fwd_all,
-    new_game,
-});
+for (const [id, handler] of [
+    ["menu-inverse", board_inverse],
+    ["menu-back", () => backward_hist()],
+    ["menu-back2", back2],
+    ["menu-back-all", back_all],
+    ["menu-fwd", () => forward_hist()],
+    ["menu-fwd2", fwd2],
+    ["menu-fwd-all", fwd_all],
+    ["menu-clear-hist", clear_hist],
+    ["menu-new-game", new_game],
+]) {
+    document.getElementById(id).addEventListener("click", handler);
+} // for(id, handler)
+
+for (const [id, handler] of [
+    ["sound-switch", apply_sound_switch],
+    ["free-move", apply_free_move],
+    ["disp-pip", apply_disp_pip],
+    ["clock_sw", () => apply_clock_sw()],
+    ["clock_limit0", () => apply_clock_limit(0)],
+    ["clock_limit1", () => apply_clock_limit(1)],
+]) {
+    document.getElementById(id).addEventListener("change", handler);
+} // for(id, handler)
+
+// 名前の <input> は focusout と change の両方から送る (元の属性と同じ)
+for (let player=0; player < 2; player++) {
+    const el = document.getElementById(`p${player}name-input`);
+    for (const ev of ["focusout", "change"]) {
+        el.addEventListener(ev, () => emit_playername(player));
+    } // for(ev)
+} // for(player)

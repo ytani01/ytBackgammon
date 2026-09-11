@@ -192,15 +192,33 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   `~/ytbg-{server_id}.jsonl` への保存・読み込みと、旧形式の変換
 - `src/ytbg/webroot/static/js/` — クライアント。ES Modules で、バンドラは
   使わない（TODO-028）。クラス階層図は `ui/base.js` の先頭にある
-  - `main.js` — エントリ。`Board` を作り、WebSocket をつなぐ。
-    `index.html` の `onClick` / `onChange` 属性から呼ぶ関数を `window` に
-    載せている（TODO-029 で消す）。`window.board` はデバッグ用。
+  - `main.js` — エントリ。`build_dom()` で要素を作り、`Board` を作り、
+    WebSocket をつなぐ。ヘッダとメニューの操作は、末尾でまとめて
+    `addEventListener` でつなぐ（TODO-029。`window` への橋渡しはもう無い）。
+    `window.board` はデバッグ用に残してある。
     **モジュールの中で素の `board` を書かないこと**（`this.board` か、
     受け取った `board` を使う）。`index.html` に `<div id="board">` が
     あり、id を持つ要素は `window` の名前付きプロパティになるので、
     `window.board` が無くても ReferenceError にならず、黙って DIV を掴む
+  - `dom.js` — 盤面の要素を作る（TODO-029）。チェッカー 30 個・ダイス 8 個
+    などの `<div>` と、名前の `<input>` 2 つ、`#buttons`。
+    **`BgImage` は `<img>` の幅・高さを読んで大きさを決めるので、
+    読み込み前に `Board` を組むと幅が 0 になって配置が崩れる。**
+    これを防いでいるのは次の 2 つで、**効いているのは前者**。
+    - `build_dom()` をモジュールの評価時（`load` より前）に呼ぶこと。
+      そこで作った `<img>` は `load` イベントを遅らせる対象になるので、
+      `window.onload` に入った時点で読み込みが済んでいる
+    - `main.js` の `wait_images()`。**上の順序が保たれている限り
+      常に即 resolve する**（画像の応答を 1.5 秒遅らせても、
+      `window.onload` 時点で未読み込みは 0 枚だった。TODO-029 で実測）。
+      `build_dom()` を `window.onload` の中へ移すと前者の保護が消えるので、
+      備えとして残してある
+    **どちらもテストでは守られない。** `wait_images()` を外しても
+    `tests/browser/` は 32 件とも通る（no-op なので当然）。
+    この順序を変えるときは、画像の応答を遅らせて配置を実測すること
   - `ws.js`（接続・再接続・送信）、`log.js`、`layout.js`（盤面の座標）、
-    `settings.js`（Cookie / QueryString）、`sound.js`
+    `settings.js`（Cookie / QueryString と、`<body>` の `data-*` から読む
+    `get_image_dir()` / `get_server_id()`）、`sound.js`
   - `board.js` — `Board`
   - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
     ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
@@ -208,7 +226,9 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     options で渡す
 - `src/ytbg/webroot/templates/index.html` — ボード 1 面。
   `<script type="module" src="/static/js/main.js">` の 1 行で読み込む。
-  画像パスに `{{image_dir}}` が埋め込まれる。
+  **中身は `<header>` と空の `<div id="board">` だけ**で、盤面の要素は
+  `dom.js` が作る（TODO-029）。画像ディレクトリとサーバ ID は
+  `<body data-image-dir="..." data-server-id="...">` で渡す。
   **キャッシュ避けはサーバ側**で、`/static` は `Cache-Control: no-cache` で
   返す（`app.py` の `NoCacheStaticFiles`。TODO-028）。以前の `?ts=` 付き URL は、
   `import` した先のモジュールには効かないのでやめた

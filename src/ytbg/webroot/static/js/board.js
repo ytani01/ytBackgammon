@@ -1,7 +1,7 @@
 import { log } from "./log.js";
 import { emit_msg } from "./ws.js";
 import { BX, BY } from "./layout.js";
-import { CookieBase, QueryStringBase } from "./settings.js";
+import { CookieBase, QueryStringBase, get_server_id } from "./settings.js";
 import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
          SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
@@ -64,7 +64,7 @@ export class Board extends BgImage {
         this.resign = -1;
 
         // server ID
-        this.svr_id = document.getElementById("server-id").innerHTML;
+        this.svr_id = get_server_id();
         log(`Board> svr_id=${this.svr_id}`);
 
         // Cookie

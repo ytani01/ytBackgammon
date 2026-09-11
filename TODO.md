@@ -1,9 +1,9 @@
 # TODO
 
-**残っている項目: TODO-027、029〜032 の 5 件。** これまでに 27 件を決着させた。
+**残っている項目: TODO-027、030〜032 の 4 件。** これまでに 28 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-033` から。**
 
-**着手順は `029 → 027 → 030`。**
+**着手順は `027 → 030`。**
 TODO-032 は TODO-026 が済んだので、いつでも着手できる。
 TODO-031 は、手元のボードが新しい保存形式に移るのを待つので最後。
 未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
@@ -51,33 +51,6 @@ ES Modules の `rules/` を import できず、先に切り出すと同じ判定
   `src/` を壊して落ちること
 - **reviewer** — **判定の中身を移す。** 表示の副作用を外すときに
   判定そのものの意味を変えていないか
-
----
-
-## TODO-029. DOM 生成を JS へ移し、onClick 属性をやめる
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `index.html` に残すのは header と `<div id="board">` だけにする
-- [ ] `dom.js` が要素を作る（今はチェッカー 30 個 + ダイス 8 個の `<div>` が
-      ベタ書きで、JS が `getElementById("p000")` で拾っている）
-- [ ] `<body data-image-dir="..." data-server-id="...">` で値を渡し、
-      `BgImage.get_image_dir()`（`src` の文字列から逆算）を消す
-- [ ] `onClick` / `onChange` 属性を全部 `addEventListener` にする
-
-### きっかけ
-
-**ES Modules ではスコープが閉じてグローバル関数が見えなくなるので、
-`onClick="new_game();"` は動かなくなる。** TODO-028 のあとに続けて要る。
-
-### 分担
-
-- **implementer** — DOM 生成とイベント登録の移し替え
-- **verifier** — `tests/browser/` で全ボタンとチェックボックスが
-  効くことを確かめる（`onClick` の付け替え漏れはテストでしか見つからない）
-- **reviewer** — イベント登録の付け替えで、対象の要素や引数が変わっていないか
 
 ---
 
@@ -179,6 +152,7 @@ TODO-024 で `clock_limit` を `gameinfo` から出したあと、reviewer が
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-029.** DOM 生成を JS へ移し、onClick 属性をやめる](archives/todo/TODO-029.%20DOM%20生成を%20JS%20へ移し、onClick%20属性をやめる.md)
 - [**TODO-028.** JS を ES Modules に分割し、継承階層を組み直す](archives/todo/TODO-028.%20JS%20を%20ES%20Modules%20に分割し、継承階層を組み直す.md)
 - [**TODO-026.** メッセージを型付けし、on_json をディスパッチ表にする](archives/todo/TODO-026.%20メッセージを型付けし、on_json%20をディスパッチ表にする.md)
 - [**TODO-025.** サーバを分割する（hub / history / storage / replay / app）](archives/todo/TODO-025.%20サーバを分割する（hub%20_%20history%20_%20storage%20_%20replay%20_%20app）.md)

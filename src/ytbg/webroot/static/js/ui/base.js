@@ -1,4 +1,4 @@
-import { log } from "../log.js";
+import { get_image_dir } from "../settings.js";
 
 /**
  *=====================================================
@@ -424,11 +424,12 @@ export class BgImage extends BgBase {
         super(id, x, y, deg, opts);
         const {w=undefined, h=undefined} = opts;
 
-        this.image_parent_dir = "/static";
         this.image_suffix = ".png";
 
         this.image_el = this.el.children[0];
-        this.image_dir = this.get_image_dir();
+        // 画像ディレクトリは <body data-image-dir="..."> から読む
+        // (src の文字列から逆算しない。TODO-029)
+        this.image_dir = get_image_dir();
 
         if ( w === undefined ) {
             this.w = this.image_el.width;
@@ -448,25 +449,6 @@ export class BgImage extends BgBase {
 
         this.e = undefined; // MouseEvent
     } // BgImage.constructor()
-
-    /**
-     * 
-     */
-    get_image_dir() {
-        const image_src = this.image_el.src;
-        log(`image_src=${image_src}`);
-        const index1 = image_src.indexOf(this.image_parent_dir);
-        log(`index1=${index1}`);
-        const index2 = image_src.indexOf("/", index1+1);
-        log(`index2=${index2}`);
-        const index3 = image_src.indexOf("/", index2+1);
-        log(`index3=${index3}`);
-
-        const image_dir = image_src.slice(index1, index3+1);
-        log(`image_dir=${image_dir}`);
-
-        return image_dir;
-    } // BgImage.get_image_dir()
 
     /**
      * @param {number} w

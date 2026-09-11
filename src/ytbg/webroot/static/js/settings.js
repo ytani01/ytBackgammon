@@ -103,3 +103,26 @@ export class CookieBase {
         return decodeURIComponent(this.data[key]);
     } // CookieBase.get()
 } // class CookieBase
+
+/**
+ * 画像ディレクトリ (TODO-029)。
+ *
+ * index.html の <body data-image-dir="..."> から読む。
+ * ここが唯一の読み口で、<img> の src から逆算しない。
+ *
+ * @return {string} - 例: "/static/images1a/"
+ */
+export function get_image_dir() {
+    return `/static/${document.body.dataset.imageDir}/`;
+} // get_image_dir()
+
+/**
+ * サーバ ID (TODO-029)。
+ *
+ * index.html の <body data-server-id="..."> から読む。
+ *
+ * @return {string}
+ */
+export function get_server_id() {
+    return document.body.dataset.serverId;
+} // get_server_id()

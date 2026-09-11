@@ -91,11 +91,16 @@ def test_index_routes(client):
 
 
 def test_index_has_image_dir(client):
-    """create_app() に渡した画像ディレクトリが埋め込まれる"""
+    """create_app() に渡した画像ディレクトリが埋め込まれる
+
+    要素は js/dom.js が作るようになったので (TODO-029)、index.html に
+    出てくるのは <body> の data-image-dir と背景画像だけ。
+    """
     res = client.get('/')
 
     assert res.status_code == 200
-    assert '/static/images1a/board-base.png' in res.text
+    assert 'data-image-dir="images1a"' in res.text
+    assert '/static/images1a/bg.png' in res.text
 
 
 def test_static_files(client):
