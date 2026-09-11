@@ -142,6 +142,28 @@ function header_box(page) {
 }
 
 /**
+ * ある要素のまわりを切り取る範囲。近づけて見せたいときに使う。
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} sel
+ * @param {number} margin - 要素の外側に足す余白
+ */
+function around(page, sel, margin) {
+    return page.evaluate(({ sel, margin }) => {
+        const r = document.querySelector(sel).getBoundingClientRect();
+        const x = Math.max(0, Math.floor(r.x) - margin);
+        const y = Math.max(0, Math.floor(r.y) - margin);
+        return {
+            x, y,
+            width: Math.min(Math.ceil(r.width) + margin * 2,
+                            window.innerWidth - x),
+            height: Math.min(Math.ceil(r.height) + margin * 2,
+                             window.innerHeight - y),
+        };
+    }, { sel, margin });
+}
+
+/**
  * ヘッダ・盤面・ボタンが収まる範囲。余白を切り落とすために使う。
  *
  * @param {import('playwright').Page} page
@@ -228,7 +250,12 @@ async function main() {
         });
         await shot(page, 'move', { clip: content });
 
-        // 5. オープニングロール (両方が 1 個ずつ振ったところ)
+        // 5. ダイスカップ (押すと振れる。振ると消えるので、振る前に撮る)
+        await clear_marks(page);
+        await shot(page, 'dicecup',
+                   { clip: await around(page, '#rollbutton0', 40) });
+
+        // 6. オープニングロール (両方が 1 個ずつ振ったところ)
         //
         // 振ったあとはダイスカップが消え、ダイスも動くので、
         // バッジは重ねない (位置がずれた所に付いてしまう)

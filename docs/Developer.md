@@ -41,8 +41,8 @@ graph LR
 
 パッケージ名は `ytbg`。`templates/` と `static/` は `src/ytbg/webroot/` の下にある。
 
-| モジュール | 持っているもの |
-|------------|----------------|
+| モジュール | 含むもの |
+|------------|----------|
 | `__init__.py` | パッケージの定数。`webroot/` の絶対パスもここ |
 | `__main__.py` | エントリポイント。click の `main()` だけ |
 | `app.py` | `create_app()`。ルーティングと WebSocket の受信ループ |
