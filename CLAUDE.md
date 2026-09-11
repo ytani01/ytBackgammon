@@ -77,8 +77,10 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 - ポートは固定せず、空いているものを OS に選ばせる。サーバは
   `detached` で起動してプロセスグループごと kill する（`uv run` の下に
   python がぶら下がるため）。`pkill` は使わない
-- 初回ロードで `/favicon.ico` が 404 になる。favicon を用意しておらず、
-  ルートも無い。コンソールエラーの判定からは除いてある
+- コンソールエラーの判定では、サーバ以外から取るもの（font awesome の
+  CDN）だけを除いている。`/static/favicon.png` を置いて
+  `index.html` に `<link rel="icon">` を書いたので、`/favicon.ico` の
+  404 は出ない（TODO-022）
 - **ここでも、通ることだけを見ない。** `src/` をわざと壊して、狙った
   テストが落ちることを確かめる（TODO-021 で 4 通り試した）
 

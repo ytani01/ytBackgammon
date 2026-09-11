@@ -190,10 +190,6 @@ export async function open_board(browser, url) {
  *
  * 除くもの:
  *
- * - `/favicon.ico` の 404。favicon を用意しておらず、Starlette 側にも
- *   ルートが無い。初回ロードのときだけブラウザが取りに行くので、
- *   1 回目だけエラーが出る。既存の不具合で、この項目では直していない
- *   (TODO-021)
  * - サーバ以外から取るもの。index.html が font awesome を CDN から
  *   読んでおり、ネットワークが無いところでは必ず失敗する。
  *   このテストが見たいのはクライアントの JS なので対象外にする。
@@ -208,9 +204,6 @@ export function console_errors(page, url) {
     const origin = new URL(url).origin;
 
     return page.ytbg_errors.filter(e => {
-        if (e.url.endsWith('/favicon.ico')) {
-            return false;
-        }
         if (!e.url.startsWith(origin)) {
             return false;
         }
