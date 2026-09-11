@@ -207,16 +207,18 @@ async function main() {
         const content = await content_box(page);
 
         // 1. 全体
+        //
+        // ヘッダの中身は次の shot で番号を振るので、ここでは「ヘッダ」と
+        // ひとまとめに 1 つだけ指す (同じものに 2 通りの番号が付くと、
+        // 説明が重複して読みにくい)
         await add_marks(page, {
             badges: [
-                { sel: '#nav-open', n: 1, dy: 40 },
-                { sel: '#free-move', n: 2, dy: 34 },
-                { sel: '#clock_sw', n: 3, dy: 34 },
-                { sel: '#rollbutton0', n: 4 },
-                { sel: '#cube', n: 5, dx: -44 },
-                { sel: '#p0pip', n: 6, dx: -44 },
-                { sel: '#p0score', n: 7, dx: 44 },
-                { sel: '#button-resign', n: 8, dx: -52 },
+                { sel: 'header', n: 1, dx: 470 },
+                { sel: '#rollbutton0', n: 2 },
+                { sel: '#cube', n: 3, dx: -44 },
+                { sel: '#p0pip', n: 4, dx: -44 },
+                { sel: '#p0score', n: 5, dx: 44 },
+                { sel: '#button-resign', n: 6, dx: -52 },
             ],
         });
         await shot(page, 'overview', { clip: content });
