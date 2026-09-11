@@ -293,7 +293,38 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 `on_json()` にしかない（TODO-015）。サーバが返すのは `gameinfo` 1 本で、
 `data` に直前の操作が `last_op`（受け取った msg そのまま。操作に紐づかない
 送信では `None`）として入る。クライアントは `gameinfo` で盤面を作り直し、
-**音と dice の回転だけを `last_op` から出す**（`Board.load_gameinfo()`）。
+**音と dice の回転だけを `last_op` から出す**（`Board.apply()`）。
+
+**表示を変えるのは `Board.apply(gameinfo, {sec, history_flag, clock_state,
+last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
+`load_gameinfo()` が名前付きの引数に直して渡すだけで、中身は持たない。
+
+ドラッグを離した瞬間の反応（**先行実行**）も同じ経路を通る。
+`Checker.on_mouse_up_xy()` は、`Board.predict_gameinfo()` で
+**動かしたあとの `gameinfo` を予測して作り**、`apply()` に渡す
+（共有ボードなので、サーバの応答を待つと操作感が悪い）。
+
+- 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]`
+  だけを書き換える。**`sn` は進めない。** 動かせるかは
+  `Position.with_move()` が確かめる（駒が無ければ例外）
+- **ヒットのときは 2 手ぶん**（相手をバーへ、自分を移動先へ）。
+  サーバへ送る `put_checker` の `idx` も、この予測から取る
+- **予測のときは `clock_state` と `last_op` を渡さない。**
+  クロックは古い残り時間から数え直しになり、音は二重に鳴る
+- **予測が外れても、サーバから届く `gameinfo` で表示は戻る**
+  （`apply()` は毎回チェッカーを配り直す）。
+  確認は `tests/browser/predict.test.mjs`
+- `apply()` は dice を `gameinfo` の値に戻すので、**使ったダイスの
+  `disable()` は `apply()` のあとで行う**。先にやると使用済みが消える。
+  予測が古い値へ戻さないよう、**dice だけは `roll_btn` から写す**
+- **free move のときは先行実行しない**（`emit` して return する）。
+  ルール判定を通らないので、行き先を確かめられない
+- **予測は、動かした駒と dice 以外を「最後に届いた `gameinfo`」へ戻す。**
+  `score` / `playername` / `cube` / `turn` は `apply()` が毎回
+  `gameinfo` から書き直すので、**画面の方が新しい値は 1 往復ぶん
+  巻き戻る**（他のクライアントの変更が飛んでいる間だけ起きる。
+  サーバの返事で必ず直る）。TODO-030 で増えた挙動だが、
+  `score` の競合そのものはそれ以前からある
 
 届いたメッセージは `message.py` の `parse()` が型を付ける（TODO-026）。
 `type` ごとの frozen dataclass に組み立てるので、**`data` のキーが
@@ -321,7 +352,7 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 `put_checker`（`SEC_CHECKER_MOVE`）だけで、残りは `0`。
 
 `type` を足すときは、`DATA_TYPES` に dataclass を、`_handlers` に
-ハンドラを足す。演出が要るときだけ `load_gameinfo()` にも足す。
+ハンドラを足す。演出が要るときだけ `apply()` にも足す。
 
 全員への送信（`broadcast()`）は `asyncio.gather()` で並行に送るが、
 **いちばん遅いクライアントを待つ**（全員へ送り終わるまで次へ進まない）。

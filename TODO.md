@@ -1,43 +1,11 @@
 # TODO
 
-**残っている項目: TODO-030〜032 の 3 件。** これまでに 29 件を決着させた。
+**残っている項目: TODO-031 と TODO-032 の 2 件。** これまでに 30 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-033` から。**
 
-**着手順は `030`。**
+**TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 TODO-032 は TODO-026 が済んだので、いつでも着手できる。
-TODO-031 は、手元のボードが新しい保存形式に移るのを待つので最後。
-未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
-順番と着手順は一致しない。
-
----
-
-## TODO-030. 表示更新の経路を 1 本にする
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `Board.apply(gameinfo, {sec, history_flag, clock_state, last_op})` を
-      表示を変える唯一の経路にする
-- [ ] `Checker.on_mouse_up_xy()` の**先行実行は残す**が、`put_checker()` を
-      直接呼ぶのをやめ、`Position.with_move()` で予測した gameinfo を
-      `apply()` に渡す
-- [ ] `put_checker()` と `load_gameinfo()` の二重実装を消す
-
-### きっかけ
-
-`Checker.on_mouse_up_xy()` がサーバの応答を待たずに `put_checker()` を
-呼んでおり、`load_gameinfo()` の配置と別経路になっている。共有ボードなので
-**ドラッグを離した瞬間の反応は残す**（無いと操作感が悪い）。
-
-`Position` とルール層が揃ってからでないと予測が作れないので、最後。
-
-### 分担
-
-- **implementer** — 経路の統合
-- **verifier** — `tests/browser/`。2 枚のタブでドラッグの同期を見る
-- **reviewer** — **先行実行と、サーバから戻る gameinfo の食い違いが出やすい。**
-  予測が外れたときに表示が戻るか
+TODO-031 は、手元のボードが新しい保存形式に移るのを待つ。
 
 ---
 
@@ -109,6 +77,7 @@ TODO-024 で `clock_limit` を `gameinfo` から出したあと、reviewer が
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-030.** 表示更新の経路を 1 本にする](archives/todo/TODO-030.%20表示更新の経路を%201%20本にする.md)
 - [**TODO-027.** JS のルール層を純粋関数として切り出し、node --test を足す](archives/todo/TODO-027.%20JS%20のルール層を純粋関数として切り出し、node%20--test%20を足す.md)
 - [**TODO-029.** DOM 生成を JS へ移し、onClick 属性をやめる](archives/todo/TODO-029.%20DOM%20生成を%20JS%20へ移し、onClick%20属性をやめる.md)
 - [**TODO-028.** JS を ES Modules に分割し、継承階層を組み直す](archives/todo/TODO-028.%20JS%20を%20ES%20Modules%20に分割し、継承階層を組み直す.md)

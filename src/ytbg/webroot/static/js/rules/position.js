@@ -111,7 +111,7 @@ export class Position {
      * gameinfo から作る。
      *
      * `gameinfo.board.checker[player][i] = [point, idx]`。
-     * 積み順は `Board.load_gameinfo()` と同じで、idx の昇順
+     * 積み順は `Board.apply()` と同じで、idx の昇順
      * (同じ idx なら player, i の順) に積む。
      *
      * @param {Object} gameinfo
@@ -224,8 +224,8 @@ export class Position {
      * 「UI と同じ」と見なさないこと** (TODO-027 のレビューでの指摘)。
      *
      * **ヒットの処理はしない。** 相手のチェッカーをバーへ送るのは、
-     * 呼んだ側が別の `with_move()` として行う (今の `put_checker()` の
-     * 呼び方と同じ)。
+     * 呼んだ側が別の `with_move()` として行う (`ui/checker.js` の
+     * `on_mouse_up_xy()` が `moves` に 2 手ぶん積む。TODO-030)。
      *
      * **from_p に player の駒が無ければ例外を投げる。** 呼ぶ側は
      * 「掴んでいる駒」を渡す前提で、駒が無いことは起きない。黙って

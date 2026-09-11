@@ -319,36 +319,70 @@ export class Checker extends BgImage {
         /**
          * 移動OK. 以降、移動後の処理
          */
+        //
+        // 先行実行 (TODO-030)
+        //
+        // サーバの応答を待たずに表示を変える (共有ボードなので、
+        // ドラッグを離した瞬間に反応が無いと操作感が悪い)。
+        // 表示を変えるのは Board.apply() だけなので、ここでは
+        // 「動かしたあとの gameinfo」を予測して渡す。
+        // ヒットのときは 2 手ぶん (相手をバーへ、自分を移動先へ)。
+        //
+        // 予測が外れても、サーバから届く gameinfo で表示は戻る。
+        let moves = [];
         if ( hit_ch !== undefined ) {
-            // hit
             log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
+            moves.push({ ch: hit_ch, p: bar_point(hit_ch.player) });
+        }
+        moves.push({ ch: ch, p: dst_p });
 
-            let bar_p = 26;
-            if ( hit_ch.player == 1 ) {
-                bar_p = 27;
-            }
-
-            ch.board.emit_put_checker(hit_ch, bar_p, false);
-            /**
-             * 上でemitしたメッセージ受信後に、put_checker()が 実行されるが、
-             * この後のダイスチェックなどのために、先行して、
-             * ここで put_checker() を実行する。
-             * このため、ここでは効果音は鳴らさない。
-             */
-            ch.board.put_checker(hit_ch, bar_p, 0.2, false);
+        let predicted = undefined;
+        try {
+            predicted = ch.board.predict_gameinfo(moves);
+        } catch (e) {
+            // 予測できないときは先行実行をあきらめる。
+            // 表示はサーバから届く gameinfo で決まる
+            log(`Checker.on_mouse_up_xy>${e}`);
         }
 
-        // move_checker
-        ch.board.emit_put_checker(ch, dst_p, false);
-        
+        // サーバへ送る
+        //
+        // idx は予測した gameinfo から取る (先に表示を変えてから
+        // 数えていた、TODO-030 より前と同じ値になる)
+        for (let mv of moves) {
+            const ch_i = parseInt(mv.ch.id.slice(1)) % 100;
+            let idx = undefined;
+            if ( predicted !== undefined ) {
+                idx = predicted.board.checker[mv.ch.player][ch_i][1];
+            }
+            ch.board.emit_put_checker(mv.ch, mv.p, false, idx);
+        } // for (mv)
+
         // 使ったダイスの組み合わせを取得
+        //
+        // **apply() より前に求める。** apply() は ch.cur_point を
+        // 移動先に変える
         dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
         log(`Checker.on_mouse_up_xy>`
                     + `dice_value=${JSON.stringify(dice_value)}`);
 
         const roll_btn = this.board.roll_btn[ch.player];
-        
+
+        // 予測した gameinfo を表示に反映する
+        //
+        // 音は鳴らさない (last_op を渡さない)。サーバから gameinfo が
+        // 届いたときに鳴る。
+        // apply() は掴んでいるチェッカーを手元の座標に戻すので、
+        // その前に moving_checker を外す
+        this.board.moving_checker = undefined;
+        if ( predicted !== undefined ) {
+            ch.board.apply(predicted, {sec: 0.2, predict: true});
+        }
+
         // 使ったダイスを使用済みする
+        //
+        // **apply() のあとで行う。** apply() は dice を gameinfo の値に
+        // 戻すので、先に disable() すると使用済みが消える (TODO-030)
         for (let d1 of dice_value) {
             for (let d of roll_btn.dice ) {
                 if ( d1 == d.value ) {
@@ -357,14 +391,6 @@ export class Checker extends BgImage {
                 }
             }
         } // for(d)
-
-        /**
-         * 上でemitしたメッセージ受信後に、put_checker()が 実行されるが、
-         * この後のダイスチェックなどのために、先行して、
-         * ここで put_checker() を実行する。
-         * このため、ここでは効果音は鳴らさない。
-         */
-        ch.board.put_checker(ch, dst_p, 0.2, false);
 
         roll_btn.check_disable();
 
@@ -384,8 +410,6 @@ export class Checker extends BgImage {
                                dice: dice_value,
                                roll: false }, true);
         }
-
-        ch.board.moving_checker = undefined;
     } // Checker.on_mouse_up_xy()
 
     /**
