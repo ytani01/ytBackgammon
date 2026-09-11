@@ -106,6 +106,14 @@ def test_static_files(client):
     assert len(res.content) > 0
 
 
+def test_static_no_cache(client):
+    """/static/ の下には Cache-Control: no-cache が付く (TODO-028)"""
+    res = client.get('/static/js/main.js')
+
+    assert res.status_code == 200
+    assert res.headers['cache-control'] == 'no-cache'
+
+
 def test_connect_sends_gameinfo(client):
     """つないだ直後に gameinfo が 1 通届く"""
     with client.websocket_connect('/ws') as ws:

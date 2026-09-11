@@ -192,7 +192,7 @@ async def test_set_clock_switch_updates_flag(fake_time, bg_server, req):
 
 async def test_clock_does_not_advance_while_switch_off(
         fake_time, bg_server, req):
-    """clock_sw が off の間は、動作中でも進まない (ytbg.js と同じ)"""
+    """clock_sw が off の間は、動作中でも進まない (ui/clock.js と同じ)"""
     await clock_on(bg_server, req)
     await send(bg_server, req, 'start_clock', 0)
     fake_time.advance(5)

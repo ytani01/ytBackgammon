@@ -12,7 +12,7 @@ clock.py
 残り時間は「最後に止まった時点の値 (clock)」から「数え始めた時刻
 (_start) からの経過分」を引いて求める (cur())。動き方が変わる直前に
 freeze() でそこまでの分を clock へ書き戻し、時刻を打ち直す。
-計算は ytbg.js の PlayerClock.update() と同じで、持ち時間は
+計算は ui/clock.js の PlayerClock.update() と同じで、持ち時間は
 マイナスも許す。
 """
 __author__ = 'Yoichi Tanibayashi'
@@ -99,7 +99,7 @@ class Clock:
 
     def reset(self, player):
         """
-        残り時間を limit に戻して止める (ytbg.js の PlayerClock.reset())
+        残り時間を limit に戻して止める (ui/clock.js の PlayerClock.reset())
         """
         self.clock[player] = list(self.limit)
         self.active[player] = False
@@ -107,7 +107,7 @@ class Clock:
 
     def start(self, player):
         """
-        猶予を limit[1] に戻してから動かす (ytbg.js の PlayerClock.start())
+        猶予を limit[1] に戻してから動かす (ui/clock.js の PlayerClock.start())
         """
         self.freeze(player)
         self.clock[player][1] = self.limit[1]

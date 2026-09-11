@@ -150,7 +150,7 @@ async def test_clock_switch_is_saved(bg_server, make_bg_server, req):
     """
     sw は保存して復元する (切ったまま再起動したら切れたまま)。
 
-    クライアント (ytbg.js の apply_clock_sw()) は history: false で
+    クライアント (board.js の apply_clock_sw()) は history: false で
     送るので、その形で確かめる。set_clock_switch の分岐で save_data() を
     呼ばないと、履歴が積まれず sw が残らない (TODO-024)。
     """

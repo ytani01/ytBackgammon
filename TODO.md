@@ -1,9 +1,9 @@
 # TODO
 
-**残っている項目: TODO-027〜032 の 6 件。** これまでに 26 件を決着させた。
+**残っている項目: TODO-027、029〜032 の 5 件。** これまでに 27 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-033` から。**
 
-**着手順は `028 → 029 → 027 → 030`。**
+**着手順は `029 → 027 → 030`。**
 TODO-032 は TODO-026 が済んだので、いつでも着手できる。
 TODO-031 は、手元のボードが新しい保存形式に移るのを待つので最後。
 未完了の項目は番号の昇順で並べると決めてあるので、上から順に並んでいる
@@ -51,51 +51,6 @@ ES Modules の `rules/` を import できず、先に切り出すと同じ判定
   `src/` を壊して落ちること
 - **reviewer** — **判定の中身を移す。** 表示の副作用を外すときに
   判定そのものの意味を変えていないか
-
----
-
-## TODO-028. JS を ES Modules に分割し、継承階層を組み直す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `ytbg.js`（4,351 行）を `static/js/` の構成に分ける
-      （[`docs/design.md`](docs/design.md) の「ファイル構成」）
-- [ ] 属性を足すだけの中間クラスをやめ、`board` と `player` を
-      コンストラクタのオプション引数で渡す（段数が 5 から 2 になる）
-- [ ] `EmitButton` の 6 つのサブクラスを 1 つにし、生成時に type と data を渡す
-- [ ] `BannerButton` の 3 つのサブクラスをコールバックで渡す形にする
-- [ ] グローバル変数 `board` への依存を整理する。`main.js` が持ち、
-      デバッグ用に `window.board` にも入れる
-- [ ] `/static` に `Cache-Control: no-cache` を返し、`index.html` の
-      `?ts=` 付き URL と動的な `<script>` 生成をやめる
-
-### きっかけ
-
-`Board` が 1,200 行超、コンストラクタだけで 280 行。モジュール分割が無く
-全部グローバルスコープで、`this.board` と `board` の参照が混在している。
-クラス数は 35 前後から 20 前後になる見込み。
-
-**TODO-027 より先に着手する。** 非モジュールの `ytbg.js` からは
-ES Modules の `rules/` を import できないため。
-**バンドラは入れない**（TODO-020 で決めた）。
-
-### 決めたこと
-
-- **キャッシュ避けは、サーバが `/static` に `Cache-Control: no-cache` を
-  返す形にする。** 今の `?ts=` 付き URL は、`import` した先のモジュールには
-  効かない。`index.html` は普通の `<script type="module">` 1 行になる
-- **`window.board` は残す。** 各クラスはコンストラクタで受け取った `board`
-  だけを見るが、ブラウザのコンソールから盤面を触れるように
-  `main.js` が `window.board` にも入れる（デバッグ用と明記する）
-
-### 分担
-
-- **implementer** — ファイル分割と継承階層の組み直し
-- **verifier** — `node --test tests/js/` と `tests/browser/`。
-  ES Modules 化で読み込みが壊れやすいので、ブラウザでの確認が要
-- **reviewer** — クラスの統合で引数の渡し方が変わる
 
 ---
 
@@ -224,6 +179,7 @@ TODO-024 で `clock_limit` を `gameinfo` から出したあと、reviewer が
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-028.** JS を ES Modules に分割し、継承階層を組み直す](archives/todo/TODO-028.%20JS%20を%20ES%20Modules%20に分割し、継承階層を組み直す.md)
 - [**TODO-026.** メッセージを型付けし、on_json をディスパッチ表にする](archives/todo/TODO-026.%20メッセージを型付けし、on_json%20をディスパッチ表にする.md)
 - [**TODO-025.** サーバを分割する（hub / history / storage / replay / app）](archives/todo/TODO-025.%20サーバを分割する（hub%20_%20history%20_%20storage%20_%20replay%20_%20app）.md)
 - [**TODO-024.** gameinfo を dataclass にし、クロックを外し、保存を JSON Lines へ移す](archives/todo/TODO-024.%20gameinfo%20を%20dataclass%20にし、クロックを外し、保存を%20JSON%20Lines%20へ移す.md)

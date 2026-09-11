@@ -13,27 +13,8 @@
     <link
       href="https://use.fontawesome.com/releases/v5.0.6/css/all.css"
       rel="stylesheet">
-    <script>
-      const ts = new Date().getTime();
-      const head_el = document.getElementsByTagName("head")[0];
-
-      const js_url = "/static/ytbg.js?ts=" + ts;
-      // const js_url = "/static/ytbg.js"; // for debug
-      const script_el = document.createElement("script");
-      console.log(`js_url=${js_url}`);
-      script_el.setAttribute("type", "text/javascript");
-      script_el.setAttribute("src", js_url);
-      head_el.appendChild(script_el);
-
-      const css_url = "/static/ytbg.css?ts=" + ts;
-      const css_el = document.createElement("link");
-      console.log(`css_url=${css_url}`);
-      css_el.setAttribute("rel", "stylesheet");
-      css_el.setAttribute("type", "text/css");
-      css_el.setAttribute("href", css_url);
-      css_el.setAttribute("charset", "utf-8");
-      head_el.appendChild(css_el);
-    </script>
+    <link rel="stylesheet" type="text/css" href="/static/ytbg.css">
+    <script type="module" src="/static/js/main.js"></script>
   </head>
   <body style="background-image:url(/static/{{image_dir}}/bg.png);">
     <header>

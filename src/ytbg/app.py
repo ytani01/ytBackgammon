@@ -31,6 +31,21 @@ _log = getLogger('app')
 templates = Jinja2Templates(directory=str(WEBROOT / 'templates'))
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """
+    Cache-Control: no-cache を付けて返す StaticFiles (TODO-028)。
+
+    JS を ES Modules に分けたので、index.html の ?ts= 付き URL では
+    キャッシュを避けられない (import した先のモジュールには効かない)。
+    かわりにサーバが毎回問い合わせさせる。
+    """
+
+    def file_response(self, *args, **kwargs):
+        res = super().file_response(*args, **kwargs)
+        res.headers['Cache-Control'] = 'no-cache'
+        return res
+
+
 def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
     """
     Starlette のアプリを作る。
@@ -111,7 +126,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
         Route('/p2', index),
         WebSocketRoute('/ws', websocket_endpoint),
         Mount('/static',
-              app=StaticFiles(directory=str(WEBROOT / 'static')),
+              app=NoCacheStaticFiles(directory=str(WEBROOT / 'static')),
               name='static'),
     ])
 

@@ -64,8 +64,19 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 **Python のテストは pytest、JS のテストは node で走らせる**（TODO-021）。
 ブラウザでの動作確認は `tests/browser/` にあり、`node --test tests/browser/`
 で走る。サーバを実プロセスとして起動し、playwright の chromium で
-ページを開いて、盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
-コンソールエラーを見る。注意する点:
+ページを開いて見る。
+
+- `board.test.mjs` — 盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
+  コンソールエラー
+- `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
+  ボタン・バナーを実際に押し、**送られたメッセージの `type` / `data` /
+  `history`** と、変わった `board` の属性を見る（TODO-028）。
+  `WebSocket.prototype.send` を包んで送ったものを貯め、`confirm()` は
+  自動で OK する。サーバの返事を待つ目印に、プレーヤー 1 の名前を
+  変えずに送り直しているので、**このファイルの中でプレーヤー 1 の名前を
+  変えないこと**
+
+注意する点:
 
 - **ブラウザはシステムの `/usr/bin/chromium` を `executablePath` で指定して
   いる**（`tests/browser/helper.mjs`）。`~/.cache/ms-playwright/` にある
@@ -73,7 +84,7 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
   `npx playwright install` で落とし直さない
 - 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
   `BackgammonServer.DATAFILE_DIR` が見ており、無ければ `$HOME`。
-  利用者の `~/ytbg-*.json` は読み書きされない
+  利用者の `~/ytbg-*` は読み書きされない
 - ポートは固定せず、空いているものを OS に選ばせる。サーバは
   `detached` で起動してプロセスグループごと kill する（`uv run` の下に
   python がぶら下がるため）。`pkill` は使わない
@@ -98,7 +109,7 @@ DEBUG にし、`uvicorn.run()` の `log_level` と `access_log` を切り替え�
 - `BackgammonServer` はコンストラクタの中で `load_data()` を呼び、
   保存先を `DATAFILE_DIR`（`$HOME`）から組み立てる。`conftest.py` の
   `bg_server` フィクスチャが `DATAFILE_DIR` を `tmp_path` に差し替えている
-  ので、利用者の `~/ytbg-*.json` は読み書きされない。**このとき履歴が
+  ので、利用者の `~/ytbg-*` は読み書きされない。**このとき履歴が
   1 件積まれる**ので、件数を数えるテストはそれを前提に書く
 - 同じフィクスチャが `ClientHub.broadcast()` を丸ごと差し替え、送られた
   メッセージを `emitted`（`EmittedMessages`）へ積む。テストは**送られた
@@ -179,11 +190,28 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   握ったまま走り切る
 - `src/ytbg/storage.py` — `Storage`（TODO-024）。
   `~/ytbg-{server_id}.jsonl` への保存・読み込みと、旧形式の変換
-- `src/ytbg/webroot/static/ytbg.js`（4000 行超）— クライアントのほぼ全て。
-  ファイル先頭のコメントにクラス階層図がある
-  （`BgBase` → `BgText`/`BgImage` → 各表示要素、`Board`）
-- `src/ytbg/webroot/templates/index.html` — ボード 1 面。JS/CSS はタイムスタンプ付き
-  URL で動的に読み込む（キャッシュ避け）。画像パスに `{{image_dir}}` が埋め込まれる
+- `src/ytbg/webroot/static/js/` — クライアント。ES Modules で、バンドラは
+  使わない（TODO-028）。クラス階層図は `ui/base.js` の先頭にある
+  - `main.js` — エントリ。`Board` を作り、WebSocket をつなぐ。
+    `index.html` の `onClick` / `onChange` 属性から呼ぶ関数を `window` に
+    載せている（TODO-029 で消す）。`window.board` はデバッグ用。
+    **モジュールの中で素の `board` を書かないこと**（`this.board` か、
+    受け取った `board` を使う）。`index.html` に `<div id="board">` が
+    あり、id を持つ要素は `window` の名前付きプロパティになるので、
+    `window.board` が無くても ReferenceError にならず、黙って DIV を掴む
+  - `ws.js`（接続・再接続・送信）、`log.js`、`layout.js`（盤面の座標）、
+    `settings.js`（Cookie / QueryString）、`sound.js`
+  - `board.js` — `Board`
+  - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
+    ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
+    `label.js` / `button.js`。`board` と `player` は基底のコンストラクタの
+    options で渡す
+- `src/ytbg/webroot/templates/index.html` — ボード 1 面。
+  `<script type="module" src="/static/js/main.js">` の 1 行で読み込む。
+  画像パスに `{{image_dir}}` が埋め込まれる。
+  **キャッシュ避けはサーバ側**で、`/static` は `Cache-Control: no-cache` で
+  返す（`app.py` の `NoCacheStaticFiles`。TODO-028）。以前の `?ts=` 付き URL は、
+  `import` した先のモジュールには効かないのでやめた
 - `ytbg.html` — 複数サーバの画面を iframe で並べる一覧ページ（サーバ経由ではなく静的）
 
 ### サーバ 1 プロセス ＝ ボード 1 面
@@ -264,7 +292,7 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 `clock`（最後に止まった時点の残り時間）、基準の時刻（`time.monotonic()`）。
 
 残り時間は `clock` の値から基準の時刻の経過分を引いて求める（`Clock.cur()`。
-計算は `ytbg.js` の `PlayerClock.update()` と同じで、持ち時間はマイナスも
+計算は `ui/clock.js` の `PlayerClock.update()` と同じで、持ち時間はマイナスも
 許す）。動き方が変わる直前に `Clock.freeze()` でそこまでの分を `clock` へ
 書き戻し、時刻を打ち直す。`emit_gameinfo()` は `Clock.state()`
 （`sw` / `active` / `clock` / `limit`）を `clock_state` として添えるので、
@@ -280,7 +308,7 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 `limit` / `sw` / 残り時間で、**`active` は保存しない**。サーバが落ちている
 間の時間は数えられないので、読み込んだときは必ず止まった状態で始める。
 `set_clock_switch` だけは、`history: false` で届いても保存する
-（`ytbg.js` の `apply_clock_sw()` がそう送るので、そこで保存しないと
+（`board.js` の `Board.apply_clock_sw()` がそう送るので、そこで保存しないと
 切ったまま再起動しても `sw` が戻ってしまう）。
 
 ### 履歴（戻す・進める）
@@ -302,13 +330,14 @@ TODO-016 では「残り時間だけは引き継ぐ」という例外で塞い�
 
 n 手ぶんの `back` / `fwd`（n > 0）は Task にせず、ロックを握ったまま
 その場で走り切る。Task にすると、2 人が同時に押したときに片方が cancel されて
-1 手分失われる。そのかわり、走っている間は cancel できない（`ytbg.js` は
-n = 1 しか送らないので、待たされるのは 1 手分だけ）。
+1 手分失われる。そのかわり、走っている間は cancel できない（JS は
+メニューからも盤面のボタンからも n = 1 しか送らないので、待たされるのは
+1 手分だけ）。
 
 履歴はメニューの「履歴を削除」から消せる（TODO-019）。`clear_history()` が
 `_fwd_hist` を空にし、`_history` を今の `gameinfo` 1 件だけにして `sn` を 1 に
 振り直す。**盤面そのものは変えない。** 消すと全員の履歴が消えて元に戻せないので、
-`ytbg.js` の `clear_hist()` が押した人の画面で `confirm()` を出す。
+`main.js` の `clear_hist()` が押した人の画面で `confirm()` を出す。
 `on_json()` の `clear_hist` は、`back` と同じく `Replayer.run()` に渡す
 （走っている連続再生を止めてから消す）。止めずに消すと、再生の Task が
 差し替えたあとの `_history` を pop し続ける。**連続再生の途中で押すと、
@@ -354,5 +383,6 @@ TODO-031）。
   代わりに、メッセージにリテラルの `{` `}` を書いたり、`{}` の数と引数の数が
   合わなかったりすると、抑制される水準でも実行時に例外になる
 - コード内のコメント・docstring は日本語と英語が混在している。周りに合わせる
-- クライアント側の座標は `Board` の `this.bx` / `this.by` の配列を基準に
-  組み立てられている。位置を直すときはこの配列を見る
+- クライアント側の座標は `layout.js` の `BX` / `BY` の配列を基準に
+  組み立てられている（`Board` が複製して `this.bx` / `this.by` として持つ）。
+  位置を直すときはこの配列を見る

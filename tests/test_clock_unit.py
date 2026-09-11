@@ -71,7 +71,7 @@ def test_cur_overflow_reduces_main_clock(fake_time):
 
 
 def test_cur_allows_negative_main_clock(fake_time):
-    """持ち時間はマイナスも許す (ytbg.js の PlayerClock と同じ)"""
+    """持ち時間はマイナスも許す (ui/clock.js の PlayerClock と同じ)"""
     clock = Clock(limit=[10, 2])
     clock.start(0)
 

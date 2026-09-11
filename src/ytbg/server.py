@@ -480,7 +480,7 @@ class BackgammonServer:
         """
         クロック機能そのものの ON/OFF。
 
-        ytbg.js の apply_clock_sw() は history: false で送るので、
+        board.js の Board.apply_clock_sw() は history: false で送るので、
         ここで保存しないと sw が残らない (TODO-024)。
         start/stop/resume/reset_clock はターンのたびに走るので
         保存しない (I/O が増えすぎる)。
@@ -492,7 +492,7 @@ class BackgammonServer:
 
     async def _on_start_clock(self, m: Message) -> float | None:
         """
-        ytbg.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
+        ui/clock.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
         """
         data: PlayerData = m.data
         self._clock.start(data.player)
