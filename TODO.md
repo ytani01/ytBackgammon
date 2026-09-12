@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目は無い。** これまでに 40 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-041` から。**
+**残っている項目: TODO-041、TODO-042。** これまでに 40 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-043` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -10,6 +10,107 @@
 2026-09-12 に `src/` 全体を過剰実装の観点で読み直した結果（15 件）は、
 TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
 すべて片付いた。
+
+---
+
+## TODO-041. 先手決めの自動クリックが `this` を取り違えている
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | verifier + reviewer |
+
+- [ ] `ui/dice.js` の `bind()` を直す
+- [ ] `tests/browser/` に先手決めの経路を足す
+
+`ui/dice.js:542`。
+
+```js
+const click_dice = this.dice[0].on_mouse_down_xy.bind(this);
+```
+
+`Dice.on_mouse_down_xy` を **`RollButton` の `this`** で呼んでいる。
+`bind(this.dice[0])` が正しい。
+
+通るのは、先手決め（`turn >= 2`）で相手が先に振っていたとき、自分が
+Roll を押した 2 秒後の自動クリック。`Dice.on_mouse_down_xy()` の中で
+`this.value` を見る枝（free move）に入ると、`RollButton` には `value` が
+無いので `RollButton.set(NaN)` になり、`dice_value[i]` で落ちる。
+free move でないときは `this.value` を読まない枝を通るので、いまは
+たまたま動いている。
+
+TODO-042 の見直しとは独立した不具合なので、先に直す。
+
+**確認**は `tests/browser/`。先手決めで両者が振る経路が 1 件も無いので、
+そこから足す。`src/` をわざと壊して、足したテストが落ちることを確かめる。
+
+---
+
+## TODO-042. モジュール構成とクラス構成を見直す（第 2 弾）
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | main のみ |
+
+- [ ] 実装項目 6 つの中身を詰める（移す関数の名前と引数、置き場所）
+- [ ] 決めた設計をこのファイルに書く
+- [ ] 実装項目を立てる
+
+TODO-020 と同じ**決めるだけの項目**。確かめるものが無いので担当は
+`main のみ`（`~/.claude/CLAUDE.md` の例外）。設計は
+`archives/todo/TODO-042. ....md` に書き、実装が全部終わったところで
+`docs/Developer.md` を直す（`docs/design.md` は TODO-033 で archives へ
+移したので、新しく作らない）。
+
+### 分かっていること
+
+Python 側は TODO-024〜026、037〜039 で整理済みで、新しく立てる項目は
+`message.py` の 1 つだけ。**残っているのは JS 側**で、TODO-027 の積み残しが
+固まっている。
+
+| 見つけたもの | 場所 |
+|--------------|------|
+| 合法手の判定がルール層に入っていない | `Board.get_dst_points()` / `get_dst_point1()` / `all_inner()`、`RollButton.check_disable()`、`Checker.dice_check()` |
+| 盤面の状態が 2 つある | `BoardPoint.checkers`（表示）と `gameinfo.board.checker`（真の状態） |
+| `Checker.on_mouse_up_xy()` が 150 行 | 行き先の決定・ヒット判定・予測・送信・ダイス消費・勝敗・得点 |
+| `Board` が 1,154 行、コンストラクタが 380 行 | 座標が `dom.js` / `Board` / `layout.js` の 3 か所に分かれている |
+
+`rules/move.js` は 33 行で `calc_dst_point()`（引き算するだけ）しか無い。
+**ベアオフ、バーからの復帰、ゾロ目、使えないダイスの判定にテストが
+1 件も無い**のは、これらが `Board` と `RollButton` から切り離せていないため。
+
+### 相談して決めたこと
+
+| 論点 | 決めたこと |
+|------|-----------|
+| 範囲 | JS と Python の両方 |
+| 盤面の状態 | **表示側の `BoardPoint.checkers` を捨て、`gameinfo` を唯一の状態にする** |
+| `Board` のコンストラクタ | 座標計算と部品生成を切り出す |
+| `log()` | `?debug` のクエリで切り替える（既定では出さない） |
+| 小さい修正 | まとめて 1 項目にする |
+| `ytbg.html` | 今回も対象外（TODO-020 と同じ） |
+| 座標のレスポンシブ化 | 今回もやらない（TODO-020 と同じ） |
+| eslint とバンドラ | 今回も入れない（playwright だけ例外。TODO-020 と同じ） |
+
+### 実装項目の分割（案）
+
+| 順 | 見出し | 中身 |
+|----|--------|------|
+| 1 | JS のルール層に合法手の判定を移す | 上の 5 つの関数を `rules/move.js` の純粋関数にする。受け取るのは `Position` と数値だけ。`tests/js/` にベアオフ・バーからの復帰・ゾロ目・使えないダイスのテストを足す |
+| 2 | 盤面の状態を `gameinfo` 1 つにする | `BoardPoint.checkers` を捨て、`Board` が `Position` を持つ。`BoardPoint` は座標だけの部品にする。「ポイントの先端の駒を掴む」は表示の話なので、`gameinfo` から引き直して今と同じ挙動を保つ |
+| 3 | `Checker.on_mouse_up_xy()` を分ける | 行き先の決定と、動かしたあとの処理を分ける |
+| 4 | `Board` のコンストラクタから配置を切り出す | 380 行の座標計算と部品生成を `layout.js` 側へ寄せる |
+| 5 | `message.py` の `from_dict()` 13 個をまとめる | `dataclasses.fields()` で 1 つに。`GameInfoData` と list をコピーする 2 つだけ残す。約 60 行減 |
+| 6 | 小さいものをまとめて直す | `?debug` での `log()` の切り替え、`ScoreButton` の player 引数が全部 0、`PlayerScore` と `ScoreButton` で二重の score 操作、`Dice.set()` の `image_el` 混在、`RollButton.roll()` の未使用変数、`<html lang="jp">` → `ja` |
+
+順番の理由:
+
+- **1 が先頭。** ルール層が `Position` を受け取る形になっていないと、
+  2 で `checkers` を消せない
+- **2 は 1 のあと、3 は 2 のあと。** ヒット判定と `idx` の数え方が 2 で
+  変わるので、先に `on_mouse_up_xy()` を分けると二度手間になる
+- **4 と 5 は独立。** 1〜3 の途中に割り込ませてよい
+- **6 が最後。** 触るファイルが他の項目と重なるので、差分に無関係な
+  修正が混ざらないようにする
 
 ---
 
