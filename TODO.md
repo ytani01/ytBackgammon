@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: 無し。** これまでに 42 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-043` から。**
+**残っている項目: TODO-043〜048。** これまでに 42 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-049` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -10,6 +10,175 @@
 2026-09-12 に `src/` 全体を過剰実装の観点で読み直した結果（15 件）は、
 TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
 すべて片付いた。
+
+---
+
+## TODO-043. JS のルール層に合法手の判定を移す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] `rules/move.js` に 5 つの純粋関数を足す
+- [ ] 呼び出し元を薄い包みにする
+- [ ] `tests/js/move.test.mjs` にベアオフ・バーからの復帰・ゾロ目・使えないダイスのテストを足す
+
+**受け取るのは `Position` と数値だけ。** `Board` も DOM も見ない。
+
+| 関数 | 引数 | 返り値 | 今どこにあるか |
+|------|------|--------|----------------|
+| `all_inner` | `(pos, player)` | `boolean` | `Board.all_inner()` |
+| `dst_point` | `(pos, player, src_p, dice_val)` | `number \| undefined` | `Board.get_dst_point1()` |
+| `dst_points` | `(pos, player, src_p, dice_vals)` | `number[]` | `Board.get_dst_points()` |
+| `usable_dice` | `(pos, player, dice_vals)` | `boolean[]` | `RollButton.check_disable()` の判定部分 |
+| `dice_for_move` | `(player, active_dice, from_p, to_p)` | `number[]` | `Checker.dice_check()` |
+
+- `Board.all_inner()` / `get_dst_point1()` / `get_dst_points()` は、
+  `this.position()` を渡して呼ぶだけの薄い包みにする（`Board.pip_count()` と
+  同じ形）。**消さない。** `tests/browser/rules.test.mjs` が
+  `board.get_dst_points()` を呼んでいる
+- `RollButton.check_disable()` は `usable_dice()` の結果を見て
+  `this.dice[i].disable()` を呼ぶだけにする。**表示を変えるのは今までどおり
+  `RollButton` の側**
+- `all_inner()` の判定の境目は今と同じ。player 0 は 0〜6（ゴールの 0 を
+  含む）、player 1 は 19〜25。バー（26・27）はインナーではない
+- `dice_for_move()` だけは `Position` を受け取らない（引き算とダイスの
+  突き合わせしかしていない）。ベアオフで「該当する目が無ければ大きい方を
+  使う」枝は、移動できるかを呼ぶ側が確かめ済みという前提のまま
+
+**ここが今回の主目的。** ベアオフ、バーからの復帰、ゾロ目、使えない
+ダイスの判定に、今はテストが 1 件も無い。
+
+---
+
+## TODO-044. 盤面の状態を `gameinfo` 1 つにする
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] `Board.position()` を `Position.from_gameinfo()` にする
+- [ ] `BoardPoint.checkers` を捨てる
+- [ ] `Board.checkers_at()` / `top_checker()` を足し、呼び出し元を直す
+
+- `BoardPoint.add()` から `this.checkers.push(ch)` と
+  `ch.cur_point = this.idx` を外し、**座標を決めて動かすだけ**にする
+- 「そのポイントの駒」を引く口を `Board` に 1 つ作る
+
+  | メソッド | 返り値 |
+  |----------|--------|
+  | `Board.checkers_at(p)` | `Checker[]`（積んだ順） |
+  | `Board.top_checker(p)` | `Checker \| undefined` |
+
+  `this.checker[player][i]` を `cur_point` で絞り、`gameinfo` の `idx` で
+  並べる。**「ポイントの先端の駒を掴む」は表示の話**なので、今と同じ駒が
+  返るようにする（`Position.with_move()` とは混在ポイントで食い違うが、
+  それは TODO-027 で分かっていること）
+- 書き換える呼び出し元は `ui/checker.js`（掴む駒の決定、ヒット判定）、
+  `ui/dice.js`、`board.js`（`apply()` の配り直し）
+
+**今回いちばん危ない項目。** ヒットの `idx` の数え方が変わるので、
+`tests/browser/predict.test.mjs` が効く。**TODO-043 のあとに行う**
+（ルール層が `Position` を受け取る形になっていないと `checkers` を消せない）。
+
+---
+
+## TODO-045. `Checker.on_mouse_up_xy()` を分ける
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | verifier + reviewer |
+
+- [ ] 150 行を 3 つに分け、`on_mouse_up_xy()` は順に呼ぶだけにする
+
+| メソッド | すること | 返り値 |
+|----------|----------|--------|
+| `decide_dst(ch, drop_p, active_dice)` | 行き先の決定（ワンタッチのときの補完、行けない場所ならキャンセル）とヒット判定 | `{dst_p, hit_ch} \| undefined` |
+| `apply_move(ch, dst_p, hit_ch, active_dice)` | 予測（`predict_gameinfo()`）・送信・使ったダイスの消費 | なし |
+| `after_move(ch)` | 勝敗・得点・ターンの受け渡し | なし |
+
+**順番の縛りは変えない。**「使ったダイスは `apply()` のあとで
+`disable()`」「`dice_check()` は `apply()` より前」は TODO-030 で決まって
+いることなので、分けたあとも同じ順で呼ぶ。
+
+**TODO-044 のあとに行う**（ヒット判定と `idx` の数え方が 044 で変わる）。
+
+---
+
+## TODO-046. `Board` のコンストラクタから配置を切り出す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | verifier + reviewer |
+
+- [ ] `layout.js` に座標を返す関数を足し、380 行のコンストラクタから呼ぶ
+
+| 関数 | 返り値 |
+|------|--------|
+| `point_geometry(bx, by, board_h)` | 28 個ぶんの `{x, y, w, h, direction, max_n}` |
+| `score_geometry(bx, by)` | スコアの表示とボタンの `{x, y, w, h}` |
+| `label_geometry(bx, by, board_h)` | 名前・クロック・PIP の `{x, y, deg}` |
+
+**移すのは座標の計算だけで、部品を `new` するのは `Board` に残す。**
+`layout.js` が `ui/` を import すると、座標の置き場所という今の役割から
+外れる。
+
+TODO-043〜045 とは独立なので、途中に割り込ませてよい。
+
+---
+
+## TODO-047. `message.py` の `from_dict` をまとめる
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | verifier |
+
+- [ ] `dataclasses.fields()` を使う mixin を 1 つ置き、13 個のうち 10 個を消す
+
+```python
+class _FromDict:
+    """data のキーをそのままフィールドに写す from_dict"""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Any:
+        return cls(**{f.name: data[f.name] for f in fields(cls)})
+```
+
+**mixin は dataclass にしない。** `fields(cls)` はサブクラスに対して
+呼べばよく、基底を dataclass にすると継承の規則を気にすることになる。
+
+残すのは 3 つ。
+
+| 残す `from_dict` | 理由 |
+|------------------|------|
+| `GameInfoData` | `data` 全体を 1 つのフィールドに入れる（キー名で写せない） |
+| `DiceData` | `list(data['dice'])` でコピーする |
+| `PlayerClockData` | `list(data['clock'])` でコピーする |
+
+`NoData` はフィールドが無いので mixin のままで `cls()` になる。約 60 行減る。
+分岐は変わらないので、レビューの担当は入れない。
+
+---
+
+## TODO-048. 小さいものをまとめて直す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | verifier + reviewer |
+
+- [ ] 下の 6 つを直す
+
+| 直すもの | 場所 |
+|----------|------|
+| `?debug` のときだけ `log()` を出す（既定では出さない） | `log.js`、`settings.js` に `get_debug_query()` を足す |
+| `ScoreButton` の `player` 引数が呼び出し 4 か所とも 0 で、使っていない | `ui/button.js`、`board.js` |
+| `PlayerScore.on_mouse_down_xy()` と `ScoreButton.on_mouse_down_xy()` が同じことをしている | `ui/label.js` 側を消す |
+| `Dice.set()` が `this.image_el` を持っているのに `this.el.children[0]` を触っている | `ui/dice.js` |
+| `RollButton.roll()` の `let dice = [0,0,0,0]` と `const modified = ...` が未使用 | `ui/dice.js` |
+| `<html lang="jp">` | `index.html`（`ja` が正しい） |
+
+**最後にやる。** 触るファイルが他の項目と重なるので、差分に無関係な修正が
+混ざらないようにする。
 
 ---
 
