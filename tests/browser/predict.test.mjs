@@ -28,6 +28,11 @@
 // 既存の board.test.mjs / clicks.test.mjs のドラッグは free move
 // なので、先行実行を通らない (free move はサーバの応答だけで動く)。
 //
+// **ポイントの枚数は cur_point から数える** (TODO-044)。cur_point を
+// 設定するのは apply() の配り直しだけなので、「表示が変わったか」を
+// 見ていることになる。board.checkers_at(p).length は gameinfo を
+// 数え直した値で、届いた gameinfo からほぼ自明に決まってしまう。
+//
 // テストは書いた順に走り、1 つのサーバの盤面を順に変えていく。
 // 並べ替えないこと。
 //
@@ -147,7 +152,7 @@ async function set_turn_dice(page, dice) {
  */
 function tip_of_point6(page) {
     return page.evaluate(() => {
-        const ch = board.point[6].checkers.slice(-1)[0];
+        const ch = board.top_checker(6);
         return parseInt(ch.id.slice(1)) % 100;
     });
 }
@@ -200,8 +205,8 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         const state = await page.evaluate(i => ({
             point: board.checker[0][i].cur_point,
-            n3: board.point[3].checkers.length,
-            n6: board.point[6].checkers.length,
+            n3: board.checker.flat().filter(c => c.cur_point === 3).length,
+            n6: board.checker.flat().filter(c => c.cur_point === 6).length,
             entry: board.gameinfo.board.checker[0][i],
             sn: board.gameinfo.sn,
             pip: board.pip[0].pip_count,
@@ -339,8 +344,10 @@ describe('ドラッグの先行実行 (予測)', () => {
         const state = await wait_for(
             () => page.evaluate(i => ({
                 point: board.checker[0][i].cur_point,
-                n20: board.point[20].checkers.length,
-                n3: board.point[3].checkers.length,
+                n20: board.checker.flat().filter(
+                    c => c.cur_point === 20).length,
+                n3: board.checker.flat().filter(
+                    c => c.cur_point === 3).length,
             }), tip),
             s => s.point === 3,
             { msg: 'correction' });
@@ -371,7 +378,8 @@ describe('ドラッグの先行実行 (予測)', () => {
            });
            await wait_for(
                () => page.evaluate(() => ({
-                   n0: board.point[0].checkers.length,
+                   n0: board.checker.flat().filter(
+                       c => c.cur_point === 0).length,
                    turn: board.turn,
                    active0: board.player_clock[0].active,
                    dice: board.roll_btn[1].get_active_dice(),
@@ -383,7 +391,7 @@ describe('ドラッグの先行実行 (予測)', () => {
 
            // player1 の駒を掴む (point 12 の先端。ダイス 3 で 15 へ動ける)
            const tip_id = await page.evaluate(
-               () => board.point[12].checkers.slice(-1)[0].id);
+               () => board.top_checker(12).id);
            const pos = await center_of(page, `#${tip_id}`);
            await page.mouse.move(pos.x, pos.y);
            await page.mouse.down();

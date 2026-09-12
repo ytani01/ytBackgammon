@@ -216,11 +216,11 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 | ファイル | 中身 |
 |----------|------|
 | `position.js` | `Position` と `goal_point()` / `bar_point()` / `get_pip()` |
-| `move.js` | `calc_dst_point()` |
+| `move.js` | `calc_dst_point()` / `all_inner()` / `dst_point()` / `dst_points()` / `usable_dice()` / `dice_for_move()` |
 | `judge.js` | `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()` |
 
-表示の更新と状態の書き換えは `Board` の側で行う。`Board.position()` が
-`this.point[]` から `Position` を作って渡す。
+表示の更新と状態の書き換えは `Board` と `RollButton` の側で行う。
+`Board.position()` が `gameinfo` から `Position` を作って渡す。
 
 **この層だけが `node --test tests/js/` で単体テストできる。**
 DOM を触るクラスは単体テストせず、ブラウザでの確認で見る。

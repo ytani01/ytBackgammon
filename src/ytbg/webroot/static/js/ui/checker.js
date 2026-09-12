@@ -102,7 +102,7 @@ export class Checker extends BgImage {
 
             // ヒットされている場合は、バーのポイントしか動かせない
             const bar_p = bar_point(this.player);
-            if ( this.board.point[bar_p].checkers.length > 0 ) {
+            if ( this.board.checkers_at(bar_p).length > 0 ) {
                 if ( this.cur_point != bar_p ) {
                     return;
                 }
@@ -122,7 +122,7 @@ export class Checker extends BgImage {
         // クリックされたポイントの先端のチェッカーに持ち換える
         let ch = this;
         if ( ch.cur_point !== undefined ) {
-            ch = this.board.point[ch.cur_point].checkers.slice(-1)[0];
+            ch = this.board.top_checker(ch.cur_point);
             log(`Checker.on_mouse_down_xy>ch.id=${ch.id}`);
         }
         this.board.moving_checker = ch;
@@ -200,7 +200,7 @@ export class Checker extends BgImage {
          * 移動先ポイントの状態に応じた判定
          */
         let hit_ch = undefined;
-        let checkers = ch.board.point[dst_p].checkers;
+        let checkers = ch.board.checkers_at(dst_p);
 
         if ( checkers.length == 1 && checkers[0].player != ch.player ) {
             hit_ch = checkers[0];

@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-044〜048。** これまでに 43 件を決着させた。
+**残っている項目: TODO-045〜048。** これまでに 44 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-049` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
@@ -10,38 +10,6 @@
 2026-09-12 に `src/` 全体を過剰実装の観点で読み直した結果（15 件）は、
 TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
 すべて片付いた。
-
----
-
-## TODO-044. 盤面の状態を `gameinfo` 1 つにする
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `Board.position()` を `Position.from_gameinfo()` にする
-- [ ] `BoardPoint.checkers` を捨てる
-- [ ] `Board.checkers_at()` / `top_checker()` を足し、呼び出し元を直す
-
-- `BoardPoint.add()` から `this.checkers.push(ch)` と
-  `ch.cur_point = this.idx` を外し、**座標を決めて動かすだけ**にする
-- 「そのポイントの駒」を引く口を `Board` に 1 つ作る
-
-  | メソッド | 返り値 |
-  |----------|--------|
-  | `Board.checkers_at(p)` | `Checker[]`（積んだ順） |
-  | `Board.top_checker(p)` | `Checker \| undefined` |
-
-  `this.checker[player][i]` を `cur_point` で絞り、`gameinfo` の `idx` で
-  並べる。**「ポイントの先端の駒を掴む」は表示の話**なので、今と同じ駒が
-  返るようにする（`Position.with_move()` とは混在ポイントで食い違うが、
-  それは TODO-027 で分かっていること）
-- 書き換える呼び出し元は `ui/checker.js`（掴む駒の決定、ヒット判定）、
-  `ui/dice.js`、`board.js`（`apply()` の配り直し）
-
-**今回いちばん危ない項目。** ヒットの `idx` の数え方が変わるので、
-`tests/browser/predict.test.mjs` が効く。**TODO-043 のあとに行う**
-（ルール層が `Position` を受け取る形になっていないと `checkers` を消せない）。
 
 ---
 
@@ -150,6 +118,7 @@ class _FromDict:
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-044.** 盤面の状態を `gameinfo` 1 つにする](archives/todo/TODO-044.%20盤面の状態を%20gameinfo%201%20つにする.md)
 - [**TODO-043.** JS のルール層に合法手の判定を移す](archives/todo/TODO-043.%20JS%20のルール層に合法手の判定を移す.md)
 - [**TODO-042.** モジュール構成とクラス構成を見直す（第 2 弾）](archives/todo/TODO-042.%20モジュール構成とクラス構成を見直す（第%202%20弾）.md)
 - [**TODO-041.** 先手決めの自動クリックが `this` を取り違えている](archives/todo/TODO-041.%20先手決めの自動クリックが%20%60this%60%20を取り違えている.md)

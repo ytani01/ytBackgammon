@@ -6,7 +6,7 @@ import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
          SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
 import { BgImage } from "./ui/base.js";
-import { Position } from "./rules/position.js";
+import { Position, N_POINT } from "./rules/position.js";
 import { all_inner as rule_all_inner,
          dst_point as rule_dst_point,
          dst_points as rule_dst_points } from "./rules/move.js";
@@ -604,16 +604,75 @@ export class Board extends BgImage {
     } // Board.set_turn()
 
     /**
-     * 今の盤面を Position にする (TODO-027)
+     * 今の盤面を Position にする (TODO-027、TODO-044)
      *
-     * ルール層は DOM を見ないので、this.point[] の中身をここで写す。
+     * 盤面の状態は gameinfo 1 つなので、そこから作る。
+     * apply() を 1 度も通る前は空の盤面を返す。
      *
      * @return {Position}
      */
     position() {
-        return Position.from_points(
-            this.point.map((pt) => pt.checkers.map((ch) => ch.player)));
+        if ( this.gameinfo === undefined ) {
+            return Position.from_points(
+                Array.from({length: N_POINT}, () => []));
+        }
+        return Position.from_gameinfo(this.gameinfo);
     } // Board.position()
+
+    /**
+     * gameinfo のチェッカーを、積んだ順に並べる (TODO-044)
+     *
+     * `gameinfo.board.checker[player][i] = [point, idx]` を idx の
+     * 昇順に並べる。Array.sort は安定なので、同じ idx の並びは
+     * (player, i) の順のまま。
+     *
+     * **積み順を決めているのはここだけ**で、apply() の配り直しと
+     * checkers_at() の両方がこれを使う (2 か所にあるとずれる)。
+     *
+     * @return {{ch: Checker, point: number, idx: number}[]}
+     */
+    checker_order() {
+        if ( this.gameinfo === undefined ) {
+            return [];
+        }
+
+        const ch_point = this.gameinfo.board.checker;
+        let ch_list = [];
+        for (let p=0; p < 2; p++) {
+            // 15 固定。gameinfo の checker[p] が 15 と違う長さでも、
+            // this.checker[p] は 15 枚しか無い (壊れた .jsonl を
+            // 読んだときに、盤面の更新が途中で止まらないように)
+            for (let c=0; c < 15; c++) {
+                ch_list.push({ ch: this.checker[p][c],
+                               point: ch_point[p][c][0],
+                               idx: ch_point[p][c][1] });
+            } // for (c)
+        } // for (p)
+
+        ch_list.sort((a, b) => a.idx - b.idx);
+        return ch_list;
+    } // Board.checker_order()
+
+    /**
+     * そのポイントのチェッカー (積んだ順、両プレーヤーぶん) (TODO-044)
+     *
+     * @param {number} p - point index
+     * @return {Checker[]}
+     */
+    checkers_at(p) {
+        return this.checker_order()
+            .filter((e) => e.point == p).map((e) => e.ch);
+    } // Board.checkers_at()
+
+    /**
+     * そのポイントの先端のチェッカー (TODO-044)
+     *
+     * @param {number} p - point index
+     * @return {Checker|undefined}
+     */
+    top_checker(p) {
+        return this.checkers_at(p).slice(-1)[0];
+    } // Board.top_checker()
 
     /**
      * PIP カウントを計算して、表示も更新する。
@@ -757,48 +816,31 @@ export class Board extends BgImage {
             }
         }
         
-        // clear points
-        // log(`Board.apply> clear points`);
-        for (let i=0; i < this.point.length; i++) {
-            this.point[i].checkers = [];
-        } // for(i)
-
         // put checkers (TODO-017)
         //
         // 退避させずに配り直すので、動いて見えるのは位置が変わった
         // チェッカーだけになる。hidden (display:none) の間に座標を動かすと
         // CSS の transition が効かず、sec を渡しても一瞬で切り替わる。
         //
-        // point の中の積み順と重なり順は add() が checkers の長さから
-        // 決めるので、idx (ch_point[p][c][1]) の小さい順に呼ぶ。
-        // add() が cur_point も設定するので put_checker() は通さない
-        // (pip count と closeout の判定が 30 回走る。どちらもこのあと
-        // pip_count() と set_turn() がまとめて行う)。
+        // point の中の積み順と重なり順は、ポイントごとに数えた枚数を
+        // add() へ渡して決める。並べる順 (idx の昇順) は
+        // checker_order() が持つ (TODO-044)。cur_point もここで設定する
+        // ので put_checker() は通さない (pip count と closeout の判定が
+        // 30 回走る。どちらもこのあと pip_count() と set_turn() が
+        // まとめて行う)。
         //
         // idx で回すループにはしない。idx はその point に既にある
         // 両プレーヤーぶんの枚数なので、free move で 1 つの point に
         // 16 枚以上乗ると 15 以上になる。0〜14 だけを拾うループだと、
         // そのチェッカーがどの point にも入らないまま画面に残る。
-        const ch_point = gameinfo.board.checker;
-        let ch_list = [];
-        for (let p=0; p < 2; p++) {
-            for (let c=0; c < 15; c++) {
-                ch_list.push({ ch: this.checker[p][c],
-                               point: ch_point[p][c][0],
-                               idx: ch_point[p][c][1] });
-            } // for (c)
-        } // for (p)
-
-        // 同じ idx が並んだときの順番は、Array.sort が安定なので
-        // 積んだ順 (player, checker の順) のまま
-        ch_list.sort((a, b) => a.idx - b.idx);
+        const ch_list = this.checker_order();
 
         // 掴んでいるチェッカーは、手元の座標へ戻す (TODO-015)
         //
         // 配り直しは point.add() が座標も z も決めるので、ドラッグ中の
         // 駒まで定位置へ飛ぶ。gameinfo は操作のたびに届くので、他人が
         // 名前を変えただけでも掴んでいる駒が一瞬戻ってしまう。
-        // checkers の並びと cur_point は gameinfo どおりに作らせたまま、
+        // 積み順と cur_point は gameinfo どおりに作らせたまま、
         // 見えている位置と重なり順だけを戻す
         const mv_ch = this.moving_checker;
         let mv_pos = undefined;
@@ -806,9 +848,12 @@ export class Board extends BgImage {
             mv_pos = { x: mv_ch.x, y: mv_ch.y, z: mv_ch.z };
         }
 
+        let n_at = new Array(this.point.length).fill(0);
         for (let e of ch_list) {
             e.ch.el.hidden = false;
-            this.point[e.point].add(e.ch, sec);
+            e.ch.cur_point = e.point;
+            this.point[e.point].add(e.ch, n_at[e.point], sec);
+            n_at[e.point] += 1;
         } // for (e)
 
         if ( mv_pos !== undefined ) {
@@ -1010,7 +1055,7 @@ export class Board extends BgImage {
      */
     emit_put_checker(ch, p, add_hist, idx=undefined) {
         if ( idx === undefined ) {
-            idx = this.point[p].checkers.length;
+            idx = this.checkers_at(p).length;
         }
         log("Board.emit_put_checker("
                     + `cd.id=${ch.id},`

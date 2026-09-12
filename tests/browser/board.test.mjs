@@ -101,6 +101,46 @@ describe('ブラウザでの基本の動作確認', () => {
                      `オープニングロールは 1 個: ${JSON.stringify(dice)}`);
     });
 
+    it('積み順は gameinfo の idx で決まる', async () => {
+        // 積み順を決めているのは Board.checker_order() だけで、
+        // apply() の配り直しと checkers_at() の両方がこれを使う
+        // (TODO-044)。初期配置では idx の順と (player, i) の順が
+        // たまたま一致するので、入れ替えて確かめる。
+        //
+        // このテストは、ドラッグで初期配置が崩れる前に置くこと
+        const r = await page1.evaluate(() => {
+            const save = JSON.parse(JSON.stringify(board.gameinfo));
+            const gi = JSON.parse(JSON.stringify(board.gameinfo));
+            // 初期配置では checker[0][0..4] が point 6 に idx 0..4 で
+            // 並ぶ。いちばん下 (p000) といちばん上 (p004) を入れ替える
+            // 控えは複製する (下で gi を書き換えるので、
+            // 参照のままだと一緒に変わる)
+            const before = [0, 1, 2, 3, 4].map(
+                (i) => [...gi.board.checker[0][i]]);
+            gi.board.checker[0][0][1] = 4;
+            gi.board.checker[0][4][1] = 0;
+
+            // predict: true なのでサーバへは何も送らない
+            board.apply(gi, { sec: 0, predict: true });
+            const at6 = board.checkers_at(6);
+            const out = { before,
+                          ids: at6.map((c) => c.id),
+                          z: at6.map((c) => c.z),
+                          tip: board.top_checker(6).id };
+
+            board.apply(save, { sec: 0, predict: true });  // 後始末
+            return out;
+        });
+
+        assert.deepEqual(r.before, [[6, 0], [6, 1], [6, 2], [6, 3], [6, 4]],
+                         '初期配置が変わった (テストの前提)');
+        assert.deepEqual(r.ids, ['p004', 'p001', 'p002', 'p003', 'p000'],
+                         'idx の順に積まれていない');
+        assert.deepEqual(r.z, [0, 1, 2, 3, 4],
+                         '積む位置が数えられていない');
+        assert.equal(r.tip, 'p000', '先端の駒が違う');
+    });
+
     it('チェッカーをドラッグできる', async () => {
         // ルールに縛られずに動かせるように free move にする
         await page1.locator('#free-move').check();
@@ -118,7 +158,7 @@ describe('ブラウザでの基本の動作確認', () => {
         // いちばん下なので、先端は p004 になる
         const tip = await page1.evaluate(() => {
             const ch = board.checker[0][0];
-            return board.point[ch.cur_point].checkers.slice(-1)[0].id;
+            return board.top_checker(ch.cur_point).id;
         });
         assert.notEqual(tip, 'p000');
 

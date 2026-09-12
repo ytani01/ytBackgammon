@@ -268,12 +268,15 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   - `board.js` — `Board`
   - `rules/` — ルール層（TODO-027）。`position.js` に `Position` と
     `goal_point()` / `bar_point()` / `get_pip()`、`move.js` に
-    `calc_dst_point()`、`judge.js` に `pip_count()` / `calc_gammon()` /
-    `winner_is()` / `closeout()`。**DOM も `Board` も見ず、値を返すだけ**で、
+    `calc_dst_point()` / `all_inner()` / `dst_point()` / `dst_points()` /
+    `usable_dice()` / `dice_for_move()`（TODO-043）、`judge.js` に
+    `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()`。
+    **DOM も `Board` も見ず、値を返すだけ**で、
     import してよいのは `rules/` の中だけ。表示の更新
-    （`pip[player].set()`）と状態の書き換え（`resign = -1`）は
-    `Board` の側で行う。`Board.position()` が `this.point[]` から
-    `Position` を作って渡す
+    （`pip[player].set()`、`dice[i].disable()`）と状態の書き換え
+    （`resign = -1`）は `Board` と `RollButton` の側で行う。
+    `Board.position()` が `Position.from_gameinfo(this.gameinfo)` を
+    返す（TODO-044。`this.gameinfo` がまだ無いときは空の盤面）
   - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
     ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
     `label.js` / `button.js`。`board` と `player` は基底のコンストラクタの
@@ -303,8 +306,12 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **クロックはここに入っていない**（TODO-024。下の「クロック」を見ること）。
 
 チェッカーは `checker[player][i] = [point, idx]` の配列で、**ID は
-`player * 100 + i`**（例: 012, 101）。サーバ側の `put_checker()` はこの ID を
-100 で割ってプレーヤーを求める。
+`player * 100 + i`**（例: 012, 101）。**盤面の状態はこれだけ**で、
+表示側は持たない（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
+積み順を決めているのは `Board.checker_order()` だけで、`apply()` の
+配り直しと `Board.checkers_at()` / `top_checker()` がそれを使う。
+
+サーバ側の `put_checker()` はこの ID を 100 で割ってプレーヤーを求める。
 
 ポイント番号は 0〜25 が盤上（0 と 25 がゴール = `goal_point(player)`）、
 **26, 27 がバー**（`bar_point(player) = 26 + player`）。プレーヤー 0 は番号が

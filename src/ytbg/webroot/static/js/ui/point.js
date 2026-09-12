@@ -29,18 +29,21 @@ export class BoardPoint extends BgBase {
         } else {
             this.y0 = this.y  + this.h;
         }
-
-        this.checkers = [];
     } // BoardPoint.constructor()
 
     /**
+     * ch を、このポイントの n 枚目の位置へ動かす。
+     *
+     * **持っているのは座標の計算だけ** (TODO-044)。積む順は呼ぶ側が
+     * 決めて n で渡し、ch.cur_point も呼ぶ側が設定する。
+     *
      * @param {Checker} ch
+     * @param {number} n - 積む位置 (0 から)
      * @param {number} sec
      * @return {number} - position index
      */
-    add(ch, sec=0) {
-        // log(`BoardPoint.add(ch.id=${ch.id},sec=${sec})`);
-        const n = this.checkers.length;
+    add(ch, n, sec=0) {
+        // log(`BoardPoint.add(ch.id=${ch.id},n=${n},sec=${sec})`);
         const n2 = n % this.max_n;
         const n3 = Math.floor(n / this.max_n);
         const x = this.cx - ch.w * 0.05 * n3;
@@ -50,8 +53,6 @@ export class BoardPoint extends BgBase {
         // log(`BoardPoint.add()> n=${n},y=${y}`);
         ch.move(x, y, true, sec);
         ch.set_z(n);
-        ch.cur_point = this.idx;
-        this.checkers.push(ch);
 
         return n;
     } // BoardPoint.add()

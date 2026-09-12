@@ -89,7 +89,8 @@ export class Position {
     /**
      * ポイントごとのプレーヤー番号の配列から作る。
      *
-     * Board の `this.point[p].checkers` をそのまま写すための入口。
+     * ポイントごとの配列から作る入口。TODO-044 で `Board.position()` が
+     * `from_gameinfo()` に移ったので、本番では空の盤面を作るときだけ通る。
      *
      * @param {number[][]} points - points[p] = プレーヤー番号の配列
      * @return {Position}
