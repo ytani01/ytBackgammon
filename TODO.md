@@ -1,11 +1,112 @@
 # TODO
 
-**残っている項目は無い。** これまでに 36 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-037` から。**
+**残っている項目: TODO-037〜040。** これまでに 36 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-041` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
 （旧 `.json` も消さずに残してある）。
+
+TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
+結果（15 件）を、性質ごとに 3 つへ分けたもの。合計でおよそ 390 行減る
+見込み。**依存関係は増減しない。**
+
+---
+
+## TODO-037. 呼ばれていないコードを消す
+
+- [ ] `ui/checker.js` の `calc_z()` / `distance()` / `is_last_man()` /
+      `get_available_points()`（T.B.D. のまま空を返す）
+- [ ] `settings.js` の `CookieBase.save()`。呼び出しが無く、
+      `if (Object.keys(this.data)) return;` で常に何もしない
+- [ ] `board.js` の `clock_on()` / `clock_off()`
+- [ ] `reset_clock` の経路。唯一の送り元 `PlayerClock.emit_reset()` が
+      どこからも呼ばれていない。`message.py` の `DATA_TYPES` と
+      `server.py` の `_handlers` から両方消す。
+      **`Clock.reset()` 自体は `new_game()` と `set_clock_limit` が使うので残す**
+- [ ] `mylog.py` の `exmsg()`（`src/` では docstring の例にしか出てこない）と、
+      `setLevel(level=None)` の分岐
+- [ ] `rules/position.js` の `Position.empty()` / `count_of()`。
+      テストからしか呼ばれていない
+- [ ] `board.js` の `apply_sound_switch()` 内の `GlobalSoundSwitch` ブロック
+      （`board_num` を読んで何もしない）、コンストラクタの
+      `this.score = [0, 0]` の二重初期化
+- [ ] コメントアウトされたまま残っている塊（`ui/dice.js` の
+      `dice_histogram`、`board.js` の `player_clock[].update()` など）
+
+盤面の挙動は変わらないはずの削除だけを集めてある。`reset_clock` と
+`Position` のメソッドはテストが参照しているので、**テストも一緒に直す**。
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | implementer + verifier + reviewer |
+
+削除でも `reset_clock` は登録表（`DATA_TYPES` / `_handlers`）から分岐が
+減るので、「本当に死んでいるか」を見るレビューの担当を入れる。
+
+---
+
+## TODO-038. 同じ形の繰り返しをまとめる
+
+- [ ] `main.js` の 14 個のラッパー関数。履歴用 9 個
+      （`back2` / `back_all` / `fwd2` …）と board への委譲 5 個
+      （`apply_sound_switch` など）。末尾の登録表へ直接書く（-90 行）
+- [ ] `server.py` の `backward_hist()` と `forward_hist()`。
+      `_hist.back()` / `forward()` 以外は同じなので 1 本にする（-35 行）
+- [ ] `server.py` のハンドラ 6 個が `asdict(data)` で dataclass を dict へ
+      戻して `GameInfo` へ渡している。`message.py` で型を付けた意味が
+      ここで消えるので、`GameInfo` 側を dataclass 受け取りにする
+- [ ] `ui/clock.js` の `ClockLimit extends BgText`。`new ClockLimit(this.board)`
+      は board を **id の引数**に渡していて `this.board` は undefined、
+      `el` も無いので、継承した機能は全部死んでいる。ただの class にする
+
+**構造が変わるので、挙動が変わりうる。** 特に `GameInfo` の更新メソッドの
+引数を変える件は、`tests/test_gameinfo_ops.py` と `tests/test_on_json.py` に
+影響する。
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+---
+
+## TODO-039. 手書きを標準機能に置き換える
+
+- [ ] `settings.js` の `QueryStringBase` → `URLSearchParams`。
+      実際に読んでいるのは `sound` 1 個だけ（-40 行）
+- [ ] `board.js` の `get_dst_points()` にある「重複削除」の手書きループ →
+      `[...new Set(dst_p)]`（-12 行）
+- [ ] `ws.js` の `ws_url()` → `new URL("/ws", location.href)` で protocol を
+      差し替える。`document.domain` は非推奨
+- [ ] `index.html` の `<meta http-equiv>` 3 行（Pragma / Cache-Control /
+      Expires）。今のブラウザは見ない
+
+`QueryStringBase` の置き換えでは、`?sound` のように値の無いクエリの
+扱いが変わる（今は `undefined` ではなく空文字になる）。
+**`sound` は「指定されていたら鳴らさない」という判定なので、
+`has()` で見るか `get()` で見るかを決めること。**
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | implementer + verifier + reviewer |
+
+---
+
+## TODO-040. `-i` の既定値に対応するディレクトリが無い
+
+- [ ] `__main__.py` の `--image_dir` の既定値が `images1` だが、
+      `static/` にあるのは `images0a` `images1a` `images2` `images3` の 4 つ
+
+`-i` を付けずに起動すると、画像が全部 404 になる。既定値を実在する
+ディレクトリへ直す。**どれを既定にするかは着手時に決める**
+（`ytbg-boot.sh` は 4 つとも使っているので、そこからは決まらない）。
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | main + verifier |
+
+1 行の変更だが、既定値で起動できるようになるという挙動の変化なので、
+確認は別の担当に分ける。
 
 ---
 
