@@ -3,6 +3,7 @@ import { emit_msg } from "../ws.js";
 import { BgImage } from "./base.js";
 import { bar_point,
          get_pip as rule_get_pip } from "../rules/position.js";
+import { dice_for_move } from "../rules/move.js";
 
 /**
  *
@@ -45,68 +46,21 @@ export class Checker extends BgImage {
     /**
      * 移動に使用するダイスの目の組み合わせを取得する
      *
-     * @param {number} player
+     * 判定は rules/move.js (TODO-043)
+     *
      * @param {number[]} active_dice
      * @param {number} from_p
      * @param {number} to_p
-     * @return {number} - 使用するダイスの目
-     *                    0: そこには移動できない
+     * @return {number[]} - 使用するダイスの目。
+     *                      空なら、そこには移動できない
      */
     dice_check(active_dice, from_p, to_p) {
+        const dice_vals = dice_for_move(this.player, active_dice,
+                                        from_p, to_p);
         log(`Checker.dice_check(`
                     + `active_dice=${JSON.stringify(active_dice)},`
-                    + `from_p=${from_p}, to_p=${to_p}`);
-
-        if ( from_p >= 26 ) {
-            // バーから移動の場合の調整
-            if ( this.player == 0 ) {
-                from_p = 25;
-            } else {
-                from_p = 0;
-            }
-        }
-
-        if ( this.player == 1 ) {
-            from_p = 25 - from_p;
-            to_p = 25 - to_p;
-        }
-        // log(`Checker.dice_check>from_p=${from_p} ==> to_p=${to_p}`);
-        
-        let diff_p = from_p - to_p;
-        log(`Checker.dice_check>diff_p=${diff_p}`);
-
-        let dice_vals = [];
-        if ( diff_p == active_dice[0] ) {
-            dice_vals = [active_dice[0]];
-        } else if ( diff_p == active_dice[1] ) {
-            dice_vals = [active_dice[1]];
-        } else if ( diff_p == active_dice[0] + active_dice[1] ) {
-            dice_vals = [active_dice[0], active_dice[1]];
-        }
-
-        if ( active_dice.length >= 3 ) {
-            let sum_d = active_dice[0] * 3;
-            if ( diff_p == sum_d ) {
-                dice_vals = [active_dice[0], active_dice[0], active_dice[0]];
-            }
-            if ( active_dice.length == 4 ) {
-                sum_d += active_dice[0];
-                if ( diff_p == sum_d ) {
-                    dice_vals = [ active_dice[0], active_dice[0],
-                                  active_dice[0], active_dice[0] ];
-                }
-            }
-        }
-
-        if ( dice_vals.length == 0 && to_p == 0 ) {
-            // bearing off
-            // 移動可能かどうかは、事前に確認済と仮定
-            // 該当するダイスが無い場合は、大きい方を使用する。
-            dice_vals = [ Math.max(...active_dice) ];
-        }
-
-        log(
-            `Checker.dice_check>dice_vals=${JSON.stringify(dice_vals)}`);
+                    + `from_p=${from_p}, to_p=${to_p}`
+                    + `)>dice_vals=${JSON.stringify(dice_vals)}`);
         return dice_vals;
     } // Checker.dice_check()
 

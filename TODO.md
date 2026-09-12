@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-043〜048。** これまでに 42 件を決着させた。
+**残っている項目: TODO-044〜048。** これまでに 43 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-049` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
@@ -10,44 +10,6 @@
 2026-09-12 に `src/` 全体を過剰実装の観点で読み直した結果（15 件）は、
 TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
 すべて片付いた。
-
----
-
-## TODO-043. JS のルール層に合法手の判定を移す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `rules/move.js` に 5 つの純粋関数を足す
-- [ ] 呼び出し元を薄い包みにする
-- [ ] `tests/js/move.test.mjs` にベアオフ・バーからの復帰・ゾロ目・使えないダイスのテストを足す
-
-**受け取るのは `Position` と数値だけ。** `Board` も DOM も見ない。
-
-| 関数 | 引数 | 返り値 | 今どこにあるか |
-|------|------|--------|----------------|
-| `all_inner` | `(pos, player)` | `boolean` | `Board.all_inner()` |
-| `dst_point` | `(pos, player, src_p, dice_val)` | `number \| undefined` | `Board.get_dst_point1()` |
-| `dst_points` | `(pos, player, src_p, dice_vals)` | `number[]` | `Board.get_dst_points()` |
-| `usable_dice` | `(pos, player, dice_vals)` | `boolean[]` | `RollButton.check_disable()` の判定部分 |
-| `dice_for_move` | `(player, active_dice, from_p, to_p)` | `number[]` | `Checker.dice_check()` |
-
-- `Board.all_inner()` / `get_dst_point1()` / `get_dst_points()` は、
-  `this.position()` を渡して呼ぶだけの薄い包みにする（`Board.pip_count()` と
-  同じ形）。**消さない。** `tests/browser/rules.test.mjs` が
-  `board.get_dst_points()` を呼んでいる
-- `RollButton.check_disable()` は `usable_dice()` の結果を見て
-  `this.dice[i].disable()` を呼ぶだけにする。**表示を変えるのは今までどおり
-  `RollButton` の側**
-- `all_inner()` の判定の境目は今と同じ。player 0 は 0〜6（ゴールの 0 を
-  含む）、player 1 は 19〜25。バー（26・27）はインナーではない
-- `dice_for_move()` だけは `Position` を受け取らない（引き算とダイスの
-  突き合わせしかしていない）。ベアオフで「該当する目が無ければ大きい方を
-  使う」枝は、移動できるかを呼ぶ側が確かめ済みという前提のまま
-
-**ここが今回の主目的。** ベアオフ、バーからの復帰、ゾロ目、使えない
-ダイスの判定に、今はテストが 1 件も無い。
 
 ---
 
@@ -175,6 +137,7 @@ class _FromDict:
 | `PlayerScore.on_mouse_down_xy()` と `ScoreButton.on_mouse_down_xy()` が同じことをしている | `ui/label.js` 側を消す |
 | `Dice.set()` が `this.image_el` を持っているのに `this.el.children[0]` を触っている | `ui/dice.js` |
 | `RollButton.roll()` の `let dice = [0,0,0,0]` と `const modified = ...` が未使用 | `ui/dice.js` |
+| `Checker.is_inner()` が未使用（TODO-043 で `Board.all_inner()` がルール層へ移り、唯一の呼び出し元が消えた） | `ui/checker.js` |
 | `<html lang="jp">` | `index.html`（`ja` が正しい） |
 
 **最後にやる。** 触るファイルが他の項目と重なるので、差分に無関係な修正が
@@ -187,6 +150,7 @@ class _FromDict:
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-043.** JS のルール層に合法手の判定を移す](archives/todo/TODO-043.%20JS%20のルール層に合法手の判定を移す.md)
 - [**TODO-042.** モジュール構成とクラス構成を見直す（第 2 弾）](archives/todo/TODO-042.%20モジュール構成とクラス構成を見直す（第%202%20弾）.md)
 - [**TODO-041.** 先手決めの自動クリックが `this` を取り違えている](archives/todo/TODO-041.%20先手決めの自動クリックが%20%60this%60%20を取り違えている.md)
 - [**TODO-038.** 同じ形の繰り返しをまとめる](archives/todo/TODO-038.%20同じ形の繰り返しをまとめる.md)

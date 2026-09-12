@@ -7,7 +7,9 @@ import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
          SOUND_TURN_CHANGE } from "./sound.js";
 import { BgImage } from "./ui/base.js";
 import { Position } from "./rules/position.js";
-import { calc_dst_point } from "./rules/move.js";
+import { all_inner as rule_all_inner,
+         dst_point as rule_dst_point,
+         dst_points as rule_dst_points } from "./rules/move.js";
 import { closeout as rule_closeout,
          pip_count as rule_pip_count,
          winner_is as rule_winner_is } from "./rules/judge.js";
@@ -650,16 +652,15 @@ export class Board extends BgImage {
     } // Board.winner_is()
 
     /**
+     * チェッカーが全てインナーに入っているか？
+     *
+     * 判定は rules/move.js (TODO-043)
+     *
      * @param {number} player
      * @return {boolean}
      */
     all_inner(player) {
-        for (let i=0; i < 15; i++) {
-            if ( ! this.checker[player][i].is_inner() ) {
-                return false;
-            }
-        }
-        return true;
+        return rule_all_inner(this.position(), player);
     } // Board.all_inner()
 
     /**
@@ -690,120 +691,26 @@ export class Board extends BgImage {
      * @return {number[]} - distination points
      */
     get_dst_points(player, src_p, dice_vals) {
+        const dst_p = rule_dst_points(this.position(), player,
+                                      src_p, dice_vals);
         log(`Board.get_dst_points(`
                     + `player=${player},src_p=${src_p},`
                     + `dice_vals=${JSON.stringify(dice_vals)}`
-                    + `)`);
-
-        let dst_p = [];
-
-        if ( dice_vals.length == 0 ) {
-            return [];
-        }
-
-        for (let dice_val of dice_vals) {
-            const dst_p1 = this.get_dst_point1(player, src_p, dice_val);
-            if ( dst_p1 === undefined ) {
-                continue;
-            }
-            dst_p.push(dst_p1);
-        } // for(dice_val)
-
-        // log(`Board.get_dst_points>dst_p=${JSON.stringify(dst_p)}`);
-
-        if ( dst_p.length == 0 ) {
-            return [];
-        }
-
-        // 重複削除
-        dst_p = [...new Set(dst_p)];
-        // log(`Board.get_dst_points>dst_p=${JSON.stringify(dst_p)}`);
-
-        let dst_p1 = undefined;
-        let dice_val = undefined;
-
-        if ( dice_vals.length >= 2 ) {
-            // サイコロの目を足した場合も確認
-            dice_val = dice_vals[0] + dice_vals[1];
-            log(`Board.get_dst_points>dice_val=${dice_val}`);
-            dst_p1 = this.get_dst_point1(player, src_p, dice_val);
-            if ( dst_p1 !== undefined ) {
-                dst_p.push(dst_p1);
-            }
-
-            if ( dice_vals.length >= 3 && dst_p1 !== undefined ) {
-                // ぞろ目の場合
-                dice_val += dice_vals[2];
-                log(`Board.get_dst_points>dice_val=${dice_val}`);
-                dst_p1 = this.get_dst_point1(player, src_p, dice_val);
-                if ( dst_p1 !== undefined ) {
-                    dst_p.push(dst_p1);
-                }
-                 
-                if ( dice_vals.length == 4 && dst_p1 !== undefined ) {
-                    dice_val += dice_vals[3];
-                    log(`Board.get_dst_points>dice_val=${dice_val}`);
-                    dst_p1 = this.get_dst_point1(player, src_p, dice_val);
-                    if ( dst_p1 !== undefined ) {
-                        dst_p.push(dst_p1);
-                    }
-                }
-            }
-        }
-
-        log(`Board.get_dst_points>dst_p=${JSON.stringify(dst_p)}`);
+                    + `)>dst_p=${JSON.stringify(dst_p)}`);
         return dst_p;
     } // Board.get_dst_points()
 
     /**
+     * 1 つの目での行き先 (判定は rules/move.js)
      *
+     * @param {number} player
+     * @param {number} src_p
+     * @param {number} dice_val
+     * @return {number|undefined} - destination point
      */
     get_dst_point1(player, src_p, dice_val) {
-        let dst_p1 = calc_dst_point(player, src_p, dice_val);
-        // log(`Board.get_dst_point1>dst_p1=${dst_p1}`);
-
-        let checkers;
-        
-        if ( player == 0 && dst_p1 <= 0 ) {
-            if ( ! this.all_inner(player) ) {
-                return undefined;
-            }
-            // すべてインナー
-            if ( dst_p1 < 0 ) {
-                // src_p以降のポイントにCheckerが存在するか確認
-                for (let p=src_p+1; p <= 6; p++) {
-                    checkers = this.point[p].checkers;
-                    if ( checkers.length > 0 && checkers[0].player == player) {
-                        return undefined;
-                    }
-                } // for(p)
-                dst_p1 = 0;
-            }
-        }
-        if ( player == 1 && dst_p1 >= 25 ) {
-            if ( ! this.all_inner(player) ) {
-                return undefined;
-            }
-            // すべてインナー
-            if ( dst_p1 > 25 ) {
-                // src_p以降のポイントにCheckerが存在するか確認
-                for (let p=src_p-1; p >= 19; p--) {
-                    checkers = this.point[p].checkers;
-                    if ( checkers.length > 0 && checkers[0].player == player) {
-                        return undefined;
-                    }
-                } // for(p)
-                dst_p1 = 25;
-            }
-        }
-
-        checkers = this.point[dst_p1].checkers;
-        if ( checkers.length >= 2 && checkers[0].player != player ) {
-            return undefined;
-        }
-
-        return dst_p1;
-    }
+        return rule_dst_point(this.position(), player, src_p, dice_val);
+    } // Board.get_dst_point1()
 
     /**
      * gameinfo を表示に反映する。**表示を変えるのはここだけ** (TODO-030)。

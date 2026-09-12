@@ -1,7 +1,7 @@
 import { log } from "../log.js";
 import { emit_msg } from "../ws.js";
 import { BgImage } from "./base.js";
-import { bar_point } from "../rules/position.js";
+import { usable_dice } from "../rules/move.js";
 import { BannerButton } from "./button.js";
 
 /**
@@ -363,88 +363,17 @@ export class RollButton extends BannerButton {
     check_disable() {
         // log(`RollButton.check_disable()`);
         let modified = false;
-        const board = this.board;
-        const player = this.player;
-        const bar_p = bar_point(player);
-        const active_d = this.get_active_dice();
-        
-        if ( this.board.point[bar_p].checkers.length > 0 ) {
-            // ヒットされている場合は、復活できるか確認
-            const dst_p = this.board.get_dst_points(player, bar_p, active_d);
-            log(`RollButton.check_disable>`
-                        + `dst_p=${JSON.stringify(dst_p)}`);
-            if ( dst_p.length == 0 ) {
-                // 復活できない
-                for (let d=0; d < 4; d++) {
-                    this.dice[d].disable();
-                }
-                modified = true;
-                return modified;
-            }
+        const usable = usable_dice(this.board.position(), this.player,
+                                   this.get());
+        log(`RollButton.check_disable>`
+                    + `usable=${JSON.stringify(usable)}`);
 
-            // T.B.D. 復活できる場合、もう一つのダイスが使えるか確認?
-
-            return modified;
-        }
-
-        // 全ての持ち駒について、移動できるかのチェック
-        for (let i=0; i < 4; i++) {
-            let can_use = false;
-
-            const dice_val = this.dice[i].value;
-            if ( dice_val < 1 || dice_val > 6) {
+        for (let i=0; i < usable.length; i++) {
+            if ( usable[i] ) {
                 continue;
             }
-
-            for (let p=1; p <= 24; p++) {
-                const ch = this.board.point[p].checkers;
-                if ( ch.length == 0 ) {
-                    continue;
-                }
-                if ( ch[0].player != player ) {
-                    continue;
-                }
-
-                const dst = this.board.get_dst_point1(player, p, dice_val);
-                if ( dst !== undefined ) {
-                    can_use = true;
-                    break;
-                }
-
-                // 使えない場合は、もう一つのダイスが使えるか確認後
-                // 足した場合も確認
-                for (let i2=0; i2 < 4; i2++) {
-                    if ( i2 == i ) {
-                        continue;
-                    }
-                    const dice_val2 = this.dice[i2].value;
-                    if ( dice_val2 < 1 || dice_val2 > 6 ) {
-                        continue;
-                    }
-                    const dst2 = this.board.get_dst_point1(player, p, dice_val2);
-                    if ( dst2 === undefined ) {
-                        continue;
-                    }
-
-                    // もう一つのダイスが使える場合、出目を足して確認
-                    // 足した目で利用可能なら、dice[i] を利用可とする
-                    const dst3 = this.board.get_dst_point1(player, p,
-                                                      dice_val+dice_val2);
-                    if ( dst3 !== undefined ) {
-                        can_use = true;
-                        break;
-                    }
-                } // for(i2)
-                if ( can_use ) {
-                    break;
-                }
-            } // for(p)
-
-            if ( ! can_use ) {
-                log(`RollButton.set>dice[${i}]: disable`);
-                this.dice[i].disable();
-                modified = true;
-            }
+            this.dice[i].disable();
+            modified = true;
         } // for(i)
 
         return modified;
