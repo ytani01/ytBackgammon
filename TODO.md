@@ -13,6 +13,10 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 
 **着手する順は TODO-040 → 037 → 039 → 038。** 小さく確実なものから始め、
 削除（037）を先にやって、集約（038）で触るコードを減らす。
+ブランチは `starlette` のまま、項目ごとにコミットを分ける。
+`CLAUDE.md` と `docs/Developer.md` の記述（`reset_clock` の分岐、
+`QueryStringBase`、クラス階層図の `ClockLimit`）は、**それを変えた項目の
+コミットの中で直す**。
 
 ---
 
@@ -27,12 +31,15 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
       どこからも呼ばれていない。`message.py` の `DATA_TYPES` と
       `server.py` の `_handlers` から両方消す。
       **`Clock.reset()` 自体は `new_game()` と `set_clock_limit` が使うので残す**
-- [ ] `rules/position.js` の `Position.empty()` / `count_of()`。
+- [ ] `rules/position.js` の `Position.empty()` / `count_of()` / `players()`。
       テストからしか呼ばれていないので、`tests/js/position.test.mjs` の
       該当する `it` ごと消す
 - [ ] `board.js` の `apply_sound_switch()` 内の `GlobalSoundSwitch` ブロック
       （`board_num` を読んで何もしない）、コンストラクタの
       `this.score = [0, 0]` の二重初期化
+- [ ] `main.js:122` の `def_name`。未使用で、そもそも `PlayerName` に
+      `default_text` は無い（あるのは `PlayerScore`）。読まれていない
+      `PlayerScore.default_text` も消す
 - [ ] コメントアウトされたまま残っている塊。**全部消す**（`board.js` と
       `ui/dice.js` にまたがる `dice_histogram` ~25 行も含む。表示先の
       `#dice-histogram` は `index.html` にも無い）。復活させたくなったら
@@ -60,7 +67,9 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
       （`back2` / `back_all` / `fwd2` …）と board への委譲 5 個
       （`apply_sound_switch` など）。末尾の登録表へ直接書く（-90 行）
 - [ ] `server.py` の `backward_hist()` と `forward_hist()`。
-      `_hist.back()` / `forward()` 以外は同じなので 1 本にする（-35 行）
+      `_hist.back()` / `forward()` 以外は同じなので中身を 1 本にする。
+      **2 つの名前は残す**（テストと `CLAUDE.md` が名前で呼んでいる）。
+      それぞれ 1 本を呼ぶだけの 1 行になる（-35 行）
 - [ ] `server.py` のハンドラ 6 個が `asdict(data)` で dataclass を dict へ
       戻して `GameInfo` へ渡している。`message.py` で型を付けた意味が
       ここで消えるので、**`GameInfo` 側を dataclass 受け取りにする**
@@ -84,7 +93,9 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 - [ ] `settings.js` の `QueryStringBase` → `URLSearchParams`。
       実際に読んでいるのは `sound` 1 個だけ（-40 行）
 - [ ] `board.js` の `get_dst_points()` にある「重複削除」の手書きループ →
-      `[...new Set(dst_p)]`（-12 行）
+      `[...new Set(dst_p)]`（-12 行）。**今は隣り合った重複しか削って
+      いないので、行き先の一覧が変わる。** 離れた重複も消す方針でよい
+      （同じポイントが 2 回出ても意味が無いため）。ブラウザで確かめる
 - [ ] `ws.js` の `ws_url()` → `new URL("/ws", location.href)` で protocol を
       差し替える。`document.domain` は非推奨
 - [ ] `index.html` の `<meta http-equiv>` 3 行（Pragma / Cache-Control /
