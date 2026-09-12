@@ -3,15 +3,13 @@ import { emit_msg } from "../ws.js";
 import { BgText } from "./base.js";
 
 /**
+ * 持ち時間と猶予の限度 (ヘッダの <input> 2 つ)。
  *
+ * BgText を継承していたが、el も board も持たないので、継承した機能は
+ * 全部使えていなかった。ただの class にした (TODO-038)。
  */
-export class ClockLimit extends BgText {
-    /**
-     * @param {Board} board
-     */
-    constructor(id, board) {
-        super(undefined, undefined, undefined, undefined, {board: board});
-
+export class ClockLimit {
+    constructor() {
         this.el_limit = [
             document.getElementById("clock_limit0"),
             document.getElementById("clock_limit1")

@@ -215,7 +215,12 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   `dice()` / `set_turn()` / `set_playername()` / `set_score()` /
   `resign_game()` / `new_game()` という更新のメソッドもここが持つ
   （TODO-025 で `ytBackgammon` を吸収した。`resign` は dataclass の
-  フィールド名なので、メソッドは `resign_game()`）。`to_dict()` は
+  フィールド名なので、メソッドは `resign_game()`）。
+  **更新のメソッドは `message.py` の dataclass をそのまま受け取る**
+  （`cube(CubeData)` の形。TODO-038。`server.py` で `asdict()` に
+  戻していたのをやめた）。そのため `gameinfo.py` は `message.py` に
+  依存する（`message.py` の側は何も import しないので循環しない）。
+  `to_dict()` は
   `dataclasses.asdict()`、`from_dict()` は自前。**ファイルから読むときだけは
   必須キーの欠落を例外にする**（黙って初期配置になると、壊れたファイルが
   「初期配置の N 手」として読まれてしまう）
@@ -450,7 +455,7 @@ n 手ぶんの `back` / `fwd`（n > 0）は Task にせず、ロックを握っ�
 履歴はメニューの「履歴を削除」から消せる（TODO-019）。`clear_history()` が
 `_fwd_hist` を空にし、`_history` を今の `gameinfo` 1 件だけにして `sn` を 1 に
 振り直す。**盤面そのものは変えない。** 消すと全員の履歴が消えて元に戻せないので、
-`main.js` の `clear_hist()` が押した人の画面で `confirm()` を出す。
+`main.js` の `menu_emit()` が押した人の画面で `confirm()` を出す。
 `on_json()` の `clear_hist` は、`back` と同じく `Replayer.run()` に渡す
 （走っている連続再生を止めてから消す）。止めずに消すと、再生の Task が
 差し替えたあとの `_history` を pop し続ける。**連続再生の途中で押すと、

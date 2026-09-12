@@ -18,6 +18,14 @@ import copy
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .message import (
+    CubeData,
+    DiceData,
+    PlayerData,
+    PlayerNameData,
+    ScoreData,
+    TurnData,
+)
 from .mylog import getLogger
 
 
@@ -171,61 +179,45 @@ class GameInfo:
         self.__log.debug('board.checker[{}][{}]=[{},{}]',
                          player, ch_i, p, idx)
 
-    def cube(self, data: dict[str, Any]) -> None:
-        """
-        data = {'side': int, 'value': int, 'accepted': bool}
-        """
+    def cube(self, data: CubeData) -> None:
+        """キューブ (TODO-038 で dataclass 受け取りにした)"""
         self.__log.debug('data={}', data)
 
-        self.board.cube = CubeState.from_dict(data)
+        self.board.cube = CubeState(side=data.side, value=data.value,
+                                    accepted=data.accepted)
 
         self.__log.debug('board.cube={}', self.board.cube)
 
-    def dice(self, data: dict[str, Any]) -> None:
-        """
-        data = {
-            'player': player,
-            'dice': [d1, d2, d3, d4]
-        }
-        """
+    def dice(self, data: DiceData) -> None:
+        """指定したプレーヤーの目だけを変える"""
         self.__log.debug('data={}', data)
-        self.board.dice[data['player']] = list(data['dice'])
+        self.board.dice[data.player] = list(data.dice)
 
-    def set_turn(self, data: dict[str, Any]) -> None:
-        """
-        data = {'turn': int, resign: int}
-        """
+    def set_turn(self, data: TurnData) -> None:
+        """turn と resign"""
         self.__log.debug('data={}', data)
-        self.turn = data['turn']
-        self.resign = data['resign']
+        self.turn = data.turn
+        self.resign = data.resign
 
-    def set_playername(self, data: dict[str, Any]) -> None:
-        """
-        data = {'player': int, 'name': str}
-        """
+    def set_playername(self, data: PlayerNameData) -> None:
+        """指定したプレーヤーの名前だけを変える"""
         self.__log.debug('data={}', data)
-        self.board.playername[data['player']] = data['name']
+        self.board.playername[data.player] = data.name
 
-    def set_score(self, data: dict[str, Any]) -> None:
-        """
-        data = {'player': int, 'score': int}
-        """
+    def set_score(self, data: ScoreData) -> None:
+        """指定したプレーヤーの得点だけを変える"""
         self.__log.debug('data={}', data)
-        self.score[data['player']] = data['score']
+        self.score[data.player] = data.score
 
-    def resign_game(self, data: dict[str, Any]) -> None:
+    def resign_game(self, data: PlayerData) -> None:
         """
         resign game
 
         resign という名前は dataclass のフィールドが使っているので、
         メソッド名は resign_game にしてある (TODO-025)。
-
-        Parameters
-        ----------
-        data: {'player': int}
         """
         self.__log.debug('data={}', data)
-        self.resign = data['player']
+        self.resign = data.player
         self.__log.debug('resign={}', self.resign)
 
     def copy(self) -> GameInfo:

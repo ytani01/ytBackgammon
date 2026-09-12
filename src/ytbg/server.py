@@ -15,7 +15,6 @@ HTTP の応答 (index.html) はここには無い。app.py の担当。
 
 import asyncio
 import os
-from dataclasses import asdict
 
 from .clock import Clock
 from .gameinfo import GameInfo
@@ -200,19 +199,22 @@ class BackgammonServer:
                 }
             })
 
-    async def backward_hist(self, n=1, sleep_sec=0.1):
+    async def _replay_hist(self, pop, n, sleep_sec):
         """
-        backward history
+        履歴を 1 手ずつたどって配信する (TODO-038)。
+
+        backward_hist() と forward_hist() の中身。違うのは
+        どちらのスタックから取り出すか (pop) だけ。
 
         Parameters
         ----------
+        pop : Callable[[], GameInfo | None]
+            History.back か History.forward。もう無ければ None を返す
         n : int
-            < 0: all
+            <= 0: 最後まで
         sleep_sec : float
-            sleep seconds
+            1 手ごとに待つ秒数
         """
-        self.__log.debug('n={}, sleep_sec={}', n, sleep_sec)
-
         count = 0
         sec = self.SEC_CHECKER_MOVE
         if n == 0:
@@ -220,7 +222,7 @@ class BackgammonServer:
 
         try:
             while True:
-                hist_ent = self._hist.back()
+                hist_ent = pop()
                 if hist_ent is None:
                     break
 
@@ -236,6 +238,20 @@ class BackgammonServer:
         finally:
             # 途中で cancel されても、そこまでの結果は保存する
             self.save_data()
+
+    async def backward_hist(self, n=1, sleep_sec=0.1):
+        """
+        backward history
+
+        Parameters
+        ----------
+        n : int
+            < 0: all
+        sleep_sec : float
+            sleep seconds
+        """
+        self.__log.debug('n={}, sleep_sec={}', n, sleep_sec)
+        await self._replay_hist(self._hist.back, n, sleep_sec)
 
     async def forward_hist(self, n=1, sleep_sec=0.1):
         """
@@ -249,30 +265,7 @@ class BackgammonServer:
             sleep seconds
         """
         self.__log.debug('n={}, sleep_sec={}', n, sleep_sec)
-
-        count = 0
-        sec = self.SEC_CHECKER_MOVE
-        if n == 0:
-            sec = 0.1
-
-        try:
-            while True:
-                hist_ent = self._hist.forward()
-                if hist_ent is None:
-                    break
-
-                self._load_hist_ent(hist_ent)
-
-                await self.emit_gameinfo(sec, history_flag=True)
-
-                count += 1
-                if n > 0 and count >= n:
-                    break
-
-                await asyncio.sleep(sleep_sec)
-        finally:
-            # 途中で cancel されても、そこまでの結果は保存する
-            self.save_data()
+        await self._replay_hist(self._hist.forward, n, sleep_sec)
 
     def save_data(self):
         """
@@ -422,37 +415,37 @@ class BackgammonServer:
     async def _on_cube(self, m: Message) -> float | None:
         """cube"""
         data: CubeData = m.data
-        self._gameinfo.cube(asdict(data))
+        self._gameinfo.cube(data)
         return 0
 
     async def _on_dice(self, m: Message) -> float | None:
         """dice"""
         data: DiceData = m.data
-        self._gameinfo.dice(asdict(data))
+        self._gameinfo.dice(data)
         return 0
 
     async def _on_set_turn(self, m: Message) -> float | None:
         """turn と resign"""
         data: TurnData = m.data
-        self._gameinfo.set_turn(asdict(data))
+        self._gameinfo.set_turn(data)
         return 0
 
     async def _on_set_playername(self, m: Message) -> float | None:
         """プレーヤー名"""
         data: PlayerNameData = m.data
-        self._gameinfo.set_playername(asdict(data))
+        self._gameinfo.set_playername(data)
         return 0
 
     async def _on_set_score(self, m: Message) -> float | None:
         """得点"""
         data: ScoreData = m.data
-        self._gameinfo.set_score(asdict(data))
+        self._gameinfo.set_score(data)
         return 0
 
     async def _on_resign(self, m: Message) -> float | None:
         """降参"""
         data: PlayerData = m.data
-        self._gameinfo.resign_game(asdict(data))
+        self._gameinfo.resign_game(data)
         return 0
 
     async def _on_set_clock_limit(self, m: Message) -> float | None:

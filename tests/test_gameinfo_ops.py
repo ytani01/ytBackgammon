@@ -5,7 +5,11 @@
 test_gameinfo_ops.py
 
 GameInfo の更新メソッド (TODO-025 で ytBackgammon から吸収した)。
+
+引数は message.py の dataclass (TODO-038)。
 """
+
+from ytbg.message import CubeData, DiceData, TurnData
 
 
 def test_init_gameinfo_structure(bg):
@@ -32,15 +36,15 @@ def test_put_checker_derives_player_from_id(bg):
 
 def test_cube_and_dice(bg):
     """cube() と dice() が gameinfo を更新する"""
-    bg.cube({'side': 0, 'value': 2, 'accepted': False})
+    bg.cube(CubeData(side=0, value=2, accepted=False))
     assert bg.board.cube.value == 2
 
-    bg.dice({'player': 1, 'dice': [3, 4, 0, 0]})
+    bg.dice(DiceData(player=1, dice=[3, 4, 0, 0]))
     assert bg.board.dice[1] == [3, 4, 0, 0]
 
 
 def test_set_turn(bg):
     """set_turn() が turn と resign の両方を更新する"""
-    bg.set_turn({'turn': 0, 'resign': 1})
+    bg.set_turn(TurnData(turn=0, resign=1))
     assert bg.turn == 0
     assert bg.resign == 1

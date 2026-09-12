@@ -1,44 +1,15 @@
 # TODO
 
-**残っている項目: TODO-038。** これまでに 39 件を決着させた。
+**残っている項目は無い。** これまでに 40 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-041` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
 （旧 `.json` も消さずに残してある）。
 
-TODO-038 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
-結果（15 件）の残り。**依存関係は増減しない。**
-削除（037）と置き換え（039）は済んでいるので、触るコードは減っている。
-ブランチは `starlette` のまま。`CLAUDE.md` と `docs/Developer.md` の
-記述（クラス階層図の `ClockLimit`）は、**このコミットの中で直す**。
-
----
-
-## TODO-038. 同じ形の繰り返しをまとめる
-
-- [ ] `main.js` の 14 個のラッパー関数。履歴用 9 個
-      （`back2` / `back_all` / `fwd2` …）と board への委譲 5 個
-      （`apply_sound_switch` など）。末尾の登録表へ直接書く（-90 行）
-- [ ] `server.py` の `backward_hist()` と `forward_hist()`。
-      `_hist.back()` / `forward()` 以外は同じなので中身を 1 本にする。
-      **2 つの名前は残す**（テストと `CLAUDE.md` が名前で呼んでいる）。
-      それぞれ 1 本を呼ぶだけの 1 行になる（-35 行）
-- [ ] `server.py` のハンドラ 6 個が `asdict(data)` で dataclass を dict へ
-      戻して `GameInfo` へ渡している。`message.py` で型を付けた意味が
-      ここで消えるので、**`GameInfo` 側を dataclass 受け取りにする**
-      （`cube(CubeData)` の形。`gameinfo.py` が `message.py` に依存する）
-- [ ] `ui/clock.js` の `ClockLimit extends BgText`。`new ClockLimit(this.board)`
-      は board を **id の引数**に渡していて `this.board` は undefined、
-      `el` も無いので、継承した機能は全部死んでいる。ただの class にする
-
-**構造が変わるので、挙動が変わりうる。** 特に `GameInfo` の更新メソッドの
-引数を変える件は、`tests/test_gameinfo_ops.py` と `tests/test_on_json.py` に
-影響する。
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+2026-09-12 に `src/` 全体を過剰実装の観点で読み直した結果（15 件）は、
+TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
+すべて片付いた。
 
 ---
 
@@ -47,6 +18,7 @@ TODO-038 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直�
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-038.** 同じ形の繰り返しをまとめる](archives/todo/TODO-038.%20同じ形の繰り返しをまとめる.md)
 - [**TODO-039.** 手書きを標準機能に置き換える](archives/todo/TODO-039.%20手書きを標準機能に置き換える.md)
 - [**TODO-037.** 呼ばれていないコードを消す](archives/todo/TODO-037.%20呼ばれていないコードを消す.md)
 - [**TODO-040.** `-i` の既定値に対応するディレクトリが無い](archives/todo/TODO-040.%20%60-i%60%20の既定値に対応するディレクトリが無い.md)

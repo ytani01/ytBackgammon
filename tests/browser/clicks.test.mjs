@@ -256,6 +256,26 @@ describe('クリックでの操作', () => {
            });
     }
 
+    it('確認をキャンセルすると「履歴を削除」は送られない', async () => {
+        // 共有ボードなので、全員の履歴が消える。confirm で止まること
+        // そのものを見る (page.on('dialog') は自動で OK するので、
+        // ここだけ window.confirm を差し替える)
+        await page.evaluate(() => {
+            window.__orig_confirm = window.confirm;
+            window.confirm = () => false;
+        });
+        try {
+            await menu('履歴を削除');
+            await settle(page);
+            const sent = await take_sent(page);
+            assert.deepEqual(sent.filter(m => m.type === 'clear_hist'), []);
+        } finally {
+            await page.evaluate(() => {
+                window.confirm = window.__orig_confirm;
+            });
+        }
+    });
+
     // --- ヘッダ ---
 
     it('ヘッダ Sound → board.sound が反転する', async () => {
@@ -465,6 +485,21 @@ describe('クリックでの操作', () => {
             assert.deepEqual(await take_sent(page), []);
 
             await page.evaluate(l => board[l][0].off(), list);
+        });
+    }
+
+    // --- キーボード (Ctrl-Z / Ctrl-Y) ---
+
+    for (const [key, type] of [['z', 'back'], ['y', 'fwd']]) {
+        it(`Ctrl-${key.toUpperCase()} → ${type} {n: 1} を送る`, async () => {
+            await settle(page);
+            await take_sent(page);
+            await page.evaluate(k => {
+                document.body.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: k, ctrlKey: true, bubbles: true,
+                }));
+            }, key);
+            await assert_sent(page, type, { n: 1 }, false);
         });
     }
 

@@ -167,7 +167,7 @@ export class Board extends BgImage {
         }
 
         // Clock
-        this.clock_limit = new ClockLimit(this.board);
+        this.clock_limit = new ClockLimit();
 
         this.player_clock = [];
         this.player_clock.push(new PlayerClock(

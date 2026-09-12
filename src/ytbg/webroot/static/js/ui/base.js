@@ -10,7 +10,6 @@ import { get_image_dir } from "../settings.js";
  * BgBase .. (x, y, w, h), mouse handlers, board / player   ui/base.js
  *    |
  *    +- BgText .. have a text                               ui/base.js
- *    |    +- ClockLimit                                     ui/clock.js
  *    |    +- PlayerClock                                    ui/clock.js
  *    |    +- PlayerName                                     ui/label.js
  *    |    +- PlayerPipCount                                 ui/label.js

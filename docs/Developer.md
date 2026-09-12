@@ -67,6 +67,7 @@ graph TD
     server --> hub["hub.py<br/>ClientHub"]
     server --> replay["replay.py<br/>Replayer"]
     server --> storage["storage.py<br/>Storage"]
+    gameinfo --> message
     history --> gameinfo
     storage --> gameinfo
     storage --> clock
@@ -231,7 +232,6 @@ graph TD
     BgBase["BgBase<br/>(座標・マウス操作)"] --> BgText
     BgBase --> BgImage
     BgBase --> BoardPoint
-    BgText --> ClockLimit
     BgText --> PlayerClock
     BgText --> PlayerName
     BgText --> PlayerPipCount

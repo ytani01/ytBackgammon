@@ -16,98 +16,23 @@ const nav = document.getElementById("nav-input");
 let board = undefined;
 
 /**
- * New game
+ * メニューの項目の共通処理 (TODO-038)。
+ *
+ * 押したらメニューを閉じ、type を送る。confirm_msg があるものは、
+ * 押した人の画面で確認を取ってから送る (共有ボードなので、全員の
+ * 盤面や履歴が変わる)。
+ *
+ * @param {string} type
+ * @param {Object} [data={}]
+ * @param {string} [confirm_msg] - 確認を取るときのメッセージ
  */
-const new_game = () => {
-    nav.checked=false;
-    log("new_game()");
-    if (! confirm("New Game を始めます。\n"
-                  + "全員の盤面が初期配置に戻ります。")) {
+const menu_emit = (type, data={}, confirm_msg=undefined) => {
+    nav.checked = false;
+    log(`menu_emit(${type})`);
+    if ( confirm_msg !== undefined && ! confirm(confirm_msg) ) {
         return;
     }
-    emit_msg("new", {}, false);
-};
-
-/**
- * Backward history
- *
- * @param {number} [n=1]
- */
-const backward_hist = (n=1) => {
-    nav.checked=false;
-    log(`backward_hist(n=${n})`);
-    emit_msg("back", {n: n}, false);
-};
-
-/**
- * 
- */
-const back2 = () => {
-    nav.checked=false;
-    log("back2");
-    emit_msg("back2", {}, false);
-};
-
-/**
- *
- */
-const back_all = () => {
-    nav.checked=false;
-    log("back_all()");
-    emit_msg("back_all", {}, false);
-};
-
-/**
- * Forward history
- *
- * @param {number} [n=1]
- */
-const forward_hist = (n=1) => {
-    nav.checked=false;
-    log(`forward_hist(n=${n})`);
-    emit_msg("fwd", {n: n}, false);
-};
-
-/**
- *
- */
-const fwd2 = () => {
-    nav.checked=false;
-    log("fwd2");
-    emit_msg("fwd2", {}, false);
-};
-
-/**
- *
- */
-const fwd_all = () => {
-    nav.checked=false;
-    log("fwd_all()");
-    emit_msg("fwd_all", {}, false);
-};
-
-/**
- * 履歴を削除して、今の盤面だけを残す (TODO-019)
- *
- * 1 枚のボードを全員で共有しているので、消すと全員の履歴が消え、
- * 元に戻せない。押した人の画面で確認を取る。
- */
-const clear_hist = () => {
-    nav.checked=false;
-    log("clear_hist()");
-    if (! confirm("履歴を削除します。\n"
-                  + "全員の履歴が消え、元に戻せません。")) {
-        return;
-    }
-    emit_msg("clear_hist", {}, false);
-};
-    
-/**
- *
- */
-const board_inverse = () => {
-    nav.checked=false;
-    board.inverse(0.5);
+    emit_msg(type, data, false);
 };
 
 /**
@@ -133,41 +58,6 @@ const emit_playername = (player) => {
 /**
  *
  */
-const apply_sound_switch = () => {
-    board.apply_sound_switch();
-};
-
-/**
- *
- */
-const apply_free_move = () => {
-    board.apply_free_move();
-};
-
-/**
- *
- */
-const apply_disp_pip = () => {
-    board.apply_disp_pip();
-};
-
-/**
- * @param {number} index
- */
-const apply_clock_sw = index => {
-    board.apply_clock_sw();
-};
-
-/**
- * @param {number} index
- */
-const apply_clock_limit = index => {
-    board.apply_clock_limit(index);
-};
-
-/**
- *
- */
 const on_key_down = (e, board) => {
     log(`on_key_down(board.svr_id=${board.svr_id}`);
     log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
@@ -176,15 +66,14 @@ const on_key_down = (e, board) => {
     const player = board.player;
     const roll_btn = board.roll_btn[player];
     const pass_btn = board.pass_btn[player];
-    const dice = roll_btn.dice[0];
 
     if ( e.ctrlKey ) {
         if ( e.key == 'z' ) {
-            backward_hist();
+            menu_emit("back", {n: 1});
             return;
         }
         if ( e.key == 'y' ) {
-            forward_hist();
+            menu_emit("fwd", {n: 1});
             return;
         }
     }
@@ -273,26 +162,30 @@ window.onload = async () => {
 // (押すと URL に "#" が付く。属性で呼んでいたときと同じ)。
 //
 for (const [id, handler] of [
-    ["menu-inverse", board_inverse],
-    ["menu-back", () => backward_hist()],
-    ["menu-back2", back2],
-    ["menu-back-all", back_all],
-    ["menu-fwd", () => forward_hist()],
-    ["menu-fwd2", fwd2],
-    ["menu-fwd-all", fwd_all],
-    ["menu-clear-hist", clear_hist],
-    ["menu-new-game", new_game],
+    ["menu-inverse", () => { nav.checked = false; board.inverse(0.5); }],
+    ["menu-back", () => menu_emit("back", {n: 1})],
+    ["menu-back2", () => menu_emit("back2")],
+    ["menu-back-all", () => menu_emit("back_all")],
+    ["menu-fwd", () => menu_emit("fwd", {n: 1})],
+    ["menu-fwd2", () => menu_emit("fwd2")],
+    ["menu-fwd-all", () => menu_emit("fwd_all")],
+    ["menu-clear-hist", () => menu_emit(
+        "clear_hist", {},
+        "履歴を削除します。\n全員の履歴が消え、元に戻せません。")],
+    ["menu-new-game", () => menu_emit(
+        "new", {},
+        "New Game を始めます。\n全員の盤面が初期配置に戻ります。")],
 ]) {
     document.getElementById(id).addEventListener("click", handler);
 } // for(id, handler)
 
 for (const [id, handler] of [
-    ["sound-switch", apply_sound_switch],
-    ["free-move", apply_free_move],
-    ["disp-pip", apply_disp_pip],
-    ["clock_sw", () => apply_clock_sw()],
-    ["clock_limit0", () => apply_clock_limit(0)],
-    ["clock_limit1", () => apply_clock_limit(1)],
+    ["sound-switch", () => board.apply_sound_switch()],
+    ["free-move", () => board.apply_free_move()],
+    ["disp-pip", () => board.apply_disp_pip()],
+    ["clock_sw", () => board.apply_clock_sw()],
+    ["clock_limit0", () => board.apply_clock_limit(0)],
+    ["clock_limit1", () => board.apply_clock_limit(1)],
 ]) {
     document.getElementById(id).addEventListener("change", handler);
 } // for(id, handler)
