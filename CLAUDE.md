@@ -94,6 +94,11 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   自動で OK する。サーバの返事を待つ目印に、プレーヤー 1 の名前を
   変えずに送り直しているので、**このファイルの中でプレーヤー 1 の名前を
   変えないこと**
+- `sound.test.mjs` — `?sound` のクエリで音が止まるか（TODO-039）。
+  ページを開いて `sound.js` の `GlobalSoundSwitch` を読む。
+  **`?sound=`（`=` はあるが値が空）は「値が無い」扱い**で、鳴る側になる
+  （`URLSearchParams` が `?sound` と区別できないため。手書きの
+  パーサだった頃は鳴らない側だった）
 
 注意する点:
 
@@ -252,7 +257,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     `tests/browser/` は全件通る（no-op なので当然）。
     この順序を変えるときは、画像の応答を遅らせて配置を実測すること
   - `ws.js`（接続・再接続・送信）、`log.js`、`layout.js`（盤面の座標）、
-    `settings.js`（Cookie / QueryString と、`<body>` の `data-*` から読む
+    `settings.js`（`CookieBase`、クエリ文字列から `sound` を読む
+    `get_sound_query()`、`<body>` の `data-*` から読む
     `get_image_dir()` / `get_server_id()`）、`sound.js`
   - `board.js` — `Board`
   - `rules/` — ルール層（TODO-027）。`position.js` に `Position` と
@@ -273,8 +279,10 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   `dom.js` が作る（TODO-029）。画像ディレクトリとサーバ ID は
   `<body data-image-dir="..." data-server-id="...">` で渡す。
   **キャッシュ避けはサーバ側**で、`/static` は `Cache-Control: no-cache` で
-  返す（`app.py` の `NoCacheStaticFiles`。TODO-028）。以前の `?ts=` 付き URL は、
-  `import` した先のモジュールには効かないのでやめた
+  返す（`app.py` の `NoCacheStaticFiles`。TODO-028）。`index.html` 自身にも
+  `app.py` の `index()` が同じヘッダを付ける（TODO-039。以前は
+  `<meta http-equiv>` で伝えていたが、今のブラウザは見ない）。
+  以前の `?ts=` 付き URL は、`import` した先のモジュールには効かないのでやめた
 - `ytbg.html` — 複数サーバの画面を iframe で並べる一覧ページ（サーバ経由ではなく静的）
 
 ### サーバ 1 プロセス ＝ ボード 1 面

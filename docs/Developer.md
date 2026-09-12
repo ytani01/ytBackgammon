@@ -190,7 +190,8 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 
 **ES Modules で、バンドラは使わない。** `index.html` は
 `<script type="module" src="/static/js/main.js">` の 1 行で読み込む。
-キャッシュ避けはサーバ側で、`/static` は `Cache-Control: no-cache` で返す。
+キャッシュ避けはサーバ側で、`/static` も `index.html` も
+`Cache-Control: no-cache` で返す。
 
 | モジュール | 役割 |
 |------------|------|
@@ -199,7 +200,7 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 | `board.js` | `Board`。盤面全体 |
 | `ws.js` | 接続・再接続・送信 |
 | `layout.js` | 盤面の座標 |
-| `settings.js` | Cookie と QueryString、`<body>` の `data-*` |
+| `settings.js` | Cookie、クエリ文字列、`<body>` の `data-*` |
 | `sound.js`, `log.js` | 音、ログ |
 | `rules/` | ルール層（純粋関数） |
 | `ui/` | 表示部品 |

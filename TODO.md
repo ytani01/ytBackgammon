@@ -1,20 +1,17 @@
 # TODO
 
-**残っている項目: TODO-038〜039。** これまでに 38 件を決着させた。
+**残っている項目: TODO-038。** これまでに 39 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-041` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
 （旧 `.json` も消さずに残してある）。
 
-TODO-038〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
-結果（15 件）を、性質ごとに分けたもの。**依存関係は増減しない。**
-
-**着手する順は 039 → 038**（TODO-040 と 037 は済んだ）。
-削除（037）を先に済ませたので、集約（038）で触るコードは減っている。
-ブランチは `starlette` のまま、項目ごとにコミットを分ける。
-`CLAUDE.md` と `docs/Developer.md` の記述（`QueryStringBase`、
-クラス階層図の `ClockLimit`）は、**それを変えた項目のコミットの中で直す**。
+TODO-038 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
+結果（15 件）の残り。**依存関係は増減しない。**
+削除（037）と置き換え（039）は済んでいるので、触るコードは減っている。
+ブランチは `starlette` のまま。`CLAUDE.md` と `docs/Developer.md` の
+記述（クラス階層図の `ClockLimit`）は、**このコミットの中で直す**。
 
 ---
 
@@ -45,38 +42,12 @@ TODO-038〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 
 ---
 
-## TODO-039. 手書きを標準機能に置き換える
-
-- [ ] `settings.js` の `QueryStringBase` → `URLSearchParams`。
-      実際に読んでいるのは `sound` 1 個だけ（-40 行）
-- [ ] `board.js` の `get_dst_points()` にある「重複削除」の手書きループ →
-      `[...new Set(dst_p)]`（-12 行）。**今は隣り合った重複しか削って
-      いないので、行き先の一覧が変わる。** 離れた重複も消す方針でよい
-      （同じポイントが 2 回出ても意味が無いため）。ブラウザで確かめる
-- [ ] `ws.js` の `ws_url()` → `new URL("/ws", location.href)` で protocol を
-      差し替える。`document.domain` は非推奨
-- [ ] `index.html` の `<meta http-equiv>` 3 行（Pragma / Cache-Control /
-      Expires）。今のブラウザは見ない。**消すかわりに、`app.py` の
-      `index` の応答に `Cache-Control: no-cache` を付ける**
-      （`/static` は `NoCacheStaticFiles` が付けているが、`index.html`
-      自身には付いていない）
-
-`QueryStringBase` を `URLSearchParams` に替えると、値の無い `?sound` の
-扱いが変わる（`get()` が `null` ではなく空文字を返す）。
-**今の扱いを保つ**こと。つまり `?sound`（値無し）は無視して鳴らし、
-`?sound=何か` のときだけ止める。
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Sonnet 5 / effort medium | implementer + verifier + reviewer |
-
----
-
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-039.** 手書きを標準機能に置き換える](archives/todo/TODO-039.%20手書きを標準機能に置き換える.md)
 - [**TODO-037.** 呼ばれていないコードを消す](archives/todo/TODO-037.%20呼ばれていないコードを消す.md)
 - [**TODO-040.** `-i` の既定値に対応するディレクトリが無い](archives/todo/TODO-040.%20%60-i%60%20の既定値に対応するディレクトリが無い.md)
 - [**TODO-036.** README と docs/ の日本語を見直す](archives/todo/TODO-036.%20README%20と%20docs_%20の日本語を見直す.md)

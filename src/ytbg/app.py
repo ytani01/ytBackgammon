@@ -67,7 +67,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
     async def index(request):
         """'/', '/p1', '/p2' はいずれも同じ index.html を返す"""
         _log.debug('')
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request, 'index.html',
             {
                 'name': svr_name,
@@ -75,6 +75,8 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
                 'server_id': svr_id,
                 'image_dir': image_dir,
             })
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
 
     async def websocket_endpoint(websocket):
         """

@@ -1,43 +1,18 @@
-import { log } from "./log.js";
-
 /**
+ * URL のクエリ文字列から "sound" を読む。
  *
+ * 値があるときだけ音を止めるので (sound.js の GlobalSoundSwitch)、
+ * 値が無い `?sound` は undefined を返す。`URLSearchParams.get()` は
+ * `?sound` にも `?sound=` にも空文字を返して区別できないので、
+ * **`?sound=` も「値が無い」扱いになる** (TODO-039。手書きの
+ * パーサだった頃は鳴らない側だった)。
+ *
+ * @return {string|undefined}
  */
-export class QueryStringBase {
-    constructor() {
-        this.querystring = '';
-        this.data = [];
-        this.load();
-    } // constructor()
-
-    load() {
-        this.querystring = window.location.search || '';
-        this.querystring = this.querystring.substr(
-            1, this.querystring.length);
-        log(`QueryStringBase.load>querystring=${this.querystring}`);
-
-        if ( this.querystring.length == 0 ) {
-            return {};
-        }
-
-        for (let ent of this.querystring.split("&")) {
-            let [k, v] = ent.split("=");
-            this.data[k] = v;
-        } // for(ent)
-
-        return this.data;
-    } // QueryStringBase.load()
-
-    /**
-     * @param {string} key
-     */
-    get(key) {
-        if ( this.data[key] === undefined ) {
-            return undefined;
-        }
-        return decodeURIComponent(this.data[key]);
-    } // QueryStringBase.get()
-} // class QueryStringBase
+export function get_sound_query() {
+    return new URLSearchParams(window.location.search).get("sound")
+        || undefined;
+} // get_sound_query()
 
 /**
  *

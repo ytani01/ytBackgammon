@@ -1,6 +1,6 @@
 import { log } from "./log.js";
 import { emit_msg, ws_connect } from "./ws.js";
-import { QueryStringBase } from "./settings.js";
+import { get_sound_query } from "./settings.js";
 import { set_global_sound_switch } from "./sound.js";
 import { build_dom, wait_images } from "./dom.js";
 import { Board } from "./board.js";
@@ -227,8 +227,7 @@ window.onload = async () => {
     await wait_images();
 
     // sound switch
-    const q_str = new QueryStringBase();
-    const sound_switch = q_str.get("sound");
+    const sound_switch = get_sound_query();
     set_global_sound_switch(sound_switch);
     log(`GlobalSoundSwitch=${sound_switch}`);
 

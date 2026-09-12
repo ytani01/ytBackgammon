@@ -12,14 +12,9 @@ let ws_retry_sec = WS_RETRY_SEC_MIN;
  * @return {string}
  */
 const ws_url = () => {
-    const proto = (document.location.protocol === "https:") ? "wss:" : "ws:";
-    let url = `${proto}//${document.domain}`;
-    log(`location.port=${location.port}`);
-    if ( location.port != "" ) {
-        url += ":" + location.port;
-    }
-    url += "/ws";
-    return url;
+    const url = new URL("/ws", location.href);
+    url.protocol = (url.protocol === "https:") ? "wss:" : "ws:";
+    return url.href;
 };
 
 /**

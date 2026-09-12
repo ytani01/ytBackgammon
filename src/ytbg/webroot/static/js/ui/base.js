@@ -31,7 +31,7 @@ import { get_image_dir } from "../settings.js";
  *    |
  *    +- BoardPoint                                          ui/point.js
  *
- * CookieBase, QueryStringBase .. cookie / querystring       settings.js
+ * CookieBase .. cookie                                      settings.js
  * SoundBase .. sound                                        sound.js
  *=====================================================
  */

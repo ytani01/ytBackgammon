@@ -1,7 +1,7 @@
 import { log } from "./log.js";
 import { emit_msg } from "./ws.js";
 import { BX, BY } from "./layout.js";
-import { CookieBase, QueryStringBase, get_server_id } from "./settings.js";
+import { CookieBase, get_sound_query, get_server_id } from "./settings.js";
 import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
          SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
@@ -366,8 +366,7 @@ export class Board extends BgImage {
         log("Board.apply_sound_switch>"
                     + `cookie_sound=${this.cookie_sound}`);
 
-        const q_str = new QueryStringBase();
-        set_global_sound_switch(q_str.get("sound"));
+        set_global_sound_switch(get_sound_query());
         log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
 
         this.sound = document.getElementById("sound-switch").checked;
@@ -717,15 +716,7 @@ export class Board extends BgImage {
         }
 
         // 重複削除
-        let dst_p2 = [];
-        let prev_p = undefined;
-        for ( let p of dst_p ) {
-            if ( p != prev_p ) {
-                dst_p2.push(p);
-                prev_p = p;
-            }
-        }
-        dst_p = dst_p2;
+        dst_p = [...new Set(dst_p)];
         // log(`Board.get_dst_points>dst_p=${JSON.stringify(dst_p)}`);
 
         let dst_p1 = undefined;

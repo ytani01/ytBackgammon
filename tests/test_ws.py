@@ -103,6 +103,18 @@ def test_index_has_image_dir(client):
     assert '/static/images1a/bg.png' in res.text
 
 
+def test_index_no_cache(client):
+    """index.html の応答に Cache-Control: no-cache が付く (TODO-039)
+
+    以前は index.html 側の <meta http-equiv> で伝えていたが、
+    今のブラウザは見ないので消し、サーバ側のヘッダへ移した。
+    """
+    res = client.get('/')
+
+    assert res.status_code == 200
+    assert res.headers['Cache-Control'] == 'no-cache'
+
+
 def test_static_files(client):
     """/static/ の下のファイルが返る"""
     res = client.get('/static/images1a/board-base.png')
