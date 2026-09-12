@@ -27,7 +27,8 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 - [ ] `mylog.py` の `exmsg()`（`src/` では docstring の例にしか出てこない）と、
       `setLevel(level=None)` の分岐
 - [ ] `rules/position.js` の `Position.empty()` / `count_of()`。
-      テストからしか呼ばれていない
+      テストからしか呼ばれていないので、`tests/js/position.test.mjs` の
+      該当する `it` ごと消す
 - [ ] `board.js` の `apply_sound_switch()` 内の `GlobalSoundSwitch` ブロック
       （`board_num` を読んで何もしない）、コンストラクタの
       `this.score = [0, 0]` の二重初期化
@@ -55,7 +56,8 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
       `_hist.back()` / `forward()` 以外は同じなので 1 本にする（-35 行）
 - [ ] `server.py` のハンドラ 6 個が `asdict(data)` で dataclass を dict へ
       戻して `GameInfo` へ渡している。`message.py` で型を付けた意味が
-      ここで消えるので、`GameInfo` 側を dataclass 受け取りにする
+      ここで消えるので、**`GameInfo` 側を dataclass 受け取りにする**
+      （`cube(CubeData)` の形。`gameinfo.py` が `message.py` に依存する）
 - [ ] `ui/clock.js` の `ClockLimit extends BgText`。`new ClockLimit(this.board)`
       は board を **id の引数**に渡していて `this.board` は undefined、
       `el` も無いので、継承した機能は全部死んでいる。ただの class にする
@@ -81,10 +83,10 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 - [ ] `index.html` の `<meta http-equiv>` 3 行（Pragma / Cache-Control /
       Expires）。今のブラウザは見ない
 
-`QueryStringBase` の置き換えでは、`?sound` のように値の無いクエリの
-扱いが変わる（今は `undefined` ではなく空文字になる）。
-**`sound` は「指定されていたら鳴らさない」という判定なので、
-`has()` で見るか `get()` で見るかを決めること。**
+`QueryStringBase` を `URLSearchParams` に替えると、値の無い `?sound` の
+扱いが変わる（`get()` が `null` ではなく空文字を返す）。
+**今の扱いを保つ**こと。つまり `?sound`（値無し）は無視して鳴らし、
+`?sound=何か` のときだけ止める。
 
 |      | main | 担当 |
 |------|------|------|
@@ -97,9 +99,9 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 - [ ] `__main__.py` の `--image_dir` の既定値が `images1` だが、
       `static/` にあるのは `images0a` `images1a` `images2` `images3` の 4 つ
 
-`-i` を付けずに起動すると、画像が全部 404 になる。既定値を実在する
-ディレクトリへ直す。**どれを既定にするかは着手時に決める**
-（`ytbg-boot.sh` は 4 つとも使っているので、そこからは決まらない）。
+`-i` を付けずに起動すると、画像が全部 404 になる。**既定値を `images1a` に
+直す**（今の `images1` に一番近い名前で、README や `ytbg.sh` の例でも
+使っている）。
 
 |      | main | 担当 |
 |------|------|------|
