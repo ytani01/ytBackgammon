@@ -539,7 +539,8 @@ export class RollButton extends BannerButton {
 
         if ( this.another().dice_active ) {
             log(`settimeout`);
-            const click_dice = this.dice[0].on_mouse_down_xy.bind(this);
+            const click_dice =
+                  this.dice[0].on_mouse_down_xy.bind(this.dice[0]);
             setTimeout(click_dice, 2000);
         }
     } // RollButton.on_mouse_down_xy()
