@@ -8,8 +8,11 @@
 （旧 `.json` も消さずに残してある）。
 
 TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
-結果（15 件）を、性質ごとに 3 つへ分けたもの。合計でおよそ 390 行減る
+結果（15 件）を、性質ごとに 3 つへ分けたもの。合計でおよそ 370 行減る
 見込み。**依存関係は増減しない。**
+
+**着手する順は TODO-040 → 037 → 039 → 038。** 小さく確実なものから始め、
+削除（037）を先にやって、集約（038）で触るコードを減らす。
 
 ---
 
@@ -24,19 +27,23 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
       どこからも呼ばれていない。`message.py` の `DATA_TYPES` と
       `server.py` の `_handlers` から両方消す。
       **`Clock.reset()` 自体は `new_game()` と `set_clock_limit` が使うので残す**
-- [ ] `mylog.py` の `exmsg()`（`src/` では docstring の例にしか出てこない）と、
-      `setLevel(level=None)` の分岐
 - [ ] `rules/position.js` の `Position.empty()` / `count_of()`。
       テストからしか呼ばれていないので、`tests/js/position.test.mjs` の
       該当する `it` ごと消す
 - [ ] `board.js` の `apply_sound_switch()` 内の `GlobalSoundSwitch` ブロック
       （`board_num` を読んで何もしない）、コンストラクタの
       `this.score = [0, 0]` の二重初期化
-- [ ] コメントアウトされたまま残っている塊（`ui/dice.js` の
-      `dice_histogram`、`board.js` の `player_clock[].update()` など）
+- [ ] コメントアウトされたまま残っている塊。**全部消す**（`board.js` と
+      `ui/dice.js` にまたがる `dice_histogram` ~25 行も含む。表示先の
+      `#dice-histogram` は `index.html` にも無い）。復活させたくなったら
+      git から拾う
 
 盤面の挙動は変わらないはずの削除だけを集めてある。`reset_clock` と
 `Position` のメソッドはテストが参照しているので、**テストも一緒に直す**。
+
+**`mylog.py` は触らない。** `exmsg()` と `setLevel(level=None)` はこの
+リポジトリでは未使用だが、`mylog.py` は他でも使い回す形のモジュールなので、
+ここだけの都合で削らない。
 
 |      | main | 担当 |
 |------|------|------|
@@ -81,7 +88,10 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 - [ ] `ws.js` の `ws_url()` → `new URL("/ws", location.href)` で protocol を
       差し替える。`document.domain` は非推奨
 - [ ] `index.html` の `<meta http-equiv>` 3 行（Pragma / Cache-Control /
-      Expires）。今のブラウザは見ない
+      Expires）。今のブラウザは見ない。**消すかわりに、`app.py` の
+      `index` の応答に `Cache-Control: no-cache` を付ける**
+      （`/static` は `NoCacheStaticFiles` が付けているが、`index.html`
+      自身には付いていない）
 
 `QueryStringBase` を `URLSearchParams` に替えると、値の無い `?sound` の
 扱いが変わる（`get()` が `null` ではなく空文字を返す）。
