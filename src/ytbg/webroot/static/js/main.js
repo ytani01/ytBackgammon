@@ -119,7 +119,6 @@ const emit_playername = (player) => {
 
     const player_name = board.player_name[player];
     const cur_name = player_name.get();
-    const def_name = player_name.default_text;
 
     log(`emit_playername2>player=${player},`
                 + `cur_name=${cur_name},`
@@ -195,12 +194,6 @@ const on_key_down = (e, board) => {
             roll_btn.on_mouse_down_xy(0, 0);
             return;
         }
-        /*
-        if ( roll_btn.dice_active ) {
-            dice.on_mouse_down_xy(0, 0);
-            return;
-        }
-        */
         if ( pass_btn.active ) {
             log(`pass_btn.active=${pass_btn.active}`);
             pass_btn.on_mouse_down_xy(0, 0);

@@ -170,7 +170,6 @@ export class PlayerScore extends BgText {
         this.el.style.transform = "rotate(-90deg)";
         this.el.style.transformOrigin = "left top";
 
-        this.default_text = `${this.score}`;
         this.set("");
     } // Score.constructor()
 

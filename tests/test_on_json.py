@@ -215,7 +215,7 @@ def no_clock_keys(gameinfo):
          lambda g: g['score'][1], 2),
         ('resign', {'player': 0},
          lambda g: g['resign'], 0),
-        # クロック系の 5 つ。クロックは gameinfo の外に出した
+        # クロック系の 4 つ。クロックは gameinfo の外に出した
         # (TODO-024) ので、gameinfo にクロックのキーは戻ってこない。
         # それを見る (状態は clock_state で送られる。
         # そちらは tests/test_clock.py)
@@ -226,8 +226,6 @@ def no_clock_keys(gameinfo):
         ('set_clock_switch', {'switch': False},
          no_clock_keys, True),
         ('resume_clock', {'player': 1},
-         no_clock_keys, True),
-        ('reset_clock', {'player': 1},
          no_clock_keys, True),
     ],
 )

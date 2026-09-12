@@ -25,59 +25,11 @@ export class Checker extends BgImage {
     } // Checker.constructor()
 
     /**
-     * @return {number} z座標
-     */
-    calc_z() {
-        let z = 0;
-
-        for (let p=0; p < 2; p++) {
-            for (let i=0; i < 15; i++) {
-                let ch = this.board.checker[p][i];
-
-                if (ch !== this) {
-                    let d = this.distance(ch);
-                    if ( d < this.w ) {
-                        let z1 = ch.z + 1;
-                        z = Math.max(z, z1);
-                        // log(`Checker.calc_z> d=${d}, z=${z}`);
-                    }
-                }
-            } // for (i)
-        } // for (p)
-
-        this.set_z(z);
-    } // Checker.calc_z()
-
-    /**
-     * calcurate distance
-     * @param {Checker} ch - distination checker object
-     * @return {number} - distance
-     */
-    distance(ch) {
-        let [dx, dy] = [ch.x - this.x, ch.y - this.y];
-        return Math.sqrt(dx * dx + dy * dy);
-    } // Checker.distance()
-    
-    /**
      * @return {number} - pip count
      */
     get_pip() {
         return rule_get_pip(this.player, this.cur_point);
     } // Checker.get_pip()
-
-    /**
-     * @return {boolean}
-     */
-    is_last_man() {
-        const pip = this.get_pip();
-        for (let i=0; i < 15; i++) {
-            const pip2 = this.board.checker[this.player][i].get_pip();
-            if ( pip2 > pip ) {
-                return false;
-            }
-        } // for(i)
-        return true;
-    } // Checker.is_last_man()
 
     /**
      * @return {boolean}
@@ -168,21 +120,6 @@ export class Checker extends BgImage {
         ch.move(ch.src_x, ch.src_y, true);
         ch.board.moving_checker = undefined;
     } // Checker.cancel_move()
-
-    /**
-     * 移動可能なポイントの取得
-     *
-     * @param {Checker} ch
-     * @param {number[]} available_dice
-     * @return {number[]} points
-     */
-    get_available_points(ch, available_dice) {
-        log(``);
-        // T.B.D.
-        // see get_dst_points()
-
-        return [];
-    } // Checker.get_available_points()
 
     /**
      * @param {number} x

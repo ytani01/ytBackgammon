@@ -87,15 +87,6 @@ export class Position {
     } // Position.constructor()
 
     /**
-     * チェッカーが 1 枚も無い Position
-     *
-     * @return {Position}
-     */
-    static empty() {
-        return new Position(Array.from({length: N_POINT}, () => []));
-    } // Position.empty()
-
-    /**
      * ポイントごとのプレーヤー番号の配列から作る。
      *
      * Board の `this.point[p].checkers` をそのまま写すための入口。
@@ -168,27 +159,6 @@ export class Position {
     count(p) {
         return this.pt[p].length;
     } // Position.count()
-
-    /**
-     * そのポイントにある、指定したプレーヤーのチェッカーの枚数
-     *
-     * @param {number} p - point index
-     * @param {number} player - 0 or 1
-     * @return {number}
-     */
-    count_of(p, player) {
-        return this.pt[p].filter((pl) => pl == player).length;
-    } // Position.count_of()
-
-    /**
-     * そのポイントのプレーヤー番号の配列 (積んだ順)
-     *
-     * @param {number} p - point index
-     * @return {number[]} - 複製
-     */
-    players(p) {
-        return [...this.pt[p]];
-    } // Position.players()
 
     /**
      * 指定したプレーヤーのチェッカーがあるポイントの一覧

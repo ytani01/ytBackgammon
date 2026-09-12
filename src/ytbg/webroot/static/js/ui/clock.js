@@ -196,16 +196,6 @@ export class PlayerClock extends BgText {
     /**
      * 
      */
-    reset() {
-        const limit = this.board.clock_limit.limit;
-        log(`PlayerClock.reset():player=${this.player},limit=[${limit[0]},${limit[1]}]`);
-        this.set(limit);
-        this.stop();
-    }
-    
-    /**
-     * 
-     */
     change_turn() {
         this.emit_stop();
         this.emit();
@@ -255,13 +245,6 @@ export class PlayerClock extends BgText {
     emit_stop(add_hist=false) {
         emit_msg("stop_clock", { player: this.player }, add_hist);
     } // PlayerClock.emit_pause()
-
-    /**
-     * @param {boolean} [add_hist=true]
-     */
-    emit_reset(add_hist=false) {
-        emit_msg("reset_clock", { player: this.player }, add_hist);
-    } // PlayerClock.emit_reset()
 
     /**
      * @param {number} x

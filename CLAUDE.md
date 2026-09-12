@@ -300,9 +300,9 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
 `{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
 `history: true` を付けたメッセージだけが履歴に 1 手として積まれる。
-ただし、クロック系の 7 つの type（`set_clock_limit` / `set_player_clock` /
-`set_clock_switch` / `start_clock` / `resume_clock` / `stop_clock` /
-`reset_clock`）は `gameinfo` を書き換えないので、`history: true` で届いても
+ただし、クロック系の 6 つの type（`set_clock_limit` / `set_player_clock` /
+`set_clock_switch` / `start_clock` / `resume_clock` / `stop_clock`）は
+`gameinfo` を書き換えないので、`history: true` で届いても
 積まない（`message.py` の `NO_HISTORY_TYPES`）。1 つ前のエントリと `sn` 以外が
 同じ場合も積まない（TODO-032）。
 
@@ -365,7 +365,7 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 `None` は「自分で送信済み」（`back` / `back2` / `back_all` / `fwd` /
 `fwd2` / `fwd_all` / `clear_hist` / `new` / `set_gameinfo` の 9 つ）、
 `float` は「アニメーションの秒数。`history` フラグを見て履歴へ積み、
-`emit_gameinfo()`」（盤面とクロックを変える 14 個）。秒数を返すのは
+`emit_gameinfo()`」（盤面とクロックを変える 13 個）。秒数を返すのは
 `put_checker`（`SEC_CHECKER_MOVE`）だけで、残りは `0`。
 
 `type` を足すときは、`DATA_TYPES` に dataclass を、`_handlers` に
@@ -380,8 +380,8 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 
 **表示を進めるのはクライアント側だけ**だが、残り時間の基準はサーバも持つ
 （TODO-016）。`on_json()` には `set_clock_limit` / `set_player_clock` に加えて
-`set_clock_switch` / `start_clock` / `stop_clock` / `resume_clock` /
-`reset_clock` の分岐があり、いずれも return せず、末尾の `add_history` と
+`set_clock_switch` / `start_clock` / `stop_clock` / `resume_clock` の
+分岐があり、いずれも return せず、末尾の `add_history` と
 `emit_gameinfo()` へ落ちる。
 
 **クロックは `Clock`（`clock.py`）が持ち、`gameinfo` には入れない**

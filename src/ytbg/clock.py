@@ -97,7 +97,7 @@ class Clock:
 
     def reset(self, player):
         """
-        残り時間を limit に戻して止める (ui/clock.js の PlayerClock.reset())
+        残り時間を limit に戻して止める
         """
         self.clock[player] = list(self.limit)
         self.active[player] = False

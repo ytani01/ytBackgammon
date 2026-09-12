@@ -217,10 +217,6 @@ export class Dice extends BgImage {
 export class RollButton extends BannerButton {
     constructor(id, board, player, x, y, deg=0) {
         super(id, board, player, x, y, deg);
-        /*
-        log(`RollButton(id=${id},player=${this.player},`
-                    + `x=${this.x},y=${this.y})`);
-        */
 
         [this.x1, this.y1] = [this.x, this.y];
         // log(`(x1,y1)=(${this.x1},${this.y1})`);
@@ -240,13 +236,6 @@ export class RollButton extends BannerButton {
 
         this.dice = [];
         for (let i=0; i < 4; i++) {
-            /*
-            let xd = this.w / 4 * ( i * 2 + 1 );
-            xd += this.x - this.w / 2;
-
-            let yd = this.h / 8 * ((i * 2 + 1) % 4);
-            yd += this.y - this.h / 2;
-            */
             let xd = this.x1 + 60 * (i - 1.5);
             log(`x1=${this.x1},xd=${xd}`);
             let yd = this.y1 + 20 * (i % 2 - 0.5);
@@ -317,11 +306,6 @@ export class RollButton extends BannerButton {
      * @param {boolean} [roll_flag=false] 
      */
     set(dice_value, roll_flag=false) {
-        /*
-        log(`RollButton[${this.player}].set(`
-                    + `dive_value=${JSON.stringify(dice_value)},`
-                    + `roll_flag=${roll_flag})`);
-        */
         if ( roll_flag ) {
             this.board.sound_roll.play();
         }
@@ -369,10 +353,6 @@ export class RollButton extends BannerButton {
                 active_dice.push(val);
             }
         }
-        /*
-        log("RollButton.get_active_dice>"
-                    +`active_dice=${JSON.stringify(active_dice)}`);
-        */
         return active_dice;
     } // RollButton.get_active_dice()
     
@@ -490,25 +470,6 @@ export class RollButton extends BannerButton {
         const value1 = Math.floor(Math.random() * 6) + 1;
         const value2 = Math.floor(Math.random() * 6) + 1;
 
-        /*
-        // Dice histogram
-        const histo = this.board.dice_histogram;
-        histo[this.player][value1 - 1]++;
-        histo[this.player][value2 - 1]++;
-        // log(`RollButton.roll>histo=${JSON.stringify(histo)}`);
-        let histogram_str = "";
-        for (let p=0; p < 2; p++) {
-            for (let i=0; i < 6; i++) {
-                let a = 0;
-                a = histo[p][i];
-                histogram_str += a + " ";
-            } // for (i)
-            histogram_str += "<br />";
-        } // for(p)
-        // log(`histogram_str=${histogram_str}`);
-        document.getElementById("dice-histogram").innerHTML = histogram_str;
-        */
-
         let dice = [0, 0, 0, 0];
 
         if ( this.board.turn >= 2 ) {
@@ -525,10 +486,6 @@ export class RollButton extends BannerButton {
         const modified = this.check_disable();
         const dice_values = this.get();
         this.clear();
-        /*
-        log("RollButton.roll()>"
-                    + `dice_value=${JSON.stringify(dice_values)}`);
-        */
         this.emit_dice(dice_values, true, true);
         
         return dice_values;

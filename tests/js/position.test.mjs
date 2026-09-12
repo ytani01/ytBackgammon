@@ -106,7 +106,6 @@ describe('Position.from_gameinfo()', () => {
         checker[1][0] = [10, 0];
 
         const pos = Position.from_gameinfo(make_gameinfo(checker));
-        assert.deepEqual(pos.players(10), [1, 0]);
         assert.equal(pos.owner(10), 1);
         assert.equal(pos.count(10), 2);
     });
@@ -119,9 +118,9 @@ describe('Position.from_gameinfo()', () => {
     });
 });
 
-describe('Position の owner() / count() / count_of() / points_of()', () => {
+describe('Position の owner() / count() / points_of()', () => {
     it('空のポイントは owner が null で count が 0', () => {
-        const pos = Position.empty();
+        const pos = make_position({});
         assert.equal(pos.owner(13), null);
         assert.equal(pos.count(13), 0);
     });
@@ -132,23 +131,10 @@ describe('Position の owner() / count() / count_of() / points_of()', () => {
         assert.equal(pos.count(5), 3);
     });
 
-    it('count_of() はプレーヤーごとの枚数', () => {
-        const pos = make_position({5: [0, 0, 1]});
-        assert.equal(pos.count_of(5, 0), 2);
-        assert.equal(pos.count_of(5, 1), 1);
-    });
-
     it('points_of() はチェッカー 1 枚につき 1 つ、昇順', () => {
         const pos = make_position({3: [0, 1], 7: stack(0, 2)});
         assert.deepEqual(pos.points_of(0), [3, 7, 7]);
         assert.deepEqual(pos.points_of(1), [3]);
-    });
-
-    it('players() は複製を返す (書き換えても Position は変わらない)', () => {
-        const pos = make_position({5: [0, 0]});
-        const players = pos.players(5);
-        players.push(1);
-        assert.equal(pos.count(5), 2);
     });
 
     it('コンストラクタも複製する', () => {
@@ -193,7 +179,7 @@ describe('Position.with_move()', () => {
         const pos = make_position({6: [1], 13: [0]});
         const pos2 = pos.with_move(13, 6, 0);
 
-        assert.deepEqual(pos2.players(6), [1, 0]);
+        assert.equal(pos2.count(6), 2);
         assert.equal(pos2.owner(6), 1);
     });
 
@@ -201,8 +187,14 @@ describe('Position.with_move()', () => {
         const pos = make_position({6: [0, 1, 0], 13: []});
         const pos2 = pos.with_move(6, 13, 0);
 
-        assert.deepEqual(pos2.players(6), [0, 1]);
-        assert.deepEqual(pos2.players(13), [0]);
+        // 動かしたのがいちばん上 (先頭の0ではない) なら owner は変わらない
+        assert.equal(pos2.owner(6), 0);
+        assert.equal(pos2.count(6), 2);
+        assert.equal(pos2.owner(13), 0);
+        assert.equal(pos2.count(13), 1);
+        // 相手の駒を代わりに取り除いていないか (owner と count だけでは
+        // [0, 1] と [0, 0] を見分けられない)
+        assert.deepEqual(pos2.points_of(1), [6]);
     });
 
     it('自分のチェッカーが無いポイントからは動かせない (例外)', () => {
@@ -227,13 +219,7 @@ describe('Position.with_move()', () => {
     it('動かしても、そのプレーヤーの枚数は変わらない', () => {
         // バーもゴールも含めて数える。今回の壊れ方は「合計が増える」
         const pos = Position.from_gameinfo(make_gameinfo());
-        const count_all = (p, player) => {
-            let n = 0;
-            for (let i=0; i < N_POINT; i++) {
-                n += p.count_of(i, player);
-            }
-            return n;
-        };
+        const count_all = (p, player) => p.points_of(player).length;
         assert.equal(count_all(pos, 0), 15);
 
         // 盤上 → 盤上 → バー → ゴール と続けて動かす

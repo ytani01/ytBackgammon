@@ -60,7 +60,7 @@ describe('pip_count()', () => {
     });
 
     it('チェッカーが 1 枚も無ければ 0', () => {
-        assert.equal(pip_count(Position.empty(), 0), 0);
+        assert.equal(pip_count(make_position({}), 0), 0);
     });
 });
 

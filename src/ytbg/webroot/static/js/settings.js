@@ -70,22 +70,6 @@ export class CookieBase {
     } // CookieBase.load()
 
     /**
-     * 
-     */
-    save() {
-        if ( Object.keys(this.data) ) {
-            return;
-        }
-
-        let allcookie = "";
-        for (let key in this.data) {
-            allcookie += `${key}=${this.data[key]};`;
-        } // for (key)
-
-        document.cookie = allcookie;
-    }
-
-    /**
      * @param {string} key
      * @param {string} value
      */

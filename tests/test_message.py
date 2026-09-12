@@ -79,7 +79,6 @@ SAMPLES = [
     ('start_clock', {'player': 1}, PlayerData(player=1)),
     ('resume_clock', {'player': 0}, PlayerData(player=0)),
     ('stop_clock', {'player': 1}, PlayerData(player=1)),
-    ('reset_clock', {'player': 0}, PlayerData(player=0)),
 ]
 
 

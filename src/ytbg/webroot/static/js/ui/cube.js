@@ -74,14 +74,6 @@ export class Cube extends BgImage {
      * @param {boolean} accepted
      */
     set(val, player=undefined, accepted=false) {
-        /*
-        log("Cube.set("
-                    + `val=${val},`
-                    + `player=${player},`
-                    + `accepted=${accepted}`
-                    + ")");
-        */
-        
         this.value = val;
         this.player = player;
         this.accepted = accepted;

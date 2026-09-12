@@ -109,7 +109,6 @@ class BackgammonServer:
             'start_clock': self._on_start_clock,
             'resume_clock': self._on_resume_clock,
             'stop_clock': self._on_stop_clock,
-            'reset_clock': self._on_reset_clock,
         }
 
         [hist_len, _fwd_hist_len] = self.load_data()
@@ -481,7 +480,7 @@ class BackgammonServer:
         self._clock.set_clock(data.player, data.clock)
         return 0
 
-    # ここから 5 つはクロックの動作そのもの (TODO-016)。TODO-012 で
+    # ここから 4 つはクロックの動作そのもの (TODO-016)。TODO-012 で
     # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
     # 返せるように戻した。TODO-015 で転送をやめたので、すでに開いて
     # いる画面も、ここで作った状態を clock_state で受け取って合わせる
@@ -492,7 +491,7 @@ class BackgammonServer:
 
         board.js の Board.apply_clock_sw() は history: false で送るので、
         ここで保存しないと sw が残らない (TODO-024)。
-        start/stop/resume/reset_clock はターンのたびに走るので
+        start/stop/resume_clock はターンのたびに走るので
         保存しない (I/O が増えすぎる)。
         """
         data: ClockSwitchData = m.data
@@ -518,12 +517,6 @@ class BackgammonServer:
         """止める"""
         data: PlayerData = m.data
         self._clock.stop(data.player)
-        return 0
-
-    async def _on_reset_clock(self, m: Message) -> float | None:
-        """limit に戻して止める"""
-        data: PlayerData = m.data
-        self._clock.reset(data.player)
         return 0
 
     async def on_json(self, ws, msg):

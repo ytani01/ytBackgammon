@@ -1,63 +1,20 @@
 # TODO
 
-**残っている項目: TODO-037〜039。** これまでに 37 件を決着させた。
+**残っている項目: TODO-038〜039。** これまでに 38 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-041` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
 （旧 `.json` も消さずに残してある）。
 
-TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
-結果（15 件）を、性質ごとに 3 つへ分けたもの。合計でおよそ 370 行減る
-見込み。**依存関係は増減しない。**
+TODO-038〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読み直した
+結果（15 件）を、性質ごとに分けたもの。**依存関係は増減しない。**
 
-**着手する順は 037 → 039 → 038**（TODO-040 は済んだ）。
-削除（037）を先にやって、集約（038）で触るコードを減らす。
+**着手する順は 039 → 038**（TODO-040 と 037 は済んだ）。
+削除（037）を先に済ませたので、集約（038）で触るコードは減っている。
 ブランチは `starlette` のまま、項目ごとにコミットを分ける。
-`CLAUDE.md` と `docs/Developer.md` の記述（`reset_clock` の分岐、
-`QueryStringBase`、クラス階層図の `ClockLimit`）は、**それを変えた項目の
-コミットの中で直す**。
-
----
-
-## TODO-037. 呼ばれていないコードを消す
-
-- [ ] `ui/checker.js` の `calc_z()` / `distance()` / `is_last_man()` /
-      `get_available_points()`（T.B.D. のまま空を返す）
-- [ ] `settings.js` の `CookieBase.save()`。呼び出しが無く、
-      `if (Object.keys(this.data)) return;` で常に何もしない
-- [ ] `board.js` の `clock_on()` / `clock_off()`
-- [ ] `reset_clock` の経路。唯一の送り元 `PlayerClock.emit_reset()` が
-      どこからも呼ばれていない。`message.py` の `DATA_TYPES` と
-      `server.py` の `_handlers` から両方消す。
-      **`Clock.reset()` 自体は `new_game()` と `set_clock_limit` が使うので残す**
-- [ ] `rules/position.js` の `Position.empty()` / `count_of()` / `players()`。
-      テストからしか呼ばれていないので、`tests/js/position.test.mjs` の
-      該当する `it` ごと消す
-- [ ] `board.js` の `apply_sound_switch()` 内の `GlobalSoundSwitch` ブロック
-      （`board_num` を読んで何もしない）、コンストラクタの
-      `this.score = [0, 0]` の二重初期化
-- [ ] `main.js:122` の `def_name`。未使用で、そもそも `PlayerName` に
-      `default_text` は無い（あるのは `PlayerScore`）。読まれていない
-      `PlayerScore.default_text` も消す
-- [ ] コメントアウトされたまま残っている塊。**全部消す**（`board.js` と
-      `ui/dice.js` にまたがる `dice_histogram` ~25 行も含む。表示先の
-      `#dice-histogram` は `index.html` にも無い）。復活させたくなったら
-      git から拾う
-
-盤面の挙動は変わらないはずの削除だけを集めてある。`reset_clock` と
-`Position` のメソッドはテストが参照しているので、**テストも一緒に直す**。
-
-**`mylog.py` は触らない。** `exmsg()` と `setLevel(level=None)` はこの
-リポジトリでは未使用だが、`mylog.py` は他でも使い回す形のモジュールなので、
-ここだけの都合で削らない。
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Sonnet 5 / effort medium | implementer + verifier + reviewer |
-
-削除でも `reset_clock` は登録表（`DATA_TYPES` / `_handlers`）から分岐が
-減るので、「本当に死んでいるか」を見るレビューの担当を入れる。
+`CLAUDE.md` と `docs/Developer.md` の記述（`QueryStringBase`、
+クラス階層図の `ClockLimit`）は、**それを変えた項目のコミットの中で直す**。
 
 ---
 
@@ -120,6 +77,7 @@ TODO-037〜039 は、2026-09-12 に `src/` 全体を過剰実装の観点で読�
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-037.** 呼ばれていないコードを消す](archives/todo/TODO-037.%20呼ばれていないコードを消す.md)
 - [**TODO-040.** `-i` の既定値に対応するディレクトリが無い](archives/todo/TODO-040.%20%60-i%60%20の既定値に対応するディレクトリが無い.md)
 - [**TODO-036.** README と docs/ の日本語を見直す](archives/todo/TODO-036.%20README%20と%20docs_%20の日本語を見直す.md)
 - [**TODO-031.** 旧形式（~/ytbg-{server_id}.json）の読み込みを消す](archives/todo/TODO-031.%20旧形式（~_ytbg-{server_id}.json）の読み込みを消す.md)

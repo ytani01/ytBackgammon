@@ -91,8 +91,6 @@ export class Board extends BgImage {
             this.set_player(0);
         }
 
-        this.score = [0, 0];
-        
         this.turn = -1;
 
         this.gameinfo = undefined;
@@ -179,10 +177,6 @@ export class Board extends BgImage {
 
         this.clock_sw = false;
         this.apply_clock_sw();
-        /*
-        this.player_clock[0].update();
-        this.player_clock[1].update();
-        */
 
         const update_clock = () => {
             this.player_clock[0].update();
@@ -338,32 +332,11 @@ export class Board extends BgImage {
             "winbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_win));
 
-        /*
-        // Dice histogram
-        this.dice_histogram = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
-        log("Board.constructor>"
-                    + `dice_histogram=${JSON.stringify(this.dice_histogram)}`);
-        */
-
         if ( this.player == 1 ) {
             this.player = 0;
             this.inverse(0);
         }
     } // Board.constructor()
-
-    /**
-     * 
-     */
-    clock_on() {
-        this.clock_sw = true;
-    }
-
-    /**
-     * 
-     */
-    clock_off() {
-        this.clock_sw = false;
-    }
 
     /**
      * @return {boolean} sound
@@ -397,11 +370,6 @@ export class Board extends BgImage {
         set_global_sound_switch(q_str.get("sound"));
         log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
 
-        if ( GlobalSoundSwitch !== undefined ) {
-            const board_num = q_str.get("board");
-            log(`board_num=${board_num}`);
-
-        }
         this.sound = document.getElementById("sound-switch").checked;
         this.cookie.set(this.cookie_sound, this.sound);
         this.el_sound.checked = this.sound;
@@ -557,11 +525,6 @@ export class Board extends BgImage {
      */
     set_turn(turn, resign=-1, sound=true, emit=true) {
         const prev_turn = this.turn;
-        /*
-        log(`Board.set_turn(`
-                    + `turn=${turn},`
-                    + `resign=${resign})>prev_turn=${prev_turn}`);
-        */
         this.turn = turn;
         this.resign = resign;
         
@@ -878,10 +841,6 @@ export class Board extends BgImage {
      */
     apply(gameinfo, {sec=2, history_flag=false, clock_state=undefined,
                      last_op=undefined, predict=false} = {}) {
-        /*
-        log(`Board.apply(`
-                    + `gameinfo=${JSON.stringify(gameinfo)},sec=${sec})`);
-        */
         this.gameinfo = gameinfo;
 
         // last_op は無いこともある (履歴の再生、接続時)。
@@ -923,10 +882,6 @@ export class Board extends BgImage {
         // 16 枚以上乗ると 15 以上になる。0〜14 だけを拾うループだと、
         // そのチェッカーがどの point にも入らないまま画面に残る。
         const ch_point = gameinfo.board.checker;
-        /*
-        log(
-            `Board.apply> ch_point=${JSON.stringify(ch_point)}`);
-        */
         let ch_list = [];
         for (let p=0; p < 2; p++) {
             for (let c=0; c < 15; c++) {

@@ -133,19 +133,6 @@ async def test_resume_clock_keeps_remaining_delay(fake_time, bg_server, req):
     assert bg_server._clock.cur(0) == [120, 5]
 
 
-async def test_reset_clock_restores_limit_and_stops(
-        fake_time, bg_server, req):
-    """reset_clock は残り時間を clock_limit に戻して止める"""
-    await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
-    fake_time.advance(30)
-
-    await send(bg_server, req, 'reset_clock', 0)
-
-    assert bg_server._clock.active == [False, False]
-    assert bg_server._clock.cur(0) == [120, 12]
-
-
 async def test_start_clock_affects_only_target_player(
         fake_time, bg_server, req):
     """相手のクロックは動かない"""
@@ -309,13 +296,12 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
         ('start_clock', {'player': 0}),
         ('resume_clock', {'player': 0}),
         ('stop_clock', {'player': 0}),
-        ('reset_clock', {'player': 0}),
     ],
 )
 async def test_clock_types_do_not_append_history(
         fake_time, bg_server, req, msg_type, data):
     """
-    クロック系の 7 つの type は、history: true で届いても積まない
+    クロック系の 6 つの type は、history: true で届いても積まない
     (TODO-032)。
 
     gameinfo を書き換えないので、積むと sn 以外すべて 1 つ前と
@@ -338,7 +324,6 @@ async def test_clock_types_do_not_append_history(
         ('start_clock', {'player': 0}),
         ('resume_clock', {'player': 0}),
         ('stop_clock', {'player': 0}),
-        ('reset_clock', {'player': 0}),
     ],
 )
 async def test_clock_types_skip_add_history_call(
@@ -424,13 +409,6 @@ async def test_clock_ops_send_gameinfo_with_clock_state(
     assert sent['data']['clock_state']['active'] == [False, True]
     # 猶予は戻らず、止めたところから続く
     assert sent['data']['clock_state']['clock'][1] == [120, 7]
-
-    await send(bg_server, req, 'reset_clock', 1)
-
-    sent = emitted.last
-    assert sent['data']['last_op']['type'] == 'reset_clock'
-    assert sent['data']['clock_state']['active'] == [False, False]
-    assert sent['data']['clock_state']['clock'][1] == [120, 12]
 
     await bg_server.on_json(
         req, {'type': 'set_clock_switch', 'data': {'switch': False},

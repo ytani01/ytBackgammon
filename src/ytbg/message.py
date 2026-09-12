@@ -144,7 +144,7 @@ class PlayerData:
     """
     プレーヤーを指すだけの type 用。
 
-    resign と、クロックの start / resume / stop / reset。
+    resign と、クロックの start / resume / stop。
     """
 
     player: int
@@ -202,7 +202,6 @@ NO_HISTORY_TYPES: frozenset[str] = frozenset({
     'start_clock',
     'resume_clock',
     'stop_clock',
-    'reset_clock',
 })
 
 
@@ -234,7 +233,6 @@ DATA_TYPES: dict[str, Callable[[dict[str, Any]], Any]] = {
     'start_clock': PlayerData.from_dict,
     'resume_clock': PlayerData.from_dict,
     'stop_clock': PlayerData.from_dict,
-    'reset_clock': PlayerData.from_dict,
 }
 
 
