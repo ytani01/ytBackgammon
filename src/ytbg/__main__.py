@@ -29,7 +29,7 @@ _log = getLogger('main')
 @click.option('--port', '-p', 'port', type=int, default=5001,
               help='port number')
 @click.option('--image_dir', '-i', 'image_dir', type=str,
-              default="images1",
+              default="images1a",
               help="Images directory under '/static/'")
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag')
