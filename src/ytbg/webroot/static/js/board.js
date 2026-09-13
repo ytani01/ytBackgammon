@@ -387,9 +387,14 @@ export class Board extends BgImage {
 
     /**
      * load player number from cookie
+     *
+     * cookie の値は文字列なので数に直す (TODO-050)。直さないと "0" の
+     * まま残り、投了で set_turn の resign に文字列を送ってしまう
+     * (サーバは data の型を確かめて弾く)。値が無ければ undefined のまま
      */
     load_player() {
-        this.player = this.cookie.get(this.cookie_board_player);
+        const player = this.cookie.get(this.cookie_board_player);
+        this.player = player === undefined ? undefined : parseInt(player);
         return this.player;
     } // Board.load_player()
 

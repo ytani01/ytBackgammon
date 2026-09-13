@@ -7,22 +7,25 @@
 //
 // Checker.on_mouse_up_xy() は、サーバの応答を待たずに
 // 「動かしたあとの gameinfo」を予測して Board.apply() に渡す。
-// ここで見るのは次の 5 つ。
+// ここで見るのは次の 4 つ。
 //
 //   1. 応答が無くても表示が変わる (先行実行)
 //   2. 予測のあとで、使ったダイスが使用済みになる
 //      (順番が逆だと、apply() が gameinfo の値に戻してしまう)
 //   3. ヒットのときは 2 手ぶん (相手をバーへ、自分を移動先へ)
 //   4. **予測が外れても、サーバから届く gameinfo で表示が戻る**
-//   5. 予測は表示を変えるだけで、サーバへ何も送らない
-//      (掴んでいる間に turn が -1 になったときの stop_clock)
+//
+// 「予測はサーバへ何も送らない (turn が -1 に変わっていても)」は
+// TODO-050 で消した。turn が -1 に変わるとサーバが両方のクロックを
+// 止めるので、勝った側のクロックが動いたまま turn が -1 になる状態を
+// もう作れない。
 //
 // **作れている「外れ方」は「行き先が違う」1 種類だけ。** 次の外れ方は
 // ここでは見ていない (TODO-030 のレビューでの指摘)。
 //
 //   - 他の人が同時に動かした (2 枚のタブ)。**verifier の担当**
 //   - ヒットの扱いが違う (ヒットを予測したが実際は違う、逆も)
-//   - turn が変わっていた (5 番は送信だけを見ており、収束は見ていない)
+//   - turn が変わっていた
 //   - score / playername / cube が飛んでいる
 //
 // 既存の board.test.mjs / clicks.test.mjs のドラッグは free move
@@ -393,84 +396,6 @@ describe('ドラッグの先行実行 (予測)', () => {
         assert.deepEqual(await take_applied(page), [],
                          'キャンセルしたのに予測を反映している');
     });
-
-    it('予測はサーバへ何も送らない (turn が -1 に変わっていても)',
-       async () => {
-           // 予測は apply() を通るので set_turn() まで走る。
-           // set_turn() には「turn < 0 で勝者がいて、そのクロックが
-           // 動作中なら stop_clock を送る」枝がある (TODO-015)。
-           // **予測からは送らないこと** (TODO-030。同じメッセージが
-           // 2 回飛ぶ)。
-           //
-           // 仕込み: player0 が全部あがった盤面 / turn = 1 /
-           // player0 のクロックが動作中
-           await record_sent(page);
-           await page.evaluate(() => {
-               for (let i = 0; i < 15; i++) {
-                   board.emit_put_checker(board.checker[0][i], 0, false);
-               }
-               board.emit_turn(1, -1, false);
-               board.roll_btn[1].emit_dice([3, 0, 0, 0], false, false);
-               board.player_clock[0].emit_start();
-           });
-           await wait_for(
-               () => page.evaluate(() => ({
-                   n0: board.checker.flat().filter(
-                       c => c.cur_point === 0).length,
-                   turn: board.turn,
-                   active0: board.player_clock[0].active,
-                   dice: board.roll_btn[1].get_active_dice(),
-                   win0: board.winner_is(0),
-               })),
-               s => s.n0 === 15 && s.turn === 1 && s.active0
-                   && s.dice.length > 0 && s.win0 > 0,
-               { msg: 'bearoff', timeout: 20000 });
-
-           // player1 の駒を掴む (point 12 の先端。ダイス 3 で 15 へ動ける)
-           const tip_id = await page.evaluate(
-               () => board.top_checker(12).id);
-           const pos = await center_of(page, `#${tip_id}`);
-           await page.mouse.move(pos.x, pos.y);
-           await page.mouse.down();
-
-           // ここから自分の送信は止める。自分が送る stop_clock が
-           // サーバへ届くと、返事でクロックが止まってしまい、
-           // 「勝者のクロックが動作中のまま」を作れない
-           await record_sent(page, true);
-
-           // 掴んでいる間に、誰かが turn を -1 にした
-           // (包んでいない send で直に流す)
-           await page.evaluate(() => {
-               window.__orig_send.call(window.__ws, JSON.stringify({
-                   src: 'predict-test', type: 'set_turn',
-                   data: { turn: -1, resign: -1 }, history: false,
-               }));
-           });
-           await wait_for(() => page.evaluate(() => board.turn),
-                          t => t === -1, { msg: 'turn -1' });
-
-           // サーバから届いた gameinfo では、今までどおり送る
-           assert.deepEqual(
-               (await take_sent(page)).map(m => m.type), ['stop_clock'],
-               'サーバの gameinfo で stop_clock を送っていない');
-           assert.equal(
-               await page.evaluate(() => board.player_clock[0].active),
-               true, 'クロックが止まってしまった');
-
-           // 離す (予測 -> apply() -> set_turn(-1))
-           await page.mouse.up();
-           assert.deepEqual(
-               (await take_sent(page)).map(m => m.type),
-               ['put_checker', 'dice'],
-               '予測から stop_clock が飛んでいる');
-
-           // put_checker() を直に呼ぶ経路も同じ
-           await page.evaluate(
-               () => board.put_checker(board.checker[1][5], 5));
-           assert.deepEqual(
-               await take_sent(page), [],
-               'put_checker() から stop_clock が飛んでいる');
-       });
 
     it('コンソールエラーが出ていない', async () => {
         const errors = console_errors(page, server.url);

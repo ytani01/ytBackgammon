@@ -103,6 +103,11 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   （TODO-048）。**既定では `console.log` を 1 件も出さない。**
   `open_board()` が貯めるのは console の `error` だけなので、
   このファイルは `log` を数える形で自分でページを開く
+- `predict.test.mjs` — ドラッグを離した瞬間の先行実行（TODO-030）。
+  予測で表示が変わり、外れてもサーバから届く `gameinfo` で戻るか
+- `opening.test.mjs` — オープニングロールで先手が決まるか（TODO-041）
+- `player_cookie.test.mjs` — cookie から読んだプレーヤー番号が数になって
+  いるか（TODO-050）。文字列のままだと、サーバが型の合わない値として弾く
 
 注意する点:
 
@@ -220,6 +225,11 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   `resign_game()` / `new_game()` という更新のメソッドもここが持つ
   （TODO-025 で `ytBackgammon` を吸収した。`resign` は dataclass の
   フィールド名なので、メソッドは `resign_game()`）。
+  名前付きの操作の `opening()` / `move()` / `end_turn()` / `double()` /
+  `take()` / `cancel_double()` もここにある（TODO-050。`roll` は `dice()`
+  を使う）。`resign_game()` は `resign` だけでなく、`turn` を -1 にして
+  相手の得点も足す。**盤面と合わないときは何も変えずに `False` を返す**
+  （`move()` だけは戻り値が無い）。
   **更新のメソッドは `message.py` の dataclass をそのまま受け取る**
   （`cube(CubeData)` の形。TODO-038。`server.py` で `asdict()` に
   戻していたのをやめた）。そのため `gameinfo.py` は `message.py` に
@@ -326,12 +336,17 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 
 メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
 `{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
-`history: true` を付けたメッセージだけが履歴に 1 手として積まれる。
-ただし、クロック系の 6 つの type（`set_clock_limit` / `set_player_clock` /
-`set_clock_switch` / `start_clock` / `resume_clock` / `stop_clock`）は
-`gameinfo` を書き換えないので、`history: true` で届いても
-積まない（`message.py` の `NO_HISTORY_TYPES`）。1 つ前のエントリと `sn` 以外が
-同じ場合も積まない（TODO-032）。
+履歴に 1 手として積むかは、`server.py` の登録表 `MESSAGE_TYPES` の
+`history` で type ごとに決める（TODO-050）。積むのは名前付きの 8 つの操作
+（`roll` / `opening` / `move` / `end_turn` / `double` / `take` /
+`cancel_double` / `resign`）と `put_checker` / `dice` / `set_playername` /
+`set_score`、それに TODO-051 で消す `cube` / `set_turn`。クロック系の 6 つ
+（`set_clock_limit` / `set_player_clock` / `set_clock_switch` /
+`start_clock` / `resume_clock` / `stop_clock`）は `gameinfo` を書き換えない
+ので積まない（TODO-032）。**名前付きの 8 つは表だけを見る。古い type は、
+表で積み、かつメッセージの `history` が真のときだけ積む**（TODO-051 で
+`history` を見る条件を消す。`server.py` の `NAMED_TYPES` もそのとき消す）。
+1 つ前のエントリと `sn` 以外が同じ場合も積まない（TODO-032）。
 
 **`type` を書くのはクライアント → サーバの向きだけ**で、分岐はサーバの
 `on_json()` にしかない（TODO-015）。サーバが返すのは `gameinfo` 1 本で、
@@ -374,7 +389,7 @@ last_op, predict})` だけ**（TODO-030）。サーバから届いた `gameinfo`
   サーバの返事で必ず直る）。TODO-030 で増えた挙動だが、
   `score` の競合そのものはそれ以前からある
 
-届いたメッセージは `message.py` の `parse()` が型を付ける（TODO-026）。
+届いたメッセージは `server.py` の `parse()` が型を付ける（TODO-026、TODO-050）。
 `type` ごとの frozen dataclass に組み立てるので、**`data` のキーが
 足りなければ入口で `KeyError` になる**（奥の `msg['data']['n']` まで
 持ち越さない）。`parse()` が返す `Message` は
@@ -383,24 +398,69 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 `back` や `clear_hist` のように中身を使わない `type` でも、キーが
 無ければ `parse()` で `KeyError` になる（旧 `on_json()` は読まずに
 `return` していた）。
+**値の型も確かめる**（TODO-050）。組み立てた dataclass をフィールドの
+注釈と照らし（`server.py` の `_type_ok()`。`list[X]` は中身まで）、合わなければ
+盤面を書き換える前に `TypeError` にする。bool は int のサブクラスだが、
+int と float のフィールドには通さず、bool のフィールドに 0 / 1 も通さない。
+float のフィールドには int も通す。**`list` のフィールドは `from_dict()` で
+`list()` に写さない**（写すと文字列も list になって弾けない）。
+届いた list を盤面と共有しないよう、写すのは受け取る側（`GameInfo` と `Clock`）。
 
-`on_json()` は 2 つの登録表で動く。`message.py` の `DATA_TYPES`
-（`type` → dataclass）と、`server.py` の `self._handlers`
-（`type` → ハンドラ）。**キーの集合が一致していること**を
-`tests/test_message.py` が見ているので、片方だけに足すと落ちる。
+`on_json()` は `server.py` の 1 つの登録表 `MESSAGE_TYPES` で動く
+（TODO-050）。1 行が `MessageType(make_data, handler, history)` で、
+`data` の dataclass、ハンドラ（`BackgammonServer` のメソッドをクラスから
+引いたもの。呼ぶときに `self` を渡す）、履歴に積むかを持つ。
+`message.py` に残るのは dataclass と例外だけ。
 **登録表に無い `type` は、警告をログに出して無視する**（履歴に積まず、
 `gameinfo` も送り返さない。接続は保つ）。文字列でない `type` も
 同じ扱い。
 
 ハンドラは全て `async def` で、戻り値で共通の後処理を分ける。
 `None` は「自分で送信済み」（`back` / `back2` / `back_all` / `fwd` /
-`fwd2` / `fwd_all` / `clear_hist` / `new` / `set_gameinfo` の 9 つ）、
-`float` は「アニメーションの秒数。`history` フラグを見て履歴へ積み、
-`emit_gameinfo()`」（盤面とクロックを変える 13 個）。秒数を返すのは
-`put_checker`（`SEC_CHECKER_MOVE`）だけで、残りは `0`。
+`fwd2` / `fwd_all` / `clear_hist` / `new` / `set_gameinfo` の 9 つ。表の
+`history` は見ないので `False`）か「盤面と合わないので捨てた」（下を見ること）、`float` は「アニメーションの秒数」
+（盤面とクロックを変える 20 個）。秒数を返すのは `put_checker` と `move`
+（`SEC_CHECKER_MOVE`）だけで、残りは `0`。`float` のときの後処理は、
+次の順に行う。
 
-`type` を足すときは、`DATA_TYPES` に dataclass を、`_handlers` に
-ハンドラを足す。演出が要るときだけ `apply()` にも足す。
+1. **`turn` が -1 に変わったら、両方のクロックを `Clock.stop()` で止める**
+   （処理の前から -1 なら止めない。勝負がついたあとでもクロックを押せば
+   再開できるように）。古い `set_turn` にも効く。`Clock.stop_all()` は
+   経過分を残り時間に反映しないので使わない
+2. 表の `history` を見て履歴へ積む
+3. `emit_gameinfo()`
+
+**履歴の操作（`back` / `fwd` と連続再生）では、勝負のついた盤面に
+なってもクロックを止めない**（利用者が決めた。TODO-050）。
+
+**名前付きの操作のうち、今の盤面と合わないものは捨てる**（TODO-050）。
+同じ操作がほぼ同時に 2 回届いても 2 回ぶん効かないようにするためで、
+ルールの判定はクライアントのまま。捨てたときは警告をログに出し、
+履歴にも積まず、盤面も送らない（ハンドラが `None` を返す）。
+`p` は `player`。
+
+| type | 受け付ける盤面 |
+|------|----------------|
+| `double` | テイク済みで、キューブが中央か `p` の側。または未テイクで、キューブが `p` の側（リダブル） |
+| `take` | 未テイクで、キューブが `p` の側 |
+| `cancel_double` | 未テイクで、キューブが `1 - p` の側 |
+| `resign` | `turn` が -1 でない |
+| `end_turn` | `turn` が `p` |
+| `opening` | `turn` が 2 以上 |
+
+`move` は捨てず、`turn` が既に -1 なら駒とダイスだけ置いて、得点も
+`turn` も変えない。`roll` は値そのものを入れるので条件を付けない。
+
+クロックの切り替え（止める側を止め、もう片方を `Clock.start()` で
+猶予を戻して動かす）は、`end_turn` と `double` では `player` を止め、
+`take` と `cancel_double` では `1 - turn` を止める（手番のクロックを
+動かす。`turn` が 0 / 1 でなければ切り替えない）。`opening` は
+クロックを動かさない。`set_clock_switch` は両方のクロックを止めてから
+`sw` を変える。
+
+`type` を足すときは、`message.py` に dataclass を、`server.py` に
+ハンドラと `MESSAGE_TYPES` の 1 行を足す。演出が要るときだけ
+`apply()` にも足す。
 
 全員への送信（`broadcast()`）は `asyncio.gather()` で並行に送るが、
 **いちばん遅いクライアントを待つ**（全員へ送り終わるまで次へ進まない）。

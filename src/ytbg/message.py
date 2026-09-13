@@ -6,16 +6,11 @@ message.py
 
 クライアントから届くメッセージの型付け (TODO-026)。
 
-`parse()` が `type` を見て、`data` の中身を type ごとの frozen
-dataclass に組み立てる。**キーが足りなければここで例外になる**ので、
-奥の `msg['data']['n']` が `KeyError` を出すことがなくなる。
-
-`type` → dataclass の登録表は `DATA_TYPES`。server.py が持つ
-`type` → ハンドラの表と、**キーの集合が一致していること**
-(tests/test_message.py が見ている)。
+ここにあるのは data の型 (type ごとの frozen dataclass) と例外だけ。
+type ごとに「data の型・ハンドラ・履歴に積むか」を持つ登録表と、
+それを引く `parse()` は server.py にある (TODO-050)。
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass, fields
 from typing import Any, cast
 
@@ -88,16 +83,17 @@ class CubeData(_FromDict):
     accepted: bool
 
 @dataclass(frozen=True)
-class DiceData:
-    """dice"""
+class DiceData(_FromDict):
+    """
+    dice と roll (TODO-050)。
+
+    dice は届いた list をそのまま持つ。list() で写すと、文字列や dict も
+    list になってしまい、server.py の型の確かめで弾けない。
+    書き換える側 (GameInfo) が写す
+    """
 
     player: int
     dice: list[int]
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DiceData:
-        return cls(player=data['player'], dice=list(data['dice']))
-
 
 @dataclass(frozen=True)
 class TurnData(_FromDict):
@@ -125,80 +121,72 @@ class PlayerData(_FromDict):
     """
     プレーヤーを指すだけの type 用。
 
-    resign と、クロックの start / resume / stop。
+    end_turn / double / take / cancel_double と、
+    クロックの start / resume / stop。
     """
 
     player: int
+
+@dataclass(frozen=True)
+class ResignData(_FromDict):
+    """resign。score は相手の得点に足す点数 (TODO-050)"""
+
+    player: int
+    score: int
+
+@dataclass(frozen=True)
+class OpeningData(_FromDict):
+    """opening。winner は先手のプレーヤー。同じ目なら -1 (TODO-050)"""
+
+    winner: int
+
+@dataclass(frozen=True)
+class MoveData:
+    """
+    move (TODO-050)。
+
+    moves は put_checker と同じ {ch, p, idx} の列。dice は動かしたあとの
+    そのプレーヤーのダイス。score が 1 以上なら勝負がついた。
+    """
+
+    player: int
+    moves: list[PutCheckerData]
+    dice: list[int]
+    score: int
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MoveData:
+        # list でない moves はそのまま入れ、server.py の型の確かめで弾く
+        moves = data['moves']
+        if isinstance(moves, list):
+            moves = [PutCheckerData.from_dict(mv) for mv in moves]
+        return cls(player=data['player'], moves=moves, dice=data['dice'],
+                   score=data['score'])
+
 
 @dataclass(frozen=True)
 class ClockLimitData(_FromDict):
     """set_clock_limit。index は 0:持ち時間、1:猶予"""
 
     index: int
-    clock_limit: int
+    # 入力欄の値を parseFloat して送るので、小数も受ける (TODO-050)
+    clock_limit: float
 
 @dataclass(frozen=True)
-class PlayerClockData:
-    """set_player_clock。clock は [持ち時間(秒), 猶予(秒)]"""
+class PlayerClockData(_FromDict):
+    """
+    set_player_clock。clock は [持ち時間(秒), 猶予(秒)]。
+    DiceData と同じ理由で、届いた list をそのまま持つ
+    """
 
     player: int
     clock: list[float]
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PlayerClockData:
-        return cls(player=data['player'], clock=list(data['clock']))
-
 
 @dataclass(frozen=True)
 class ClockSwitchData(_FromDict):
     """set_clock_switch。クロック機能そのものの ON/OFF"""
 
     switch: bool
-
-# history: true で届いても履歴に積まない type (TODO-032)。
-#
-# クロックは gameinfo の外 (clock.py の Clock) にあるので、これらの
-# type は gameinfo を書き換えない。積むと sn 以外すべて 1 つ前と
-# 同じエントリになり、back を押しても盤面が変わらない手が挟まる。
-NO_HISTORY_TYPES: frozenset[str] = frozenset({
-    'set_clock_limit',
-    'set_player_clock',
-    'set_clock_switch',
-    'start_clock',
-    'resume_clock',
-    'stop_clock',
-})
-
-
-# type → data の dataclass。server.py のハンドラの表と
-# キーの集合が一致すること (TODO-026)
-DATA_TYPES: dict[str, Callable[[dict[str, Any]], Any]] = {
-    # 履歴 (自分で送信するもの)
-    'back': HistStepData.from_dict,
-    'back2': NoData.from_dict,
-    'back_all': NoData.from_dict,
-    'fwd': HistStepData.from_dict,
-    'fwd2': NoData.from_dict,
-    'fwd_all': NoData.from_dict,
-    'clear_hist': NoData.from_dict,
-    'new': NoData.from_dict,
-    'set_gameinfo': GameInfoData.from_dict,
-    # 盤面
-    'put_checker': PutCheckerData.from_dict,
-    'cube': CubeData.from_dict,
-    'dice': DiceData.from_dict,
-    'set_turn': TurnData.from_dict,
-    'set_playername': PlayerNameData.from_dict,
-    'set_score': ScoreData.from_dict,
-    'resign': PlayerData.from_dict,
-    # クロック
-    'set_clock_limit': ClockLimitData.from_dict,
-    'set_player_clock': PlayerClockData.from_dict,
-    'set_clock_switch': ClockSwitchData.from_dict,
-    'start_clock': PlayerData.from_dict,
-    'resume_clock': PlayerData.from_dict,
-    'stop_clock': PlayerData.from_dict,
-}
 
 
 @dataclass(frozen=True)
@@ -219,34 +207,4 @@ class Message:
     data: Any
     history: bool
     raw: dict[str, Any]
-
-
-def parse(msg: dict[str, Any]) -> Message:
-    """
-    受け取った msg を Message にする。
-
-    Raises
-    ------
-    UnknownMessageType
-        DATA_TYPES に無い type。文字列でない type もこれで扱う
-        (list / dict は dict のキーにできず、そのままでは
-        TypeError になるため)
-    KeyError
-        'type' / 'data' / 'history' か、data の中のキーが足りない
-    """
-    msg_type = msg['type']
-
-    if not isinstance(msg_type, str):
-        raise UnknownMessageType(msg_type)
-
-    make_data = DATA_TYPES.get(msg_type)
-    if make_data is None:
-        raise UnknownMessageType(msg_type)
-
-    return Message(
-        type=msg_type,
-        data=make_data(msg['data']),
-        history=bool(msg['history']),
-        raw=msg,
-    )
 ##

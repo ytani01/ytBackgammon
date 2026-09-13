@@ -15,13 +15,15 @@ HTTP の応答 (index.html) はここには無い。app.py の担当。
 
 import asyncio
 import os
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, fields, is_dataclass
+from typing import Any, get_args, get_origin, get_type_hints
 
 from .clock import Clock
 from .gameinfo import GameInfo
 from .history import History
 from .hub import ClientHub
 from .message import (
-    NO_HISTORY_TYPES,
     ClockLimitData,
     ClockSwitchData,
     CubeData,
@@ -29,14 +31,17 @@ from .message import (
     GameInfoData,
     HistStepData,
     Message,
+    MoveData,
+    NoData,
+    OpeningData,
     PlayerClockData,
     PlayerData,
     PlayerNameData,
     PutCheckerData,
+    ResignData,
     ScoreData,
     TurnData,
     UnknownMessageType,
-    parse,
 )
 from .mylog import getLogger
 from .replay import Replayer
@@ -79,36 +84,6 @@ class BackgammonServer:
         # 入れると履歴に載り、back / fwd でクロックの発着まで戻ってしまう。
         # 保存したものがあれば load_data() が差し替える
         self._clock = Clock()
-
-        # type → ハンドラの登録表 (TODO-026)。message.py の
-        # DATA_TYPES と、キーの集合が一致すること
-        self._handlers = {
-            # 履歴 (自分で送信するもの)
-            'back': self._on_back,
-            'back2': self._on_back2,
-            'back_all': self._on_back_all,
-            'fwd': self._on_fwd,
-            'fwd2': self._on_fwd2,
-            'fwd_all': self._on_fwd_all,
-            'clear_hist': self._on_clear_hist,
-            'new': self._on_new,
-            'set_gameinfo': self._on_set_gameinfo,
-            # 盤面
-            'put_checker': self._on_put_checker,
-            'cube': self._on_cube,
-            'dice': self._on_dice,
-            'set_turn': self._on_set_turn,
-            'set_playername': self._on_set_playername,
-            'set_score': self._on_set_score,
-            'resign': self._on_resign,
-            # クロック
-            'set_clock_limit': self._on_set_clock_limit,
-            'set_player_clock': self._on_set_player_clock,
-            'set_clock_switch': self._on_set_clock_switch,
-            'start_clock': self._on_start_clock,
-            'resume_clock': self._on_resume_clock,
-            'stop_clock': self._on_stop_clock,
-        }
 
         [hist_len, _fwd_hist_len] = self.load_data()
         if hist_len < 1:
@@ -336,9 +311,10 @@ class BackgammonServer:
     # type ごとのハンドラ (TODO-026)
     #
     # 戻り値で共通の後処理を分ける。
-    #   None  : 自分で送信済み。後処理をしない
-    #   float : アニメーションの秒数。history フラグを見て履歴へ積み、
-    #           emit_gameinfo() する
+    #   None  : 自分で送信済みか、盤面と合わないので捨てた (TODO-050)。
+    #           後処理をしない
+    #   float : アニメーションの秒数。on_json() が、勝負がついたら
+    #           クロックを止め、履歴へ積むかを決めて emit_gameinfo() する
     # -----------------------------------------------------------------
 
     async def _on_back(self, m: Message) -> float | None:
@@ -442,10 +418,103 @@ class BackgammonServer:
         self._gameinfo.set_score(data)
         return 0
 
-    async def _on_resign(self, m: Message) -> float | None:
-        """降参"""
+    # 名前付きの操作 (TODO-050)。1 つの操作を 1 通で受け、盤面と
+    # クロックをサーバの持つ値から変える。
+    #
+    # 今の盤面と合わないもの (GameInfo のメソッドが False を返したもの) は
+    # _ignore() で捨てる。同じ操作がほぼ同時に 2 回届いても、2 回ぶん
+    # 効かないようにするため
+
+    def _ignore(self, m: Message) -> None:
+        """
+        盤面と合わない操作を捨てる。警告をログに出し、None を返して
+        履歴にも積まず、盤面も送らない
+        """
+        self.__log.warning('ignored: type={}, data={}, turn={}, cube={}',
+                           m.type, m.data, self._gameinfo.turn,
+                           self._gameinfo.board.cube)
+
+    def _switch_clock(self, player: int) -> None:
+        """player のクロックを止め、相手のクロックを猶予を戻して動かす"""
+        self._clock.stop(player)
+        self._clock.start(1 - player)
+
+    async def _on_roll(self, m: Message) -> float | None:
+        """ダイスを振った。使えない目はクライアントが 11〜16 にして送る"""
+        data: DiceData = m.data
+        self._gameinfo.dice(data)
+        return 0
+
+    async def _on_opening(self, m: Message) -> float | None:
+        """オープニングロールの結果。クロックは動かさない"""
+        data: OpeningData = m.data
+        if not self._gameinfo.opening(data):
+            self._ignore(m)
+            return None
+        return 0
+
+    async def _on_move(self, m: Message) -> float | None:
+        """駒を動かした。チェッカーが動くので SEC_CHECKER_MOVE を返す"""
+        data: MoveData = m.data
+        self._gameinfo.move(data)
+        return self.SEC_CHECKER_MOVE
+
+    async def _on_end_turn(self, m: Message) -> float | None:
+        """手番を相手に渡す"""
         data: PlayerData = m.data
-        self._gameinfo.resign_game(data)
+        if not self._gameinfo.end_turn(data):
+            self._ignore(m)
+            return None
+        self._switch_clock(data.player)
+        return 0
+
+    async def _on_double(self, m: Message) -> float | None:
+        """ダブル。掛けた側 (player) のクロックを止める"""
+        data: PlayerData = m.data
+        if not self._gameinfo.double(data):
+            self._ignore(m)
+            return None
+        self._switch_clock(data.player)
+        return 0
+
+    async def _on_take(self, m: Message) -> float | None:
+        """テイク。手番のクロックを動かす"""
+        data: PlayerData = m.data
+        if not self._gameinfo.take(data):
+            self._ignore(m)
+            return None
+        self._switch_to_turn()
+        return 0
+
+    async def _on_cancel_double(self, m: Message) -> float | None:
+        """
+        ダブルの取り消し。ダブルの前 (手番の人が振る番) に戻す扱いで、
+        手番のクロックを動かす
+        """
+        data: PlayerData = m.data
+        if not self._gameinfo.cancel_double(data):
+            self._ignore(m)
+            return None
+        self._switch_to_turn()
+        return 0
+
+    def _switch_to_turn(self) -> None:
+        """
+        手番でない側 (1 - turn) のクロックを止め、手番のクロックを動かす。
+
+        turn が 0 か 1 のときだけ。2 や -1 で 1 - turn を添字にすると、
+        負の添字で別のプレーヤーを指してしまう
+        """
+        turn = self._gameinfo.turn
+        if turn in (0, 1):
+            self._switch_clock(1 - turn)
+
+    async def _on_resign(self, m: Message) -> float | None:
+        """投了。turn は -1 になるので、on_json() がクロックを止める"""
+        data: ResignData = m.data
+        if not self._gameinfo.resign_game(data):
+            self._ignore(m)
+            return None
         return 0
 
     async def _on_set_clock_limit(self, m: Message) -> float | None:
@@ -488,6 +557,10 @@ class BackgammonServer:
         保存しない (I/O が増えすぎる)。
         """
         data: ClockSwitchData = m.data
+        # 切り替えたら両方を止める (TODO-050)。stop() で経過分を
+        # 残り時間に反映してから sw を変える
+        self._clock.stop(0)
+        self._clock.stop(1)
         self._clock.set_switch(data.switch)
         self.save_data()
         return 0
@@ -516,9 +589,9 @@ class BackgammonServer:
         """
         msg := {'type': str, 'data': object, 'history': bool}
 
-        parse() で型を付けてから、登録表のハンドラへ渡す (TODO-026)。
-        data のキーが足りなければ parse() で例外になり、受信ループの
-        受け皿 (app.py) が拾う。
+        parse() で型を付けてから、登録表 (MESSAGE_TYPES) のハンドラへ
+        渡す (TODO-026、TODO-050)。data のキーが足りなければ parse() で
+        例外になり、受信ループの受け皿 (app.py) が拾う。
         """
         self.__log.info('client={}', self._hub.name(ws))
         self.__log.info('msg={}', msg)
@@ -531,14 +604,25 @@ class BackgammonServer:
             self.__log.warning('{}: ignored', e)
             return
 
-        sec = await self._handlers[m.type](m)
+        msg_type = MESSAGE_TYPES[m.type]
+        turn0 = self._gameinfo.turn
+
+        sec = await msg_type.handler(self, m)
         if sec is None:
-            # ハンドラが自分で送信済み
+            # ハンドラが自分で送信済みか、盤面と合わないので捨てた
             return
 
-        # append history or not。クロック系は gameinfo を書き換えないので
-        # history: true で届いても積まない (TODO-032)
-        if m.history and m.type not in NO_HISTORY_TYPES:
+        # 勝負がついたら、両方のクロックを止める (TODO-050)。
+        # 処理の前から -1 のときは止めない (勝負がついたあとでも、
+        # クロックを押せば再開できるように)。Clock.stop_all() は
+        # 経過分を残り時間に反映しないので使わない
+        if turn0 != -1 and self._gameinfo.turn == -1:
+            self._clock.stop(0)
+            self._clock.stop(1)
+
+        # 履歴に積むかは表で決める (TODO-050)。古い type は、
+        # メッセージの history も真のときだけ積む (TODO-051 で消す)
+        if msg_type.history and (m.history or m.type in NAMED_TYPES):
             self.add_history(self._gameinfo)
 
         # 受け取った msg をそのまま転送するのではなく、gameinfo に
@@ -546,4 +630,143 @@ class BackgammonServer:
         # 盤面を作り直し、音と dice の回転だけを last_op から出す。
         # チェッカーが動くときだけアニメーションの時間を渡す
         await self.emit_gameinfo(sec, history_flag=False, last_op=m.raw)
+
+
+@dataclass(frozen=True)
+class MessageType:
+    """
+    登録表 (MESSAGE_TYPES) の 1 行 (TODO-050)。
+
+    make_data: data を dataclass にする関数
+    handler: 処理する関数。BackgammonServer のメソッドを、クラスから
+        引いたまま持つ (呼ぶときに self を渡す)
+    history: 履歴に積むか。ハンドラが自分で送信する type (戻り値が
+        None) では見ないので False にしてある
+    """
+
+    make_data: Callable[[dict[str, Any]], Any]
+    handler: Callable[[BackgammonServer, Message], Awaitable[float | None]]
+    history: bool
+
+
+_S = BackgammonServer
+
+# type ごとの「data の型・ハンドラ・履歴に積むか」(TODO-050)。
+# type を足すときに直すのはここだけ。
+# history には、TODO-051 で history を見なくなったあとの値を書く
+MESSAGE_TYPES: dict[str, MessageType] = {
+    # 履歴の操作 (自分で送信するもの)
+    'back': MessageType(HistStepData.from_dict, _S._on_back, False),
+    'back2': MessageType(NoData.from_dict, _S._on_back2, False),
+    'back_all': MessageType(NoData.from_dict, _S._on_back_all, False),
+    'fwd': MessageType(HistStepData.from_dict, _S._on_fwd, False),
+    'fwd2': MessageType(NoData.from_dict, _S._on_fwd2, False),
+    'fwd_all': MessageType(NoData.from_dict, _S._on_fwd_all, False),
+    'clear_hist': MessageType(NoData.from_dict, _S._on_clear_hist, False),
+    'new': MessageType(NoData.from_dict, _S._on_new, False),
+    'set_gameinfo': MessageType(
+        GameInfoData.from_dict, _S._on_set_gameinfo, False),
+    # 名前付きの操作
+    'roll': MessageType(DiceData.from_dict, _S._on_roll, True),
+    'opening': MessageType(OpeningData.from_dict, _S._on_opening, True),
+    'move': MessageType(MoveData.from_dict, _S._on_move, True),
+    'end_turn': MessageType(PlayerData.from_dict, _S._on_end_turn, True),
+    'double': MessageType(PlayerData.from_dict, _S._on_double, True),
+    'take': MessageType(PlayerData.from_dict, _S._on_take, True),
+    'cancel_double': MessageType(
+        PlayerData.from_dict, _S._on_cancel_double, True),
+    'resign': MessageType(ResignData.from_dict, _S._on_resign, True),
+    # 盤面
+    'put_checker': MessageType(
+        PutCheckerData.from_dict, _S._on_put_checker, True),
+    'cube': MessageType(CubeData.from_dict, _S._on_cube, True),
+    'dice': MessageType(DiceData.from_dict, _S._on_dice, True),
+    'set_turn': MessageType(TurnData.from_dict, _S._on_set_turn, True),
+    'set_playername': MessageType(
+        PlayerNameData.from_dict, _S._on_set_playername, True),
+    'set_score': MessageType(ScoreData.from_dict, _S._on_set_score, True),
+    # クロック。gameinfo を書き換えないので積まない (TODO-032)。
+    # 積むと sn 以外すべて 1 つ前と同じエントリになる
+    'set_clock_limit': MessageType(
+        ClockLimitData.from_dict, _S._on_set_clock_limit, False),
+    'set_player_clock': MessageType(
+        PlayerClockData.from_dict, _S._on_set_player_clock, False),
+    'set_clock_switch': MessageType(
+        ClockSwitchData.from_dict, _S._on_set_clock_switch, False),
+    'start_clock': MessageType(
+        PlayerData.from_dict, _S._on_start_clock, False),
+    'resume_clock': MessageType(
+        PlayerData.from_dict, _S._on_resume_clock, False),
+    'stop_clock': MessageType(
+        PlayerData.from_dict, _S._on_stop_clock, False),
+}
+
+# 名前付きの操作。メッセージの history を見ず、表だけで積むかを決める。
+# TODO-051 で古い type とメッセージの history を消したら、これも消す
+NAMED_TYPES: frozenset[str] = frozenset({
+    'roll', 'opening', 'move', 'end_turn',
+    'double', 'take', 'cancel_double', 'resign',
+})
+
+
+def parse(msg: dict[str, Any]) -> Message:
+    """
+    受け取った msg を Message にする (TODO-026)。
+
+    type を見て、data の中身を type ごとの frozen dataclass に
+    組み立てる。**キーが足りなければここで例外になる**ので、
+    奥の msg['data']['n'] が KeyError を出すことがなくなる。
+
+    Raises
+    ------
+    UnknownMessageType
+        MESSAGE_TYPES に無い type。文字列でない type もこれで扱う
+        (list / dict は dict のキーにできず、そのままでは
+        TypeError になるため)
+    KeyError
+        'type' / 'data' / 'history' か、data の中のキーが足りない
+    TypeError
+        data の値の型が dataclass の注釈と合わない (TODO-050)。
+        盤面を書き換える前に弾く
+    """
+    msg_type = msg['type']
+
+    if not isinstance(msg_type, str) or msg_type not in MESSAGE_TYPES:
+        raise UnknownMessageType(msg_type)
+
+    data = MESSAGE_TYPES[msg_type].make_data(msg['data'])
+    if not _type_ok(type(data), data):
+        raise TypeError(f'{msg_type}: bad data: {msg["data"]!a}')
+
+    return Message(
+        type=msg_type,
+        data=data,
+        history=bool(msg['history']),
+        raw=msg,
+    )
+
+
+def _type_ok(tp: Any, value: Any) -> bool:
+    """
+    value が注釈 tp に合うか (TODO-050)。
+
+    dataclass はフィールドごとに、list[X] は中身ごとに見る。
+    **bool は int のサブクラスなので、int と float に bool を通さず、
+    bool に 0 / 1 を通さない** (isinstance だけでは区別できない)。
+    float には int も通す。dict などは入れ物の型だけを見る。
+    Optional や Any は扱わない (今の注釈に無いため)
+    """
+    if isinstance(tp, type) and is_dataclass(tp):
+        hints = get_type_hints(tp)
+        return isinstance(value, tp) and all(
+            _type_ok(hints[f.name], getattr(value, f.name))
+            for f in fields(tp))
+    if get_origin(tp) is list:
+        return isinstance(value, list) and all(
+            _type_ok(get_args(tp)[0], v) for v in value)
+    if isinstance(value, bool):
+        return tp is bool
+    if tp is float:
+        return isinstance(value, (int, float))
+    return isinstance(value, get_origin(tp) or tp)
 ##

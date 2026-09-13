@@ -12,32 +12,32 @@ parse() のテスト (TODO-026)。
   (奥の msg['data']['n'] で KeyError にしない、が眼目)
 - 登録表に無い type は UnknownMessageType になること
 
-加えて、message.py の DATA_TYPES と server.py のハンドラの表で、
-キーの集合が一致することも見る (片方だけに足したら落ちる)。
+parse() と登録表 (MESSAGE_TYPES) は server.py にある (TODO-050)。
 """
 import dataclasses
 
 import pytest
 
 from ytbg.message import (
-    DATA_TYPES,
-    NO_HISTORY_TYPES,
     ClockLimitData,
     ClockSwitchData,
     CubeData,
     DiceData,
     GameInfoData,
     HistStepData,
+    MoveData,
     NoData,
+    OpeningData,
     PlayerClockData,
     PlayerData,
     PlayerNameData,
     PutCheckerData,
+    ResignData,
     ScoreData,
     TurnData,
     UnknownMessageType,
-    parse,
 )
+from ytbg.server import MESSAGE_TYPES, parse
 
 
 def make_msg(msg_type, data, history=False):
@@ -69,7 +69,23 @@ SAMPLES = [
      PlayerNameData(player=1, name='Alice')),
     ('set_score', {'player': 1, 'score': 5},
      ScoreData(player=1, score=5)),
-    ('resign', {'player': 1}, PlayerData(player=1)),
+    ('resign', {'player': 1, 'score': 2},
+     ResignData(player=1, score=2)),
+    ('roll', {'player': 0, 'dice': [3, 5, 0, 0]},
+     DiceData(player=0, dice=[3, 5, 0, 0])),
+    ('opening', {'winner': -1}, OpeningData(winner=-1)),
+    ('move', {'player': 1,
+              'moves': [{'ch': 101, 'p': 5, 'idx': 0},
+                        {'ch': 3, 'p': 26, 'idx': 0}],
+              'dice': [13, 0, 0, 0], 'score': 0},
+     MoveData(player=1,
+              moves=[PutCheckerData(ch=101, p=5, idx=0),
+                     PutCheckerData(ch=3, p=26, idx=0)],
+              dice=[13, 0, 0, 0], score=0)),
+    ('end_turn', {'player': 1}, PlayerData(player=1)),
+    ('double', {'player': 0}, PlayerData(player=0)),
+    ('take', {'player': 1}, PlayerData(player=1)),
+    ('cancel_double', {'player': 0}, PlayerData(player=0)),
     ('set_clock_limit', {'index': 1, 'clock_limit': 60},
      ClockLimitData(index=1, clock_limit=60)),
     ('set_player_clock', {'player': 1, 'clock': [90, 5]},
@@ -98,7 +114,7 @@ def test_samples_cover_all_types():
 
     これが無いと、登録表に足しただけで parse() のテストが素通りする。
     """
-    assert {s[0] for s in SAMPLES} == set(DATA_TYPES)
+    assert {s[0] for s in SAMPLES} == set(MESSAGE_TYPES)
 
 
 def test_parse_keeps_history_and_raw():
@@ -131,7 +147,13 @@ def test_parse_data_is_frozen():
         ('set_turn', {'turn': 1}, 'resign'),
         ('set_playername', {'player': 1}, 'name'),
         ('set_score', {'player': 1}, 'score'),
-        ('resign', {}, 'player'),
+        ('resign', {'player': 1}, 'score'),
+        ('opening', {}, 'winner'),
+        ('move', {'player': 0, 'moves': [], 'dice': [0, 0, 0, 0]},
+         'score'),
+        ('move', {'player': 0, 'moves': [{'ch': 1, 'p': 5}],
+                  'dice': [0, 0, 0, 0], 'score': 0}, 'idx'),
+        ('end_turn', {}, 'player'),
         ('set_clock_limit', {'index': 1}, 'clock_limit'),
         ('set_player_clock', {'player': 1}, 'clock'),
         ('set_clock_switch', {}, 'switch'),
@@ -172,7 +194,7 @@ def test_parse_raises_on_non_str_type(msg_type):
     文字列でない type も UnknownMessageType (TODO-026)。
 
     list / dict は dict のキーにできないので、素直に
-    DATA_TYPES.get() を呼ぶと TypeError になる。
+    MESSAGE_TYPES を引くと TypeError になる。
     """
     with pytest.raises(UnknownMessageType) as e:
         parse(make_msg(msg_type, {}))
@@ -182,26 +204,52 @@ def test_parse_raises_on_non_str_type(msg_type):
 
 def test_parse_ignores_extra_data_keys():
     """余分なキーは読み捨てる (クライアントが古くても落ちない)"""
-    m = parse(make_msg('resign', {'player': 1, 'extra': 'x'}))
+    m = parse(make_msg('resign', {'player': 1, 'score': 1, 'extra': 'x'}))
 
-    assert m.data == PlayerData(player=1)
-
-
-def test_tables_have_same_keys(bg_server):
-    """
-    message.py の DATA_TYPES と server.py のハンドラの表で、
-    キーの集合が一致すること (TODO-026)。
-
-    片方にだけ type を足すと、ここで落ちる。
-    """
-    assert set(DATA_TYPES) == set(bg_server._handlers)
+    assert m.data == ResignData(player=1, score=1)
 
 
-def test_no_history_types_are_known_types():
-    """
-    NO_HISTORY_TYPES は DATA_TYPES の部分集合であること (TODO-032)。
+# ---------------------------------------------------------------------
+# data の値の型 (TODO-050)
+# ---------------------------------------------------------------------
 
-    知らない type を挙げても on_json() の分岐 (_handlers) に届く前の
-    parse() で弾かれるので、ここで確かめておく。
-    """
-    assert set(DATA_TYPES) >= NO_HISTORY_TYPES
+@pytest.mark.parametrize(('msg_type', 'data'), [
+    # int に文字列
+    ('take', {'player': '1'}),
+    ('put_checker', {'ch': 1, 'p': '5', 'idx': 0}),
+    # int に bool (bool は int のサブクラス)
+    ('double', {'player': True}),
+    ('set_score', {'player': 0, 'score': False}),
+    # int に float
+    ('put_checker', {'ch': 1, 'p': 5.0, 'idx': 0}),
+    # bool に 0 / 1
+    ('set_clock_switch', {'switch': 1}),
+    # list でない
+    ('roll', {'player': 0, 'dice': 5}),
+    ('roll', {'player': 0, 'dice': '1234'}),
+    ('roll', {'player': 0, 'dice': ''}),
+    ('move', {'player': 0, 'moves': '', 'dice': [0, 0, 0, 0], 'score': 0}),
+    ('move', {'player': 0, 'moves': {}, 'dice': [0, 0, 0, 0], 'score': 0}),
+    # list の中身
+    ('roll', {'player': 0, 'dice': [1, '2', 0, 0]}),
+    ('roll', {'player': 0, 'dice': [1, True, 0, 0]}),
+    ('move', {'player': 0, 'moves': [{'ch': '0', 'p': 5, 'idx': 0}],
+              'dice': [0, 0, 0, 0], 'score': 0}),
+    ('set_player_clock', {'player': 0, 'clock': [90, 'x']}),
+    # float に bool
+    ('set_clock_limit', {'index': 0, 'clock_limit': True}),
+    # str に数
+    ('set_playername', {'player': 0, 'name': 1}),
+])
+def test_parse_raises_on_bad_value_type(msg_type, data):
+    """data の値の型が注釈と合わなければ TypeError"""
+    with pytest.raises(TypeError):
+        parse(make_msg(msg_type, data))
+
+
+@pytest.mark.parametrize('limit', [90, 90.5])
+def test_parse_clock_limit_accepts_int_and_float(limit):
+    """clock_limit は parseFloat の値を送るので、int も float も受ける"""
+    m = parse(make_msg('set_clock_limit', {'index': 0, 'clock_limit': limit}))
+
+    assert m.data == ClockLimitData(index=0, clock_limit=limit)

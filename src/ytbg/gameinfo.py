@@ -21,12 +21,19 @@ from typing import Any
 from .message import (
     CubeData,
     DiceData,
+    MoveData,
+    OpeningData,
     PlayerData,
     PlayerNameData,
+    ResignData,
     ScoreData,
     TurnData,
 )
 from .mylog import getLogger
+
+# キューブの値と得点の上限 (TODO-050)
+CUBE_MAX = 64
+SCORE_MAX = 99
 
 
 def init_checker() -> list[list[list[int]]]:
@@ -209,16 +216,141 @@ class GameInfo:
         self.__log.debug('data={}', data)
         self.score[data.player] = data.score
 
-    def resign_game(self, data: PlayerData) -> None:
+    def resign_game(self, data: ResignData) -> bool:
         """
-        resign game
+        resign game。勝負をつけ、相手の得点に score を足す (TODO-050)。
 
         resign という名前は dataclass のフィールドが使っているので、
         メソッド名は resign_game にしてある (TODO-025)。
+
+        turn が既に -1 なら何もせず False を返す (2 回届いても
+        2 回ぶん足さない)
         """
         self.__log.debug('data={}', data)
+        if self.turn == -1:
+            return False
+        self.turn = -1
         self.resign = data.player
+        self._add_score(1 - data.player, data.score)
         self.__log.debug('resign={}', self.resign)
+        return True
+
+    def _add_score(self, player: int, score: int) -> None:
+        """得点を足す。上限は SCORE_MAX"""
+        self.score[player] = min(self.score[player] + score, SCORE_MAX)
+
+    # ここから名前付きの操作 (TODO-050)。roll は dice() をそのまま使う。
+    # クロックは gameinfo の外なので、切り替えは server.py が行う。
+    #
+    # 戻り値が bool のものは、今の盤面と合わないとき何もせず False を
+    # 返す。ルールの判定はクライアントが行うので、ここで防ぐのは
+    # 同じ操作がほぼ同時に 2 回届いたときの重複だけ
+
+    def opening(self, data: OpeningData) -> bool:
+        """
+        オープニングロールの結果。
+
+        勝者のダイスを [勝者の目, 0, 0, 敗者の目]、敗者のダイスを空にし、
+        手番を勝者に渡す。同じ目 (winner が -1) なら両方を空にして
+        turn を 2 に戻す。振った目は 4 つのうちランダムな位置に入って
+        いるので、0 でない値を拾う。無ければ 0。
+
+        turn が 2 以上 (オープニングの前) でなければ False
+        """
+        self.__log.debug('data={}', data)
+        if self.turn < 2:
+            return False
+        if data.winner < 0:
+            self.board.dice = init_dice()
+            self.turn = 2
+            return True
+
+        winner = data.winner
+        loser = 1 - winner
+        [w, lo] = [next((d for d in self.board.dice[p] if d != 0), 0)
+                   for p in (winner, loser)]
+        self.board.dice[winner] = [w, 0, 0, lo]
+        self.board.dice[loser] = [0, 0, 0, 0]
+        self.turn = winner
+        return True
+
+    def move(self, data: MoveData) -> None:
+        """
+        駒を moves のとおりに置き、ダイスを入れ替える。
+
+        score が 1 以上なら勝負がついたので、turn を -1 にして
+        player の得点に足す。turn が既に -1 なら、駒とダイスは置くが
+        得点も turn も変えない (2 回届いても 2 回ぶん足さない)
+        """
+        self.__log.debug('data={}', data)
+        for mv in data.moves:
+            self.put_checker(mv.ch, mv.p, mv.idx)
+        self.board.dice[data.player] = list(data.dice)
+        if data.score >= 1 and self.turn != -1:
+            self.turn = -1
+            self._add_score(data.player, data.score)
+
+    def end_turn(self, data: PlayerData) -> bool:
+        """
+        自分のダイスを空にして、手番を相手に渡す。
+
+        turn が player でなければ False
+        """
+        self.__log.debug('data={}', data)
+        if self.turn != data.player:
+            return False
+        self.board.dice[data.player] = [0, 0, 0, 0]
+        self.turn = 1 - data.player
+        return True
+
+    def double(self, data: PlayerData) -> bool:
+        """
+        キューブを倍にし (上限 CUBE_MAX)、相手側に未テイクで置く。
+
+        受け付けるのは、テイク済みでキューブが中央か player の側のときと、
+        未テイクでキューブが player の側 (掛けられた側がさらに倍にする
+        リダブル) のときだけ。それ以外は False
+        """
+        self.__log.debug('data={}', data)
+        cube = self.board.cube
+        p = data.player
+        if not (cube.side == p
+                or (cube.accepted and cube.side == -1)):
+            return False
+        cube.value = min(cube.value * 2, CUBE_MAX)
+        cube.side = 1 - p
+        cube.accepted = False
+        return True
+
+    def take(self, data: PlayerData) -> bool:
+        """
+        テイク済みにする。
+
+        未テイクでキューブが player の側のときだけ。それ以外は False
+        """
+        self.__log.debug('data={}', data)
+        cube = self.board.cube
+        if cube.accepted or cube.side != data.player:
+            return False
+        cube.accepted = True
+        return True
+
+    def cancel_double(self, data: PlayerData) -> bool:
+        """
+        ダブルを取り消す。値を半分に戻し、掛けた側にテイク済みで置く。
+        1 に戻ったら中央。
+
+        未テイクでキューブが相手 (1 - player) の側のときだけ。
+        それ以外は False
+        """
+        self.__log.debug('data={}', data)
+        cube = self.board.cube
+        if cube.accepted or cube.side != 1 - data.player:
+            return False
+        cube.value = max(cube.value // 2, 1)
+        cube.side = data.player if cube.value > 1 else -1
+        cube.accepted = True
+        return True
 
     def copy(self) -> GameInfo:
         """独立した複製を返す"""

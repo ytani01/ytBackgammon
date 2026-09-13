@@ -121,7 +121,8 @@ async def test_set_clock_limit_is_saved(bg_server, req):
     set_clock_limit はファイルに保存される (TODO-032)。
 
     クロック系は history: true で届いても履歴に積まない
-    (NO_HISTORY_TYPES) ので、add_history() 経由の保存が効かない。
+    (登録表 MESSAGE_TYPES の history が False) ので、add_history()
+    経由の保存が効かない。
     _on_set_clock_limit() が自分で save_data() を呼んでいること
     (_on_set_clock_switch() と同じ理由)
     """

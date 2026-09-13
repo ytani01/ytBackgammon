@@ -154,7 +154,7 @@ async def test_set_score_updates_only_target_player(bg_server, req):
 
 async def test_resign_updates_resign(bg_server, req):
     """resign は resign にプレーヤー番号を入れる"""
-    data = {'player': 1}
+    data = {'player': 1, 'score': 1}
     msg = {'type': 'resign', 'data': data, 'history': False}
     await bg_server.on_json(req, msg)
 
@@ -213,7 +213,7 @@ def no_clock_keys(gameinfo):
          lambda g: g['board']['playername'][1], 'Bob'),
         ('set_score', {'player': 1, 'score': 2},
          lambda g: g['score'][1], 2),
-        ('resign', {'player': 0},
+        ('resign', {'player': 0, 'score': 1},
          lambda g: g['resign'], 0),
         # クロック系の 4 つ。クロックは gameinfo の外に出した
         # (TODO-024) ので、gameinfo にクロックのキーは戻ってこない。

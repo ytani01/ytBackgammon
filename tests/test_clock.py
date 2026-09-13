@@ -192,8 +192,11 @@ async def test_clock_does_not_advance_while_switch_off(
 
     assert bg_server._clock.cur(0) == [120, 7]
 
-    # on に戻すと、off だった 60 秒は数えずに続きから進む
+    # on に戻すとクロックは止まっている (TODO-050)。再開すると、
+    # off だった 60 秒は数えずに続きから進む
     await clock_on(bg_server, req)
+    assert bg_server._clock.active == [False, False]
+    await send(bg_server, req, 'resume_clock', 0)
     fake_time.advance(2)
 
     assert bg_server._clock.cur(0) == [120, 5]
@@ -329,8 +332,8 @@ async def test_clock_types_do_not_append_history(
 async def test_clock_types_skip_add_history_call(
         fake_time, bg_server, req, monkeypatch, msg_type, data):
     """
-    on_json() が NO_HISTORY_TYPES を見て、add_history() 自体を
-    呼ばないこと (TODO-032)。
+    on_json() が登録表 (MESSAGE_TYPES) の history を見て、
+    add_history() 自体を呼ばないこと (TODO-032、TODO-050)。
 
     History.add() 自身も同じ盤面なら積まないので (前のテスト)、
     ここでは add_history() を呼んだかどうかを直接見る。
