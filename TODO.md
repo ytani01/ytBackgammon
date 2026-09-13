@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: 無し。** これまでに 48 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-049` から。**
+**残っている項目: TODO-049。** これまでに 48 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-050` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -13,6 +13,57 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 **TODO-042 で決めた構成の見直し（第 2 弾）の実装（TODO-043〜048）も、
 2026-09-13 に全部終わった。**
+
+---
+
+## TODO-049. モジュール構成とクラス構成を見直す（第 3 弾）
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | main のみ |
+
+TODO-020・TODO-042 と同じ**決めるだけの項目**。実装は TODO-050 以降に分ける。
+
+- [ ] メッセージの送り方（下の A・B・F）の設計を決める
+- [ ] JS のクラス構成（C・D・E）の設計を決める
+- [ ] 部品と DOM の結びつき（G）の設計を決める
+- [ ] 細かい修正の範囲を決める
+- [ ] 実装の項目の分け方と順番を決める
+
+### 背景
+
+2026-09-13 に `src/` 全体を読み直して見つけたもの。4 つとも取り組むことは
+決まっている。**TODO-020 の決定（ルール判定はクライアントに置く、
+バンドラと eslint は入れない）は変えない。**
+
+| | 見つけたもの | 場所 |
+|---|--------------|------|
+| A | 1 つの操作が複数のメッセージに分かれる。手番を渡すと 5 通（`dice` → `stop_clock` → `set_player_clock` → `start_clock` → `set_turn`）、サーバは 1 通ごとに全員へ `gameinfo` を送る。1 手の区切りは「最後の 1 通だけ `history: true`」で表している（TODO-032）。`set_player_clock` はクライアントが数えた残り時間でサーバの値を上書きする | `ui/clock.js` の `change_turn()`、`ui/dice.js`、`ui/checker.js` |
+| B | 表示の更新がサーバへの送信を起こす。`apply()` → `set_turn()` が勝敗を見て `stop_clock` を送る（`predict` / `emit` 引数はそのため）。`Board.winner_is()` が判定のついでに `this.resign` を書き換える | `board.js` |
+| C | ゲームの進行が UI 部品のクリック処理に散らばっている。`emit_msg` を呼ぶモジュールが 8 つ | `ui/dice.js`（オープニングロール）、`ui/button.js`（投了の点数）、`ui/cube.js`（ダブル） |
+| D | `gameinfo` 以外にも状態が残っている。判定がそちらを読む | `Board.turn` / `resign`、`Cube.value` / `accepted`、`PlayerScore.score`、`Dice.value`、`RollButton.dice_active` |
+| E | `Board`（1,034 行）が表示・操作・設定を兼ねる。ドラッグの処理は `Checker` にあるが、扱っているのは `board.moving_checker` | `board.js`、`ui/checker.js` |
+| F | `type` を足すと 3 か所を直す | `message.py` の `DATA_TYPES` / `NO_HISTORY_TYPES`、`server.py` の `_handlers` |
+| G | 部品が id の文字列で要素を拾い直す。チェッカー ID を `parseInt(ch.id.slice(1))` で 4 か所変換している | `dom.js`、`ui/base.js`、`board.js`、`ui/checker.js` |
+
+細かい修正の候補:
+
+- `BackgammonServer.DATAFILE_DIR` が import の時点で環境変数を読む
+- `add_history()` の `gameinfo=None` と `History.add()` の `None` 分岐が
+  使われていない。`History._cur_sn` は実質ローカル変数
+- `load_data()` が件数のタプルを返すが、呼ぶ側は `< 1` しか見ない
+- `backward_hist()` / `forward_hist()` の docstring（`n < 0`）と実装（`n <= 0`）が食い違う
+- `Board.search_checker()` がループで探している
+
+### 決めること（着手してから相談する）
+
+- **A の形。** 基本の更新をまとめて送る（`batch` のような 1 通）か、
+  `end_turn` のように意味で送るか。後者ならクロックの切り替えを
+  サーバの中で済ませられる
+- **B で、勝ったときのクロック停止をどこから送るか**
+- **C の置き場所。** 新しいモジュール（`actions.js` など）に集めるか
+- **D で、手元だけに要る状態（使用済みのダイス）をどう持つか**
+- **順番。** A・B を先にすると C〜E が進めやすい
 
 ---
 
