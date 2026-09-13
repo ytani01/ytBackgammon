@@ -70,7 +70,7 @@ describe('cookie のプレーヤー番号', () => {
                             [['resign', { player: 0, score: 3 }]]);
 
            // サーバが弾かずに受け付け、turn が -1 になる
-           await page.waitForFunction(() => board.turn === -1);
+           await page.waitForFunction(() => board.gameinfo.turn === -1);
        });
 
     it('コンソールエラーが出ていない', async () => {

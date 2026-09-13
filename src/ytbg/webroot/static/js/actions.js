@@ -28,6 +28,14 @@ const SCORE_MAX = 99;
 const checker_id = (ch) => parseInt(ch.id.slice(1));
 
 /**
+ * gameinfo の複製 (予測した盤面を作るとき、届いた gameinfo を汚さない)
+ *
+ * @param {Object} gameinfo
+ * @return {Object}
+ */
+const copy_gameinfo = (gameinfo) => JSON.parse(JSON.stringify(gameinfo));
+
+/**
  * 使えない目を 11〜16 にする
  *
  * @param {Position} position
@@ -61,7 +69,8 @@ export const disable_unusable = (position, player, dice) => {
  * @return {boolean} - 送ったか (キューブが受けられていないと振れない)
  */
 export const roll = (board, player) => {
-    if ( ! board.cube.accepted ) {
+    const gi = board.gameinfo;
+    if ( gi === undefined || ! gi.board.cube.accepted ) {
         return false;
     }
     player = parseInt(player);
@@ -76,7 +85,7 @@ export const roll = (board, player) => {
     log(`roll> [d1, d2]=[${d1}, ${d2}], [${value1}, ${value2}]`);
 
     let dice = [0, 0, 0, 0];
-    if ( board.turn >= 2 ) {
+    if ( gi.turn >= 2 ) {
         dice[d1] = value1;
     } else if ( value1 != value2 ) {
         dice[d1] = value1;
@@ -93,7 +102,7 @@ export const roll = (board, player) => {
 /**
  * ダイスを押したとき。
  *
- * - free move: 押したダイスの目を 1 つ進めて dice を送る
+ * - free move: 押したダイスの目を 1 つ進めた盤面を先に表示し、dice を送る
  * - 先手決め (turn >= 2): 相手も振っていれば、目を比べて opening を送る
  * - それ以外: 使えるダイスが残っていなければ、手番を渡す (end_turn)
  *
@@ -103,39 +112,44 @@ export const roll = (board, player) => {
  */
 export const click_dice = (board, player, i) => {
     player = parseInt(player);
-    const roll_btn = board.roll_btn[player];
-    const roll_btn1 = board.roll_btn[1 - player];
+    const gi = board.gameinfo;
+    if ( gi === undefined ) {
+        return;
+    }
 
     if ( board.free_move ) {
-        const d = roll_btn.dice[i];
-        if ( d.value < 1 ) {
+        const cur = gi.board.dice[player][i];
+        if ( cur < 1 ) {
             return;
         }
-        let val = d.value + 1;
-        if ( d.value > 6 ) {
-            val = d.value % 10;
+        let val = cur + 1;
+        if ( cur > 6 ) {
+            val = cur % 10;
         } else if ( val > 6 ) {
             val = 1;
         }
         // 続けて押したときに、サーバの返事の前でも目が進むように、
-        // 画面の値も変えておく (TODO-052 で gameinfo を読む形にする)
-        d.set(val);
-        emit_msg("dice", { player: player, dice: roll_btn.get() });
+        // 予測した盤面を先に表示する (move と同じ先行実行。TODO-052)
+        const predicted = copy_gameinfo(gi);
+        predicted.board.dice[player][i] = val;
+        board.apply(predicted, { sec: 0 });
+        emit_msg("dice", { player: player,
+                           dice: predicted.board.dice[player] });
         return;
     }
 
-    if ( board.turn < 0 ) {
-        log(`click_dice>turn=${board.turn} .. ignored`);
+    if ( gi.turn < 0 ) {
+        log(`click_dice>turn=${gi.turn} .. ignored`);
         return;
     }
 
-    if ( board.turn >= 2 ) {
+    if ( gi.turn >= 2 ) {
         // 先手決め。双方が振った後、目が大きい方が先手
-        if ( ! roll_btn1.dice_active ) {
+        if ( ! board.has_dice(1 - player) ) {
             return;
         }
-        const d0 = roll_btn.get_active_dice()[0];
-        const d1 = roll_btn1.get_active_dice()[0];
+        const d0 = board.get_active_dice(player)[0];
+        const d1 = board.get_active_dice(1 - player)[0];
 
         let winner = -1;   // 同じ目なら、もう一度
         if ( d0 > d1 ) {
@@ -147,7 +161,7 @@ export const click_dice = (board, player, i) => {
         return;
     }
 
-    if ( roll_btn.get_active_dice().length > 0 ) {
+    if ( board.get_active_dice(player).length > 0 ) {
         return;
     }
     end_turn(board, player);
@@ -175,15 +189,19 @@ export const end_turn = (board, player) => {
  * @return {boolean}
  */
 export const can_pick_checker = (board, ch) => {
+    const gi = board.gameinfo;
+    if ( gi === undefined ) {
+        return false;
+    }
     if ( board.free_move ) {
         return true;
     }
 
     // 手番のプレーヤーのチェッカーだけ
-    if ( board.turn >= 2 || board.turn < 0 ) {
+    if ( gi.turn >= 2 || gi.turn < 0 ) {
         return false;
     }
-    if ( board.turn != ch.player ) {
+    if ( gi.turn != ch.player ) {
         return false;
     }
 
@@ -361,28 +379,27 @@ export const move = (board, ch, dst_p, hit_ch, active_dice) => {
  * @return {boolean}
  */
 export const can_hold_cube = (board) => {
-    const cube = board.cube;
+    const gi = board.gameinfo;
+    if ( gi === undefined ) {
+        return false;
+    }
+    const cube = gi.board.cube;   // side: -1 なら中央
 
-    if ( board.turn >= 2 || board.turn < 0 ) {
+    if ( gi.turn >= 2 || gi.turn < 0 ) {
         // ゲーム開始時、終了時は、触れない
         return false;
     }
-    if ( cube.player !== undefined && cube.player != board.player ) {
+    if ( cube.side >= 0 && cube.side != board.player ) {
         // 相手側にあるキューブは、触れない
         return false;
     }
-    if ( cube.accepted ) {
-        if ( board.turn != board.player ) {
-            // 自分の番にしかダブルを掛けられない
-            return false;
-        }
-        if ( cube.player && cube.player != board.player ) {
-            return false;
-        }
+    if ( cube.accepted && gi.turn != board.player ) {
+        // 自分の番にしかダブルを掛けられない
+        return false;
     }
-    for (let rb of board.roll_btn) {
-        // ダイスがアクティブのときは、キューブに触れない
-        if ( rb.dice_active ) {
+    for (let p=0; p < 2; p++) {
+        // ダイスが出ているときは、キューブに触れない
+        if ( board.has_dice(p) ) {
             return false;
         }
     }
@@ -398,10 +415,11 @@ export const can_hold_cube = (board) => {
  *     リダブルでは上限を見ない (上限はサーバが抑える。TODO-051 より前と同じ)
  */
 export const double = (board, player, redouble=false) => {
-    if ( player === undefined ) {
+    const gi = board.gameinfo;
+    if ( player === undefined || gi === undefined ) {
         return;
     }
-    if ( ! redouble && board.cube.value >= CUBE_MAX ) {
+    if ( ! redouble && gi.board.cube.value >= CUBE_MAX ) {
         return;
     }
     emit_msg("double", { player: parseInt(player) });
@@ -437,14 +455,19 @@ export const cancel_double = (board, player) => {
  * @param {Board} board
  */
 export const resign = (board) => {
+    const gi = board.gameinfo;
+    if ( gi === undefined ) {
+        return;
+    }
+    const cube = gi.board.cube;
     let score;
-    if ( ! board.cube.accepted ) {
+    if ( ! cube.accepted ) {
         // ダブルを掛けられて降りる場合、ダブルを掛ける前の値
-        score = board.cube.value / 2;
+        score = cube.value / 2;
     } else {
         // ダブルを掛けられてないときに降りる場合は、
         // 「バックギャモン」(3倍)扱い
-        score = board.cube.value * 3;
+        score = cube.value * 3;
     }
     log(`resign>score=${score}`);
     emit_msg("resign", { player: parseInt(board.player),
@@ -458,11 +481,11 @@ export const resign = (board) => {
  * @param {number} player
  */
 export const score_up = (board, player) => {
-    const s = board.score[player];
-    // 続けて押したときに、サーバの返事の前でも足されるように、
-    // 手元の値も変えておく (TODO-052 で gameinfo を読む形にする)
-    s.score = Math.min(s.score + 1, SCORE_MAX);
-    set_score(player, s.score);
+    const gi = board.gameinfo;
+    if ( gi === undefined ) {
+        return;
+    }
+    set_score(board, player, Math.min(gi.score[player] + 1, SCORE_MAX));
 }; // score_up()
 
 /**
@@ -472,17 +495,27 @@ export const score_up = (board, player) => {
  * @param {number} player
  */
 export const score_clear = (board, player) => {
-    board.score[player].score = 0;
-    set_score(player, 0);
+    if ( board.gameinfo === undefined ) {
+        return;
+    }
+    set_score(board, player, 0);
 }; // score_clear()
 
 /**
+ * 得点を変えた盤面を先に表示してから set_score を送る。
+ * 続けて押したときに、サーバの返事の前でも足されるように
+ * (move と同じ先行実行。TODO-052)
+ *
+ * @param {Board} board - gameinfo が届いていること
  * @param {number} player
  * @param {number} score
  */
-const set_score = (player, score) => {
-    emit_msg("set_score", { player: parseInt(player),
-                            score: parseInt(score) });
+const set_score = (board, player, score) => {
+    player = parseInt(player);
+    const predicted = copy_gameinfo(board.gameinfo);
+    predicted.score[player] = score;
+    board.apply(predicted, { sec: 0 });
+    emit_msg("set_score", { player: player, score: parseInt(score) });
 }; // set_score()
 
 /**

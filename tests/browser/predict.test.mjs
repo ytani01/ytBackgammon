@@ -49,7 +49,7 @@ import { after, before, describe, it } from 'node:test';
 
 import {
     center_of, console_errors, launch_browser, open_board, send_msg,
-    set_turn, start_server, wait_for,
+    set_turn, shown_dice, start_server, wait_for,
 } from './helper.mjs';
 
 /**
@@ -140,8 +140,8 @@ async function set_turn_dice(page, dice) {
 
     await wait_for(
         () => page.evaluate(() => ({
-            turn: board.turn,
-            dice: board.roll_btn[0].get(),
+            turn: board.gameinfo.turn,
+            dice: board.gameinfo.board.dice[0],
         })),
         s => s.turn === 0 && JSON.stringify(s.dice) === JSON.stringify(dice),
         { msg: 'set_turn_dice' });
@@ -266,10 +266,10 @@ describe('ドラッグの先行実行 (予測)', () => {
             pip: board.pip[0].pip_count,
             // 使ったダイスは使用済み (3 -> 13) になっている。
             // 予測した gameinfo に入っている (TODO-051)
-            dice: board.roll_btn[0].get(),
             gi_dice: board.gameinfo.board.dice[0],
-            active_dice: board.roll_btn[0].get_active_dice(),
+            active_dice: board.get_active_dice(0),
         }), tip);
+        state.dice = await shown_dice(page, 0);
 
         // 表示 (サーバの応答は届いていない)
         assert.equal(state.point, 3, '先行実行で動いていない');
@@ -426,8 +426,8 @@ describe('ドラッグの先行実行 (予測)', () => {
         const state = await page.evaluate(i => ({
             point: board.checker[0][i].cur_point,
             moving: board.moving_checker !== undefined,
-            dice: board.roll_btn[0].get(),
         }), tip);
+        state.dice = await shown_dice(page, 0);
 
         assert.equal(state.point, 6, '元のポイントに戻っていない');
         assert.equal(state.moving, false, '掴んだままになっている');
@@ -459,8 +459,8 @@ describe('ドラッグの先行実行 (予測)', () => {
             const state = await page.evaluate(i => ({
                 point: board.checker[0][i].cur_point,
                 moving: board.moving_checker !== undefined,
-                dice: board.roll_btn[0].get(),
             }), tip);
+            state.dice = await shown_dice(page, 0);
             assert.equal(state.point, 6, '元のポイントに戻っていない');
             assert.equal(state.moving, false, '掴んだままになっている');
             assert.deepEqual(state.dice, [3, 0, 0, 0]);
@@ -487,8 +487,8 @@ describe('ドラッグの先行実行 (予測)', () => {
             const state = await page.evaluate(() => ({
                 point: board.checker[0][0].cur_point,
                 gi_dice: board.gameinfo.board.dice[0],
-                dice: board.roll_btn[0].get(),
             }));
+            state.dice = await shown_dice(page, 0);
             assert.equal(state.point, 4, '先行実行で動いていない');
             assert.deepEqual(state.gi_dice, [15, 11, 0, 0],
                              '予測した gameinfo のダイス');

@@ -72,8 +72,6 @@ export class Board extends BgImage {
         this.bx = [...BX];
         this.by = [...BY];
 
-        this.resign = -1;
-
         // server ID
         this.svr_id = get_server_id();
         log(`Board> svr_id=${this.svr_id}`);
@@ -97,8 +95,8 @@ export class Board extends BgImage {
             this.set_player(0);
         }
 
-        this.turn = -1;
-
+        // 盤面の状態はこれだけ。判定もここを読む (TODO-052)。
+        // サーバから届くまでは undefined で、何も操作できない
         this.gameinfo = undefined;
 
         // Buttons
@@ -442,9 +440,6 @@ export class Board extends BgImage {
      * クロックを止めるのはサーバ (TODO-050)。
      */
     set_turn(turn, resign=-1, sound=true) {
-        this.turn = turn;
-        this.resign = resign;
-        
         for (let p=0; p < 2; p++) {
             this.roll_btn[p].off();
             this.pass_btn[p].off();
@@ -491,7 +486,7 @@ export class Board extends BgImage {
             let playpromise = this.sound_turn_change.play();
         }
 
-        if ( this.closeout(1 - this.turn) ) {
+        if ( this.closeout(1 - turn) ) {
             this.pass_btn[turn].on();
         } else {
             this.roll_btn[turn].update();
@@ -593,16 +588,20 @@ export class Board extends BgImage {
      * player の勝ちなら、その点数を返す。
      *
      * 判定は rules/judge.js。**判定するだけで、状態は書き換えない**
-     * (TODO-051。以前は投了による勝ちのときに this.resign を戻していた)。
+     * (TODO-051。以前は投了による勝ちのときに resign を戻していた)。
      *
      * @param {number} player
      * @return {number} points - 0 なら勝ちではない
      */
     winner_is(player) {
+        const gi = this.gameinfo;
+        if ( gi === undefined ) {
+            return 0;
+        }
         return rule_winner_is(this.position(), player, {
-            resign: this.resign,
-            cube_value: this.cube.value,
-            cube_accepted: this.cube.accepted,
+            resign: gi.resign,
+            cube_value: gi.board.cube.value,
+            cube_accepted: gi.board.cube.accepted,
         }).score;
     } // Board.winner_is()
 
@@ -631,12 +630,32 @@ export class Board extends BgImage {
     } // Board.closeout()
 
     /**
-     * 使えるダイスを取得
-     * @return {number[]}
+     * 使えるダイス (1〜6) の目。gameinfo から求める (TODO-052)
+     *
+     * @param {number} player
+     * @return {number[]} - gameinfo がまだ無いときは空
      */
     get_active_dice(player) {
-        return this.roll_btn[player].get_active_dice();
+        if ( this.gameinfo === undefined ) {
+            return [];
+        }
+        return this.gameinfo.board.dice[player].filter(
+            (v) => v >= 1 && v <= 6);
     } // Board.get_active_dice
+
+    /**
+     * ダイスが出ているか (使い終わった 11〜16 も含む)。
+     * gameinfo から求める (TODO-052。以前は RollButton.dice_active)
+     *
+     * @param {number} player
+     * @return {boolean} - gameinfo がまだ無いときは false
+     */
+    has_dice(player) {
+        if ( this.gameinfo === undefined ) {
+            return false;
+        }
+        return this.gameinfo.board.dice[player].some((v) => v > 0);
+    } // Board.has_dice()
 
     /**
      * 移動可能なポイントの取得
@@ -759,12 +778,7 @@ export class Board extends BgImage {
         // score
         this.score[0].set(gameinfo.score[0]);
         this.score[1].set(gameinfo.score[1]);
-        log(`Board.apply>score[]=[`
-                    + `${this.score[0].score},`
-                    + `${this.score[1].score}]`);
-
-        // resign
-        this.resign = gameinfo.resign;
+        log(`Board.apply>score[]=${JSON.stringify(gameinfo.score)}`);
 
         // clock
         //
@@ -824,7 +838,7 @@ export class Board extends BgImage {
         // (opening と end_turn) で来たときだけ許す。turn が変わったかは
         // 見ない (TODO-051。どちらの操作でも turn は変わる)
         log(`Board.apply>turn=${gameinfo.turn}`);
-        this.set_turn(gameinfo.turn, this.resign,
+        this.set_turn(gameinfo.turn, gameinfo.resign,
                       op_type == "opening" || op_type == "end_turn");
 
         // pip count
@@ -835,7 +849,7 @@ export class Board extends BgImage {
         //
         // 盤面はもう gameinfo で揃っているので、ここで出すのは音だけ。
         // put_checker (free move) は turn == -1 (操作不可) では鳴らさない
-        if ( put_ch !== undefined && this.turn != -1 ) {
+        if ( put_ch !== undefined && gameinfo.turn != -1 ) {
             if ( last_op.data.p >= 26 && put_prev_p < 26 ) {
                 this.sound_hit.play();
             } else {

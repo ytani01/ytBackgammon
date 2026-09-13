@@ -45,7 +45,7 @@ describe('Board とルール層のつながり', () => {
     beforeEach(async () => {
         const state = await page.evaluate(() => {
             return { pip: [board.pip_count(0), board.pip_count(1)],
-                     resign: board.resign,
+                     resign: board.gameinfo.resign,
                      n6: board.position().count(6) };
         });
         assert.deepEqual(state, { pip: [167, 167], resign: -1, n6: 5 },
@@ -112,15 +112,16 @@ describe('Board とルール層のつながり', () => {
         assert.deepEqual(score, [0, 0]);
     });
 
-    it('winner_is() が投了の勝ちを返し、board.resign は書き換えない',
+    it('winner_is() が投了の勝ちを返し、gameinfo.resign は書き換えない',
        async () => {
            // 判定するだけで状態は変えない (TODO-051。以前は -1 に戻して
-           // いた)。resign はこの it の中で立てて、最後に戻す
+           // いた)。判定は gameinfo を読む (TODO-052)。resign はこの it の
+           // 中で立てて、最後に戻す
            const r = await page.evaluate(() => {
-               board.resign = 1;
+               board.gameinfo.resign = 1;
                const score = board.winner_is(0);
-               const resign = board.resign;
-               board.resign = -1;
+               const resign = board.gameinfo.resign;
+               board.gameinfo.resign = -1;
                return { score: score, resign: resign };
            });
            // 初期配置では、相手が point 1 (player0 のインナー) に

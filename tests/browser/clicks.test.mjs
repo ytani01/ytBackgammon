@@ -22,7 +22,7 @@ import { after, before, describe, it } from 'node:test';
 
 import {
     center_of, console_errors, launch_browser, open_board, send_msg,
-    set_turn, sleep, start_server, wait_for,
+    dice_from_els, set_turn, sleep, start_server, wait_for,
 } from './helper.mjs';
 
 /**
@@ -217,6 +217,7 @@ describe('クリックでの操作', () => {
     });
 
     const board_attr = name => page.evaluate(n => board[n], name);
+    const turn = () => page.evaluate(() => board.gameinfo.turn);
 
     /**
      * メニューを開いて項目を押す。押す前に貯めたメッセージは捨てる
@@ -441,7 +442,7 @@ describe('クリックでの操作', () => {
 
     it('スコアの ▲ → set_score {player: 0, score: +1} を送る', async () => {
         await settle(page);
-        const s0 = await page.evaluate(() => board.score[0].score);
+        const s0 = await page.evaluate(() => board.gameinfo.score[0]);
         await take_sent(page);
         await page.locator('#score_up0').click({ force: true });
         await assert_only_sent(page, 'set_score',
@@ -452,6 +453,96 @@ describe('クリックでの操作', () => {
         await take_sent(page);
         await page.locator('#score_down0').click({ force: true });
         await assert_only_sent(page, 'set_score', { player: 0, score: 0 });
+    });
+
+    /**
+     * 要素を、返事を待たずに続けて n 回押し、押し終えた直後の状態を返す。
+     *
+     * 1 回の evaluate の中で押すので、その間にサーバの返事は届かない。
+     * 手元の写しを持たずに gameinfo を読むので、先に表示 (apply()) して
+     * いないと 2 回目も同じ値を送ってしまう (TODO-052)
+     *
+     * @param {string} id
+     * @param {number} n
+     * @return {Promise<{score: number[], shown: string, dice: number[],
+     *                   shown_dice: number[]}>}
+     */
+    const press_n = (id, n) => page.evaluate(([id, n]) => {
+        const el = document.getElementById(id);
+        for (let i = 0; i < n; i++) {
+            const r = el.getBoundingClientRect();
+            el.dispatchEvent(new MouseEvent('mousedown', {
+                bubbles: true,
+                clientX: r.x + r.width / 2, clientY: r.y + r.height / 2,
+            }));
+        }
+        return { score: board.gameinfo.score.slice(),
+                 shown: board.score[0].el.innerHTML,
+                 dice: board.gameinfo.board.dice[0].slice(),
+                 dice_els: board.roll_btn[0].dice.map(
+                     d => ({ z: d.z, src: d.image_el.src,
+                             opacity: d.image_el.style.opacity })) };
+    }, [id, n]).then(r => ({ ...r, shown_dice: dice_from_els(r.dice_els) }));
+
+    it('スコアの ▲ を返事の前に 2 回押す → 2 回ぶん足される', async () => {
+        // 上の ▼ で 0 になっている
+        await settle(page);
+        const s0 = await page.evaluate(() => board.gameinfo.score[0]);
+        await take_sent(page);
+
+        const r = await press_n('score_up0', 2);
+        // 返事の前に、表示と gameinfo が 2 つ進んでいる (先行実行)
+        assert.equal(r.score[0], s0 + 2, 'gameinfo が 2 つ進んでいない');
+        assert.equal(r.shown, String(s0 + 2), '表示が 2 つ進んでいない');
+
+        await settle(page);
+        const sent = await take_sent(page);
+        assert.deepEqual(sent.map(m => [m.type, m.data]), [
+            ['set_score', { player: 0, score: s0 + 1 }],
+            ['set_score', { player: 0, score: s0 + 2 }],
+        ]);
+        assert.equal(await page.evaluate(() => board.gameinfo.score[0]),
+                     s0 + 2, 'サーバの盤面が 2 つ進んでいない');
+
+        // 元に戻す
+        await page.locator('#score_down0').click({ force: true });
+        await assert_only_sent(page, 'set_score', { player: 0, score: 0 });
+    });
+
+    it('free move でダイスを返事の前に 2 回押す → 目が 2 つ進む', async () => {
+        await send_msg(page, 'dice', { player: 0, dice: [5, 0, 0, 0] });
+        await wait_for(
+            () => page.evaluate(() => board.gameinfo.board.dice[0]),
+            d => d[0] === 5, { msg: 'dice' });
+        await page.locator('#free-move').click();
+        try {
+            await settle(page);
+            await take_sent(page);
+
+            // 5 -> 6 -> 1
+            const r = await press_n('dice00', 2);
+            assert.deepEqual(r.dice, [1, 0, 0, 0],
+                             'gameinfo が 2 つ進んでいない');
+            assert.deepEqual(r.shown_dice, [1, 0, 0, 0],
+                             '表示が 2 つ進んでいない');
+
+            await settle(page);
+            const sent = await take_sent(page);
+            assert.deepEqual(sent.map(m => [m.type, m.data]), [
+                ['dice', { player: 0, dice: [6, 0, 0, 0] }],
+                ['dice', { player: 0, dice: [1, 0, 0, 0] }],
+            ]);
+            assert.deepEqual(
+                await page.evaluate(() => board.gameinfo.board.dice[0]),
+                [1, 0, 0, 0], 'サーバの盤面が 2 つ進んでいない');
+        } finally {
+            await page.locator('#free-move').click();
+            // 次の項目 (キューブ) はダイスが空の前提
+            await send_msg(page, 'dice', { player: 0, dice: [0, 0, 0, 0] });
+            await wait_for(
+                () => page.evaluate(() => board.gameinfo.board.dice[0]),
+                d => d.every(v => v === 0), { msg: 'dice clear' });
+        }
     });
 
     it('スコアの ▲ / ▼ の上に、押せなくする要素が重なっていない', async () => {
@@ -592,6 +683,20 @@ describe('クリックでの操作', () => {
                 && d.dice.every(v => v === 0 || (v % 10 >= 1 && v % 10 <= 6)));
     });
 
+    it('ダイスが出ているときにキューブを動かす → 何も送らない', async () => {
+        // Roll のあとなので、ダイスが出ていて turn は 0。キューブは
+        // テイクの項目のまま自分の側でテイク済みなので、ダイスが無ければ
+        // double を送る盤面 (TODO-052)
+        await settle(page);
+        assert.ok(await page.evaluate(() => board.has_dice(0)), 'ダイスが無い');
+        await take_sent(page);
+
+        await drag_cube(5);
+
+        await settle(page);
+        assert.deepEqual(await take_sent(page), []);
+    });
+
     it('クロックを押す → 止まっていれば resume_clock、動いていれば '
        + 'stop_clock を 1 通だけ送る', async () => {
         // キューブの操作でクロックが切り替わっているので、動いているか
@@ -614,7 +719,7 @@ describe('クリックでの操作', () => {
         // Roll のあとなので turn は 0。目を使えないもの (11〜16) にする
         await send_msg(page, 'dice', { player: 0, dice: [13, 15, 0, 0] });
         await wait_for(
-            () => page.evaluate(() => board.roll_btn[0].get()),
+            () => page.evaluate(() => board.gameinfo.board.dice[0]),
             d => d[0] === 13 && d[1] === 15, { msg: 'dice' });
         await settle(page);
         await take_sent(page);
@@ -622,7 +727,7 @@ describe('クリックでの操作', () => {
         await page.locator('#dice00').click({ force: true });
 
         await assert_only_sent(page, 'end_turn', { player: 0 });
-        await wait_for(() => board_attr('turn'), t => t === 1,
+        await wait_for(() => turn(), t => t === 1,
                        { msg: 'turn' });
     });
 
@@ -639,7 +744,7 @@ describe('クリックでの操作', () => {
            await assert_only_sent(page, 'end_turn', { player: 0 });
 
            // サーバの返事で turn が 1 になるのを待つ
-           await wait_for(() => board_attr('turn'), t => t === 1,
+           await wait_for(() => turn(), t => t === 1,
                           { msg: 'turn' });
        });
 
@@ -708,12 +813,60 @@ describe('クリックでの操作', () => {
         await take_sent(page);
         await page.locator('#button-resign').click({ force: true });
         await assert_only_sent(page, 'resign', { player: 0, score: score });
-        await wait_for(() => board_attr('turn'), t => t === -1,
+        await wait_for(() => turn(), t => t === -1,
                        { msg: 'resign' });
     });
 
     it('コンソールエラーが出ていない', async () => {
         const errors = console_errors(page, server.url);
         assert.deepEqual(errors, [], JSON.stringify(errors, null, 2));
+    });
+
+    it('gameinfo が届く前にキューブ・▲・Roll を押す → 何も送らず、'
+       + 'エラーも出ない', async () => {
+        // サーバにつながず、ページが送ったものだけを受ける (TODO-052)。
+        // 判定が gameinfo の無いことを見ていなければ、送るか、
+        // gameinfo を読んで TypeError になる
+        const p = await browser.newPage();
+        const errors = [];
+        p.on('pageerror', e => errors.push(e.message));
+        const received = [];
+        await p.routeWebSocket(/\/ws$/, ws => {
+            ws.onMessage(m => received.push(m));
+        });
+        try {
+            await p.goto(server.url);
+            await p.waitForFunction(
+                () => typeof board !== 'undefined' && board !== undefined
+                    && board.cube !== undefined);
+
+            await p.evaluate(() => {
+                const fire = (el, type) => {
+                    const r = el.getBoundingClientRect();
+                    el.dispatchEvent(new MouseEvent(type, {
+                        bubbles: true,
+                        clientX: r.x + r.width / 2,
+                        clientY: r.y + r.height / 2,
+                    }));
+                };
+                const cube = document.getElementById('cube');
+                fire(cube, 'mousedown');
+                fire(cube, 'mouseup');
+                fire(document.getElementById('score_up0'), 'mousedown');
+                fire(document.getElementById('rollbutton0'), 'mousedown');
+                // つながっていて送れることの確かめ。履歴の操作は
+                // gameinfo を読まずに送る
+                fire(document.getElementById('button-back'), 'mousedown');
+            });
+            await wait_for(() => received.length, n => n > 0,
+                           { msg: 'back' });
+            await sleep(200);
+
+            assert.equal(await p.evaluate(() => board.gameinfo), undefined);
+            assert.deepEqual(received.map(m => JSON.parse(m).type), ['back']);
+            assert.deepEqual(errors, []);
+        } finally {
+            await p.close();
+        }
     });
 });

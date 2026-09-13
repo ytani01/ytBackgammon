@@ -31,9 +31,8 @@ export class Cube extends BgImage {
     constructor(id, board) {
         super(id, 0, 0, 0, {board: board});
 
-        this.player = undefined;
-        this.value = 1;
-        this.accepted = false;
+        // 値・向き・テイク済みかは持たない。表示は apply() が
+        // gameinfo から毎回作り、判定は gameinfo を読む (TODO-052)
 
         this.move_sec = 0.3;
         this.moving = false;
@@ -57,18 +56,13 @@ export class Cube extends BgImage {
     } // Cube.constructor()
 
     /**
+     * 表示だけを変える
+     *
      * @param {number} val
-     * @param {number} player
+     * @param {number} side - どちらの側か。-1 なら中央
      * @param {boolean} accepted
      */
-    set(val, player=undefined, accepted=false) {
-        this.value = val;
-        this.player = player;
-        this.accepted = accepted;
-
-        if ( player < 0 ) {
-            this.player = undefined;
-        }
+    set(val, side=-1, accepted=false) {
 
         let file_val = val;
         if ( val > 64 ) {
@@ -80,26 +74,24 @@ export class Cube extends BgImage {
 
         this.el.children[0].src = filename;
 
-        if ( this.player === undefined ) {
+        if ( side === undefined || side < 0 ) {
             this.rotate(0, true);
             this.move(this.x0, this.y0, true, this.move_sec);
         } else if ( accepted ) {
-            this.player = player;
-            if ( this.player == 0 ) {
+            if ( side == 0 ) {
                 this.rotate(90, true);
             } else {
                 this.rotate(-90, true);
             }
-            this.move(this.x0, this.y2[this.player], true, this.move_sec);
+            this.move(this.x0, this.y2[side], true, this.move_sec);
         } else {
-            this.player = player;
             this.set_z(100);
-            if ( this.player == 0 ) {
+            if ( side == 0 ) {
                 this.rotate(90, true);
             } else {
                 this.rotate(-90, true);
             }
-            this.move(this.x1[this.player], this.y1[this.player],
+            this.move(this.x1[side], this.y1[side],
                       true, this.move_sec);
         }
     } // Cube.set()
@@ -109,9 +101,7 @@ export class Cube extends BgImage {
      * @param {number} y
      */
     on_mouse_down_xy(x, y) {
-        log(`Cube.on_mouse_down_xy():this.plyaer=${this.player}`);
         log(`Cube.on_mouse_down_xy():this.board.plyaer=${this.board.player}`);
-        log(`Cube.on_mouse_down_xy():this.board.turn=${this.board.turn}`);
         // 触れてよいかの判定は actions.js (TODO-051)
         if ( ! can_hold_cube(this.board) ) {
             return false;
@@ -138,8 +128,7 @@ export class Cube extends BgImage {
      * @param {number} y
      */
     on_mouse_up_xy(x, y) {
-        log(`Cube.on_mouse_down_xy>this.player=${this.player},`
-                    + `this.board.player=${this.board.player}`);
+        log(`Cube.on_mouse_up_xy>this.board.player=${this.board.player}`);
 
         if ( this.moving ) {
             this.moving = false;
@@ -147,12 +136,16 @@ export class Cube extends BgImage {
             return false;
         }
 
-        if ( ! this.accepted ) {
+        // 掴めたなら gameinfo は届いている (can_hold_cube())
+        const cube = this.board.gameinfo.board.cube;
+        const side = cube.side;   // -1 なら中央
+
+        if ( ! cube.accepted ) {
             // ダブルが掛けられた状態
-            if ( this.player == this.board.player ) {
+            if ( side == this.board.player ) {
                 if ( this.src_y == this.y1[0] ) {
                     if ( this.y >= this.y0 ) {
-                        take(this.board, this.player);
+                        take(this.board, side);
                     } else {
                         // redouble
                         double(this.board, 0, true);
@@ -160,7 +153,7 @@ export class Cube extends BgImage {
                 }
                 if ( this.src_y == this.y1[1] ) {
                     if ( this.y <= this.y0 ) {
-                        take(this.board, this.player);
+                        take(this.board, side);
                     } else {
                         // redouble
                         double(this.board, 1, true);
@@ -170,12 +163,12 @@ export class Cube extends BgImage {
                 return false;
             }
             // 掛けた側 (キューブの反対側) が取り消す
-            cancel_double(this.board, 1 - this.player);
+            cancel_double(this.board, 1 - side);
             return false;
         }
 
-        // this.accepted == true
-        if (this.player === undefined || this.player == this.board.player) {
+        // cube.accepted == true
+        if ( side < 0 || side == this.board.player ) {
             double(this.board, this.board.player);
         }
         return false;

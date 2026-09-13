@@ -8,7 +8,7 @@
 // turn >= 2 のとき、Roll を押した 2 秒後に dice[0] の
 // on_mouse_down_xy() が自動で呼ばれる (RollButton.on_mouse_down_xy())。
 // この自動クリックの this がずれていても、free move でないときは
-// this.value を読まない枝を通るので、見た目には気づけない。
+// 押したダイスの目を読まない枝を通るので、見た目には気づけない。
 // そこで free move でも 1 件見る。
 //
 // ダイスの目は roll() が乱数で決めるので、振ったあとに
@@ -52,9 +52,9 @@ async function set_opening(page, dice0, dice1) {
 
     await wait_for(
         () => page.evaluate(() => ({
-            turn: board.turn,
-            d0: board.roll_btn[0].get(),
-            d1: board.roll_btn[1].get(),
+            turn: board.gameinfo.turn,
+            d0: board.gameinfo.board.dice[0],
+            d1: board.gameinfo.board.dice[1],
         })),
         s => s.turn === 2
             && JSON.stringify(s.d0) === JSON.stringify(dice0)
@@ -111,16 +111,16 @@ describe('先手決め (opening roll)', () => {
                emit_msg('dice', { player: 0, dice: [5, 0, 0, 0] });
            });
            await wait_for(
-               () => page.evaluate(() => board.roll_btn[0].get()),
+               () => page.evaluate(() => board.gameinfo.board.dice[0]),
                d => JSON.stringify(d) === JSON.stringify([5, 0, 0, 0]),
                { msg: 'force dice' });
 
            // 5 > 2 なので、自分が先手
            const state = await wait_for(
                () => page.evaluate(() => ({
-                   turn: board.turn,
-                   d0: board.roll_btn[0].get(),
-                   d1: board.roll_btn[1].get(),
+                   turn: board.gameinfo.turn,
+                   d0: board.gameinfo.board.dice[0],
+                   d1: board.gameinfo.board.dice[1],
                })),
                s => s.turn !== 2,
                { msg: 'opening roll', timeout: AUTO_CLICK_WAIT });
@@ -134,7 +134,7 @@ describe('先手決め (opening roll)', () => {
 
     it('free move でも、自動クリックが dice[0] を進める', async () => {
         // 自動クリックの this が RollButton になっていると、
-        // free move の枝で this.value (RollButton には無い) を読み、
+        // free move の枝で押したダイスを取り違え、
         // ダイスが NaN になる (TODO-041)
         await set_free_move(page, true);
 
@@ -146,19 +146,19 @@ describe('先手決め (opening roll)', () => {
             emit_msg('dice', { player: 0, dice: [5, 0, 0, 0] });
         });
         await wait_for(
-            () => page.evaluate(() => board.roll_btn[0].get()),
+            () => page.evaluate(() => board.gameinfo.board.dice[0]),
             d => JSON.stringify(d) === JSON.stringify([5, 0, 0, 0]),
             { msg: 'force dice' });
 
         // free move では、クリックされたダイスの目が 1 つ進む
         const d0 = await wait_for(
-            () => page.evaluate(() => board.roll_btn[0].get()),
+            () => page.evaluate(() => board.gameinfo.board.dice[0]),
             d => JSON.stringify(d) !== JSON.stringify([5, 0, 0, 0]),
             { msg: 'free move click', timeout: AUTO_CLICK_WAIT });
 
         assert.deepEqual(d0, [6, 0, 0, 0],
                          'dice[0] 以外が書き換わっている');
-        assert.equal(await page.evaluate(() => board.turn), 2,
+        assert.equal(await page.evaluate(() => board.gameinfo.turn), 2,
                      'free move で先手が決まってしまっている');
 
         await set_free_move(page, false);

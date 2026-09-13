@@ -152,8 +152,6 @@ export class PlayerScore extends BgText {
     constructor(id, board, player, x, y, deg=0) {
         super(id, x, y, deg, {board: board, player: player});
 
-        this.score = 0;
-
         this.el.style.width = "42px";
         this.el.style.textAlign = "center";
         this.el.style.fontSize = "30px";
@@ -170,7 +168,6 @@ export class PlayerScore extends BgText {
      * @param {number} score
      */
     set(score) {
-        this.score = score;
         super.set(`${score}`);
     }
 

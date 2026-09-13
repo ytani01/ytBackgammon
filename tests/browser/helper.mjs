@@ -316,3 +316,40 @@ export async function set_turn(page, turn) {
         () => page.evaluate(() => board.gameinfo.turn),
         t => t === turn, { msg: `set_turn(${turn})` });
 }
+
+/**
+ * 画面に出ているダイスの目を、表示から読む (TODO-052)。
+ *
+ * ダイスは目を持たない (表示は apply() が gameinfo から作る) ので、
+ * 要素の状態から戻す。隠れている (z が負) なら 0、暗い (opacity 0.5) なら
+ * 11〜16、それ以外は画像のファイル名の数字。gameinfo.board.dice と
+ * 比べれば、表示まで届いたかが分かる。
+ *
+ * @param {import('playwright').Page} page
+ * @param {number} player
+ * @return {Promise<number[]>}
+ */
+export async function shown_dice(page, player) {
+    const els = await page.evaluate(p => board.roll_btn[p].dice.map(
+        d => ({ z: d.z, src: d.image_el.src,
+                opacity: d.image_el.style.opacity })), player);
+    return dice_from_els(els);
+}
+
+/**
+ * shown_dice() の読み替えの部分。ページの中で要素の状態
+ * ({z, src, opacity}) だけを取り、ここで目に直す (押したのと同じ
+ * evaluate の中で読みたいときに使う)
+ *
+ * @param {{z: number, src: string, opacity: string}[]} els
+ * @return {number[]}
+ */
+export function dice_from_els(els) {
+    return els.map(e => {
+        if (e.z < 0) {
+            return 0;
+        }
+        const n = parseInt(e.src.match(/(\d)\.[a-z]+$/)[1]);
+        return e.opacity === '0.5' ? n + 10 : n;
+    });
+}

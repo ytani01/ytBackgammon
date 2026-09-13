@@ -13,8 +13,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, center_of, launch_browser, open_board, start_server,
-    wait_for,
+    console_errors, center_of, launch_browser, open_board, shown_dice,
+    start_server, wait_for,
 } from './helper.mjs';
 
 describe('ブラウザでの基本の動作確認', () => {
@@ -84,15 +84,14 @@ describe('ブラウザでの基本の動作確認', () => {
         const active = await page1.evaluate(() => board.roll_btn[0].active);
         assert.equal(active, true, 'Roll ボタンが出ていない');
 
-        const before_dice = await page1.evaluate(
-            () => board.roll_btn[0].get());
+        const before_dice = await shown_dice(page1, 0);
         assert.deepEqual(before_dice, [0, 0, 0, 0]);
 
         await page1.locator('#rollbutton0').click();
 
         // サーバが返す gameinfo で dice が入る
         const dice = await wait_for(
-            () => page1.evaluate(() => board.roll_btn[0].get()),
+            () => shown_dice(page1, 0),
             d => d.some(v => v >= 1 && v <= 6),
             { msg: 'dice' });
 

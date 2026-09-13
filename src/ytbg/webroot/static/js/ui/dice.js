@@ -26,14 +26,8 @@ export class Dice extends BgImage {
 
         this.deg = 0;
 
-        /**
-         * ダイスの値
-         * @type {number}
-         *    0,10: 画面に表示されない
-         *    1- 6: 有効な値
-         *   11-16: 使えない(使い終わった)状態：暗くなる
-         */
-        this.value = 0;
+        // 目は持たない。表示は apply() が gameinfo から毎回作り、
+        // 判定は gameinfo.board.dice を読む (TODO-052)
 
         this.image_el = this.el.firstElementChild;
 
@@ -48,7 +42,6 @@ export class Dice extends BgImage {
      *
      */
     enable() {
-        this.value = this.value % 10;
         this.image_el.style.opacity = 1.0;
     } // Dice.enable()
 
@@ -56,7 +49,6 @@ export class Dice extends BgImage {
      *
      */
     disable() {
-        this.value = this.value % 10 + 10;
         this.image_el.style.opacity = 0.5;
     } // Dice.disable()
 
@@ -103,8 +95,6 @@ export class Dice extends BgImage {
      */
     set(val, roll_flag=false) {
         // log(`Dice.set(val=${val},roll_flag=${roll_flag})>`);
-        this.value = val;
-
         this.enable();
 
         if (val % 10 < 1) {
@@ -159,8 +149,6 @@ export class RollButton extends BannerButton {
         }
         // log(`(x0,y0)=(${this.x0},${this.y0})`);
 
-        this.dice_active = false;
-
         const dice_prefix = "dice" + this.player;
 
         this.dice = [];
@@ -203,31 +191,22 @@ export class RollButton extends BannerButton {
      * 
      */
     update() {
-        const dice = this.get();
-        // log(`RollButton.update>dice=${JSON.stringify(dice)}`);
+        // apply() の中から呼ばれるので、gameinfo は届いている (TODO-052)
+        const gi = this.board.gameinfo;
 
-        if ( this.board.turn != this.player && this.board.turn < 2 ) {
+        if ( gi.turn != this.player && gi.turn < 2 ) {
             this.off();
             return;
         }
-        
-        for (let d of this.dice) {
-            if ( d.value != 0 ) {
-                this.off();
-                return;
-            }
-        } // for(i)
+
+        if ( this.board.has_dice(this.player) ) {
+            this.off();
+            return;
+        }
 
         this.board.pass_btn[1 - this.player].off();
         this.on();
     } // RollButton.on()
-
-    /**
-     *
-     */
-    another() {
-        return this.board.roll_btn[1 - this.player];
-    } // RollButton.another()
 
     /**
      * Set dice values
@@ -243,13 +222,10 @@ export class RollButton extends BannerButton {
         this.off();
         
         for (let i=0; i < 4; i++) {
-            if ( dice_value[i] > 0 ) {
-                this.dice_active = true;
-            }
             this.dice[i].set(dice_value[i], roll_flag);
         } // for(i)
 
-        if ( ! this.dice_active ) {
+        if ( ! dice_value.some((v) => v > 0) ) {
             if ( this.board.closeout(1 - this.player) ) {
                 this.board.pass_btn[1 - this.player].on();
             }
@@ -258,38 +234,9 @@ export class RollButton extends BannerButton {
     } // RollButton.set()
 
     /**
-     * Get dice values list
-     * @return {number[]} - dice values
-     */
-    get() {
-        let values = [];
-        for (let i=0; i < this.dice.length; i++) {
-            values.push(this.dice[i].value);
-        }
-        return values;
-    } // RollButton.get()
-
-    /**
-     * 使えるダイスを取得
-     * @return {number[]}
-     */
-    get_active_dice() {
-        let active_dice = [];
-        
-        for (let d of this.dice) {
-            let val = d.value;
-            if ( val >= 1 && val <=6 ) {
-                active_dice.push(val);
-            }
-        }
-        return active_dice;
-    } // RollButton.get_active_dice()
-    
-    /**
      *
      */
     clear() {
-        this.dice_active = false;
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].clear();
         }
@@ -310,7 +257,7 @@ export class RollButton extends BannerButton {
 
         this.off();
 
-        if ( this.another().dice_active ) {
+        if ( this.board.has_dice(1 - this.player) ) {
             log(`settimeout`);
             const click0 = this.dice[0].on_mouse_down_xy.bind(this.dice[0]);
             setTimeout(click0, 2000);
