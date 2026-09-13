@@ -1,6 +1,7 @@
 import { log } from "./log.js";
 import { emit_msg } from "./ws.js";
-import { BX, BY } from "./layout.js";
+import { BX, BY, label_geometry, point_geometry,
+         score_geometry } from "./layout.js";
 import { CookieBase, get_sound_query, get_server_id } from "./settings.js";
 import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
          SOUND_ROLL, SOUND_PUT, SOUND_HIT,
@@ -123,45 +124,39 @@ export class Board extends BgImage {
                                + this.button_back.w) + 30 + "px";
         body_el.style.height = (this.y + this.h + 15) + "px";
 
+        // 座標は layout.js にある (TODO-046)
+        const score_geo = score_geometry(this.bx, this.by);
+        const label_geo = label_geometry(this.bx, this.by, this.h);
+
         // PlayerScore
-        let [sw, sh] = [22, 53];
-
-        let sx1 = this.bx[0] + 2;
-        let sx2 = sx1 + sw + 2;
-
-        let sy_offset = 27;
-        let sy1 = this.by[2] + sy_offset;
-        let sy2 = this.by[7] - sy_offset - sh;
-
-        let psx = sx1 + 3;
-        let psy1 = sy1 + sh - 4;
-        let psy2 = sy2 + sh - 4;
-
+        const score_at = (p) => score_geo[p].label;
         this.score = [];
-        this.score[1] = new PlayerScore("p1score", this, 1, psx, psy1, -90);
-        this.score[0] = new PlayerScore("p0score", this, 0, psx, psy2, -90);
+        this.score[1] = new PlayerScore("p1score", this, 1,
+                                        score_at(1).x, score_at(1).y,
+                                        score_at(1).deg);
+        this.score[0] = new PlayerScore("p0score", this, 0,
+                                        score_at(0).x, score_at(0).y,
+                                        score_at(0).deg);
 
         // Score buttons
+        const score_btn = (id, p, key, offset) => {
+            const g = score_geo[p][key];
+            return new ScoreButton(id, this, 0, g.x, g.y, g.w, g.h,
+                                   this.score[p], offset);
+        };
         this.score_btn = [{}, {}];
-
-        this.score_btn[1].up = new ScoreButton(
-            "score_up1",   this, 0, sx1, sy1, sw, sh, this.score[1], +1);
-        this.score_btn[1].down = new ScoreButton(
-            "score_down1", this, 0, sx2, sy1, sw, sh, this.score[1], -1);
-
-        this.score_btn[0].up = new ScoreButton(
-            "score_up0",   this, 0, sx1, sy2, sw, sh,
-            this.score[0], +1);
-        this.score_btn[0].down = new ScoreButton(
-            "score_down0", this, 0, sx2, sy2, sw, sh,
-            this.score[0], -1);
+        this.score_btn[1].up   = score_btn("score_up1",   1, "up",   +1);
+        this.score_btn[1].down = score_btn("score_down1", 1, "down", -1);
+        this.score_btn[0].up   = score_btn("score_up0",   0, "up",   +1);
+        this.score_btn[0].down = score_btn("score_down0", 0, "down", -1);
 
         // PlayerName
         this.player_name = [];
-        this.player_name.push(new PlayerName(
-            "p0name", this, 0, this.bx[3], this.by[9]+2,   0));
-        this.player_name.push(new PlayerName(
-            "p1name", this, 1, this.bx[4], this.by[0]-2, 180));
+        for (let p=0; p < 2; p++) {
+            const g = label_geo.name[p];
+            this.player_name.push(new PlayerName(
+                `p${p}name`, this, p, g.x, g.y, g.deg));
+        }
 
         for (let p=0; p < 2; p++) {
             this.player_name[p].set("");
@@ -172,10 +167,11 @@ export class Board extends BgImage {
         this.clock_limit = new ClockLimit();
 
         this.player_clock = [];
-        this.player_clock.push(new PlayerClock(
-            "p0clock", this, 0, this.bx[3] + 200, this.by[9]+3,   0));
-        this.player_clock.push(new PlayerClock(
-            "p1clock", this, 1, this.bx[4] - 200, this.by[0]-3, 180));
+        for (let p=0; p < 2; p++) {
+            const g = label_geo.clock[p];
+            this.player_clock.push(new PlayerClock(
+                `p${p}clock`, this, p, g.x, g.y, g.deg));
+        }
 
         this.clock_sw = false;
         this.apply_clock_sw();
@@ -186,17 +182,13 @@ export class Board extends BgImage {
         };
         setInterval(update_clock, 200);
 
-        // Pip count XXX
+        // Pip count
         this.pip = [];
-        let py_offset = 14;
-        this.pip.push(new PlayerPipCount("p0pip", this, 0,
-                                         (this.bx[6] + this.bx[7]) / 2 - 5,
-                                         this.h - py_offset,
-                                         0));
-        this.pip.push(new PlayerPipCount("p1pip", this, 1,
-                                         (this.bx[6] + this.bx[7]) / 2 - 5,
-                                         py_offset,
-                                         180));
+        for (let p=0; p < 2; p++) {
+            const g = label_geo.pip[p];
+            this.pip.push(new PlayerPipCount(
+                `p${p}pip`, this, p, g.x, g.y, g.deg));
+        }
 
         // Checkers
         this.checker = [Array(15), Array(15)];
@@ -213,73 +205,9 @@ export class Board extends BgImage {
         this.cube = new Cube("cube", this);
 
         // Points
-        this.point = [];
-        
-        for ( let p=0; p < 28; p++ ) {
-            let cn = 5;
-            let pw = (this.bx[3] - this.bx[2]) / 6;
-            let ph = this.h / 2 - this.by[0];
-            let x0, y0, xn, x;
-
-            if ( p == 0 ) {
-                x0 = this.bx[6];
-                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
-                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
-                                               p, -1, cn));
-            }
-            if ( p >= 1 && p <= 6 ) {
-                x0 = this.bx[4];
-                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
-                xn = 6 - p;
-                x = x0 + pw * xn;
-                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
-                                               p, -1, cn));
-            }
-            if ( p >= 7 && p <= 12 ) {
-                x0 = this.bx[2];
-                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
-                xn = 12 - p;
-                x = x0 + pw * xn;
-                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
-                                               p, -1, cn));
-            }
-            if ( p >= 13 && p <= 18 ) {
-                x0 = this.bx[2];
-                y0 = this.by[0];
-                xn = p - 13;
-                x = x0 + pw * xn;
-                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
-                                               p, 1, cn));
-            }
-            if ( p >= 19 && p <= 24 ) {
-                x0 = this.bx[4];
-                y0 = this.by[0];
-                xn = p - 19;
-                x = x0 + pw * xn;
-                this.point.push(new BoardPoint("", this, x, y0, pw, ph,
-                                               p, 1, cn));
-            }
-            if ( p == 25 ) {
-                x0 = this.bx[6];
-                y0 = this.by[0];
-                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
-                                               p, 1, cn));
-            }
-            if ( p == 26 ) {
-                x0 = this.bx[3];
-                y0 = this.by[0] + (this.by[9] - this.by[0]) / 2;
-                let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
-                                               p, 1, cn));
-            }
-            if ( p == 27 ) {
-                x0 = this.bx[3];
-                y0 = this.by[0];
-                let pw = this.bx[4] - this.bx[3];
-                this.point.push(new BoardPoint("", this, x0, y0, pw, ph,
-                                               p, -1, cn));
-            }
-        } // for (p)
+        this.point = point_geometry(this.bx, this.by, this.h).map(
+            (g, p) => new BoardPoint("", this, g.x, g.y, g.w, g.h,
+                                     p, g.direction, g.max_n));
 
         // RollButton
         const bx1 = 160;

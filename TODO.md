@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-046〜048。** これまでに 45 件を決着させた。
+**残っている項目: TODO-047、TODO-048。** これまでに 46 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-049` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
@@ -10,28 +10,6 @@
 2026-09-12 に `src/` 全体を過剰実装の観点で読み直した結果（15 件）は、
 TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
 すべて片付いた。
-
----
-
-## TODO-046. `Board` のコンストラクタから配置を切り出す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Sonnet 5 / effort medium | verifier + reviewer |
-
-- [ ] `layout.js` に座標を返す関数を足し、380 行のコンストラクタから呼ぶ
-
-| 関数 | 返り値 |
-|------|--------|
-| `point_geometry(bx, by, board_h)` | 28 個ぶんの `{x, y, w, h, direction, max_n}` |
-| `score_geometry(bx, by)` | スコアの表示とボタンの `{x, y, w, h}` |
-| `label_geometry(bx, by, board_h)` | 名前・クロック・PIP の `{x, y, deg}` |
-
-**移すのは座標の計算だけで、部品を `new` するのは `Board` に残す。**
-`layout.js` が `ui/` を import すると、座標の置き場所という今の役割から
-外れる。
-
-TODO-043〜045 とは独立なので、途中に割り込ませてよい。
 
 ---
 
@@ -96,6 +74,7 @@ class _FromDict:
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-046.** `Board` のコンストラクタから配置を切り出す](archives/todo/TODO-046.%20Board%20のコンストラクタから配置を切り出す.md)
 - [**TODO-045.** `Checker.on_mouse_up_xy()` を分ける](archives/todo/TODO-045.%20Checker.on_mouse_up_xy()%20を分ける.md)
 - [**TODO-044.** 盤面の状態を `gameinfo` 1 つにする](archives/todo/TODO-044.%20盤面の状態を%20gameinfo%201%20つにする.md)
 - [**TODO-043.** JS のルール層に合法手の判定を移す](archives/todo/TODO-043.%20JS%20のルール層に合法手の判定を移す.md)
