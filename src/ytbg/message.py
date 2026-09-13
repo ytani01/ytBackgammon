@@ -16,8 +16,8 @@ dataclass に組み立てる。**キーが足りなければここで例外に�
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, fields
+from typing import Any, cast
 
 
 class UnknownMessageType(Exception):
@@ -28,25 +28,32 @@ class UnknownMessageType(Exception):
         self.msg_type = msg_type
 
 
-@dataclass(frozen=True)
-class NoData:
-    """data が空の type 用"""
+class _FromDict:
+    """
+    data のキーを、同じ名前のフィールドへそのまま写す from_dict (TODO-047)。
+
+    **dataclass にしない。** fields(cls) はサブクラスに対して呼べばよく、
+    基底を dataclass にすると継承の規則を気にすることになる。
+    キーが足りなければ KeyError になる (parse() の約束どおり)。
+    """
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> NoData:
-        return cls()
+    def from_dict(cls, data: dict[str, Any]) -> Any:
+        # 型の上では dataclass か分からないので cast する
+        # (呼ばれるのは dataclass のサブクラスだけ)
+        return cls(**{f.name: data[f.name]
+                      for f in fields(cast(Any, cls))})
 
 
 @dataclass(frozen=True)
-class HistStepData:
+class NoData(_FromDict):
+    """data が空の type 用"""
+
+@dataclass(frozen=True)
+class HistStepData(_FromDict):
     """back / fwd の手数"""
 
     n: int
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> HistStepData:
-        return cls(n=data['n'])
-
 
 @dataclass(frozen=True)
 class GameInfoData:
@@ -65,31 +72,20 @@ class GameInfoData:
 
 
 @dataclass(frozen=True)
-class PutCheckerData:
+class PutCheckerData(_FromDict):
     """put_checker。ch は checker の ID (player * 100 + i)"""
 
     ch: int
     p: int
     idx: int
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PutCheckerData:
-        return cls(ch=data['ch'], p=data['p'], idx=data['idx'])
-
-
 @dataclass(frozen=True)
-class CubeData:
+class CubeData(_FromDict):
     """cube"""
 
     side: int
     value: int
     accepted: bool
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> CubeData:
-        return cls(side=data['side'], value=data['value'],
-                   accepted=data['accepted'])
-
 
 @dataclass(frozen=True)
 class DiceData:
@@ -104,43 +100,28 @@ class DiceData:
 
 
 @dataclass(frozen=True)
-class TurnData:
+class TurnData(_FromDict):
     """set_turn"""
 
     turn: int
     resign: int
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TurnData:
-        return cls(turn=data['turn'], resign=data['resign'])
-
-
 @dataclass(frozen=True)
-class PlayerNameData:
+class PlayerNameData(_FromDict):
     """set_playername"""
 
     player: int
     name: str
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PlayerNameData:
-        return cls(player=data['player'], name=data['name'])
-
-
 @dataclass(frozen=True)
-class ScoreData:
+class ScoreData(_FromDict):
     """set_score"""
 
     player: int
     score: int
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ScoreData:
-        return cls(player=data['player'], score=data['score'])
-
-
 @dataclass(frozen=True)
-class PlayerData:
+class PlayerData(_FromDict):
     """
     プレーヤーを指すだけの type 用。
 
@@ -149,23 +130,12 @@ class PlayerData:
 
     player: int
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PlayerData:
-        return cls(player=data['player'])
-
-
 @dataclass(frozen=True)
-class ClockLimitData:
+class ClockLimitData(_FromDict):
     """set_clock_limit。index は 0:持ち時間、1:猶予"""
 
     index: int
     clock_limit: int
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ClockLimitData:
-        return cls(index=data['index'],
-                   clock_limit=data['clock_limit'])
-
 
 @dataclass(frozen=True)
 class PlayerClockData:
@@ -180,15 +150,10 @@ class PlayerClockData:
 
 
 @dataclass(frozen=True)
-class ClockSwitchData:
+class ClockSwitchData(_FromDict):
     """set_clock_switch。クロック機能そのものの ON/OFF"""
 
     switch: bool
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ClockSwitchData:
-        return cls(switch=data['switch'])
-
 
 # history: true で届いても履歴に積まない type (TODO-032)。
 #
