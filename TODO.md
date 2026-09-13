@@ -37,15 +37,33 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - **古い type はまだ消さない。** 履歴に積むかどうかも、古い type では
   今までどおりメッセージの `history` を見る。**今のクライアントのまま
   `tests/browser/` が通る**こと
+- 表には、どの type にも最終的な値（`docs/design.md` の「履歴に積むかどうか」）を
+  書く。古い type は「表で積む」と「メッセージの `history` が真」の両方を
+  満たすときだけ積み、新しい 8 つは表だけを見る。これで古い type の結果は
+  今の `NO_HISTORY_TYPES` と同じになり、TODO-051 では `history` を見る条件を
+  消すだけで済む
+- `parse()` は表を引くので `server.py` へ移す（`message.py` に残すのは
+  dataclass と例外だけ）。`test_message.py` の「2 つの表のキーが一致する」
+  テストは、表が 1 つになるので消す
 - `resign` の `data` は `{player, score}` にする。`{player}` で送っている
   Python のテスト（`test_on_json.py` / `test_message.py`）も直す
 - 止めるときは `Clock.stop()` を 2 回呼ぶ。**`Clock.stop_all()` は
   経過分を残り時間に反映しない**ので使わない
-- クロックを止める側は、`double` と `take` では `player`、`cancel_double`
-  では `1 - player`。**`take` は今のコードと違う。** 今の
-  `Cube.accept_double()` は `1 - turn` のクロックを止めるので、
-  リダブルされたあとのテイクでは、受ける側ではなく掛けた側を止めている。
-  設計のほう（受ける側を止める）に合わせる
+- クロックを止める側は、`double` では `player`、`take` と `cancel_double`
+  では `1 - turn`（手番のクロックを動かす）。バックギャモンのルールに
+  合わせると決めた。テイクのあとにダイスを振るのは手番のプレーヤーで、
+  リダブルのあとに受けるのもその人なので、「受ける側を止める」では
+  振る人のクロックが止まる。`cancel_double` はルールに無い取り消しなので、
+  ダブルの前（手番の人が振る番）に戻す扱いにする。
+  `take` は今の `Cube.accept_double()` と同じ。`cancel_double` は、
+  リダブルを取り消したときだけ今の `Cube.cancel_double()` と違う
+- `cancel_double` のあとのキューブはテイク済み（`accepted: true`）にする
+  （今の `Cube.cancel_double()` と同じ）
+- 勝負がついたらクロックを止める処理は、古い `set_turn` にも効かせる。
+  そのため `predict.test.mjs` の「予測はサーバへ何も送らない (turn が -1 に
+  変わっていても)」が落ちる（勝った側のクロックが動いたまま `turn` が -1 に
+  なる状態を、もう作れない）。**このテストは TODO-050 で消す**と決めた。
+  「今のクライアントのまま `tests/browser/` が通る」の例外はこれだけ
 - 処理の前から `turn` が -1 のときは止めない。勝負がついたあとでも、
   クロックを押せば再開できるようにするため
 - `opening` で決まったダイスの並びは `[勝者の目, 0, 0, 敗者の目]`。
@@ -53,7 +71,9 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
   先手が後から振った側でないときは左右が入れ替わる。設計に合わせてよいと決めた
 - オープニングで振った 1 個の目は、`dice[player]` の 4 つのうち
   ランダムな位置に入っている（`RollButton.roll()`）。`opening` の
-  ハンドラは位置を決め打ちせず、0 でない値を拾う
+  ハンドラは位置を決め打ちせず、0 でない値を拾う。0 でない値が無ければ 0 を
+  入れる（TODO-051 でブラウザのテストが、ダイスを置かずに `opening` を送って
+  手番を決めるため）
 
 ---
 
@@ -67,7 +87,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `emit_msg` を import するのを `actions.js` だけにする（ボタン・メニュー・名前・得点・クロック・設定も）
 - [ ] `emit_msg` から `history` をなくす
 - [ ] `Board.set_turn()` と `apply()` から送信をなくし、`emit` / `predict` 引数を消す。`winner_is()` が `resign` を書き換えないようにする
-- [ ] 先行実行で作る盤面に、`move` で使ったダイス（11〜16）も書き込み、`apply()` のあとで `disable()` するのをやめる
+- [ ] 先行実行で作る盤面に、`move` で使ったダイスと使えなくなったダイス（11〜16。今の `RollButton.check_disable()` が暗くするもの）も書き込み、`apply()` のあとで `disable()` するのをやめる
 - [ ] `apply()` が鳴らす音とダイスの回転を、新しい type の `last_op` から決める
 - [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理（`parse()` が `history` を必須にしているところも）と、`Clock.stop_all()` を消す。それらだけが使っていた `GameInfo.cube()` / `set_turn()`、`Clock.set_clock()`、`CubeData` / `TurnData` / `GameInfoData` も消す
 - [ ] `GameInfo.from_dict()` から `strict` をなくし、常にキーの欠落を `KeyError` にする（`_get()` と `BoardState` / `CubeState` の `from_dict()` も）
@@ -85,8 +105,26 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
   決める。今の「動かす前の位置が 26 未満」を写すと、先行実行した画面では
   サーバの返事が届く時点で駒がもうバーにあるので、ヒットの音が鳴らない
   （コードを読む限り、今もその画面では put の音になる。実測はしていない）
+- `move` の音は `turn` を見ずに鳴らす。勝ちになる `move` では、返ってくる
+  `gameinfo` の `turn` がもう -1 なので、今の「`turn == -1` では鳴らさない」を
+  写すと、最後の 1 手で音が鳴らなくなる（今は `put_checker` が `set_turn` より
+  先に届くので鳴る）。`put_checker` は今のまま `turn == -1` では鳴らさない
+- 手番が変わる音は、`last_op` が `opening` か `end_turn` のときに鳴らし、
+  `turn` が変わったか（今の `set_turn()` の `prev_turn`）は見ない。
+  TODO-052 で `Board.turn` を消すため。どちらの操作でも `turn` は変わる
+- `move` は、勝ちの点数と `idx` を予測した盤面から求めてから 1 通で送る。
+  **予測に失敗したら何も送らない**（今は `put_checker` だけ送っている）。
+  行き先は `decide_dst()` が `gameinfo` から確かめたあとなので、
+  失敗するのは `gameinfo` がまだ届いていないときだけ
+- free move の `dice` から `roll` を外す。回転と振る音は `roll` の type から
+  出すので、`dice` の `roll` を読むところが無くなる
 - `Board.apply_clock_sw()` / `apply_clock_limit()` と `ResignButton` が
   別に送っている `stop_clock` 2 通もやめる（TODO-050 からサーバが止める）
+- `tests/browser/` は `board.emit_turn()` と `set_turn` で盤面を用意して
+  いる（`predict.test.mjs`、`opening.test.mjs`、`clicks.test.mjs`）。
+  テスト専用の type は残さず、残る type で作る。手番 0 / 1 は `opening`
+  （`winner` を指定）、2 は `opening`（`winner: -1`）、-1 は `moves` が空で
+  `score` が 1 の `move`、目は `dice`、駒は `put_checker`
 - `strict=False` は `set_gameinfo` のためだけにあった（TODO-031）。
   部分的な dict を受けるテスト（`test_on_json.py`）は `set_gameinfo` と一緒に消える
 
@@ -105,6 +143,11 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 設計は `docs/design.md` の「判定は `gameinfo` だけを読む」。
 **TODO-051 のあとに行う。**
+
+- `Checker.cur_point`（駒がいまどのポイントにあるか）は**残す**と決めた。
+  `apply()` が `gameinfo` と一緒に書き直すので食い違わず、画面に出している
+  駒の位置として `tests/browser/` が 23 か所で使っているため。
+  判定で読んでいるところも今のままにする
 
 ---
 
