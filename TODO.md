@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: なし。** これまでに 49 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-050` から。**
+**残っている項目: TODO-050〜055。** これまでに 49 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-056` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -14,8 +14,133 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 **TODO-042 で決めた構成の見直し（第 2 弾）の実装（TODO-043〜048）も、
 2026-09-13 に全部終わった。**
 
-**TODO-049 で構成の見直し（第 3 弾）を決めた。実装は TODO-050〜055 に
-分ける予定**（設計は archives の TODO-049 にある）。
+**TODO-049 で決めた構成の見直し（第 3 弾）は、TODO-050〜055 で実装する。**
+設計は `docs/design.md` にある。
+
+---
+
+## TODO-050. サーバに操作の type を足し、登録表を 1 つにする
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] 名前付きの 8 つの操作（`roll` / `opening` / `move` / `end_turn` / `double` / `take` / `cancel_double` / `resign`）のハンドラと dataclass を足す
+- [ ] type ごとの「`data` の型・ハンドラ・履歴に積むか」を `server.py` の 1 つの表にまとめ、`DATA_TYPES` と `NO_HISTORY_TYPES` を消す
+- [ ] `turn` が -1 になったら、共通の後処理で両方のクロックを止める
+- [ ] `set_clock_limit` / `set_clock_switch` を受けたら、両方のクロックを止める
+- [ ] `tests/` にテストを足す（わざと壊して落ちることも確かめる）
+
+設計は `docs/design.md` の「メッセージ」。
+
+- **古い type はまだ消さない。** 履歴に積むかどうかも、古い type では
+  今までどおりメッセージの `history` を見る。**今のクライアントのまま
+  `tests/browser/` が通る**こと
+- `resign` は `{player}` と `{player, score}` の両方を受ける（`score` が
+  無ければ今の動き）。古い形は TODO-051 で消す
+- 止めるときは `Clock.stop()` を 2 回呼ぶ。**`Clock.stop_all()` は
+  経過分を残り時間に反映しない**ので使わない
+- クロックを止める側は、`double` と `take` では `player`、`cancel_double`
+  では `1 - player`（今の `change_turn()` の呼び方と同じ）
+
+---
+
+## TODO-051. 操作を `actions.js` から 1 通で送る
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] `actions.js` を作り、ゲームを進める処理と「押してよいか」の判定を `ui/` から移す
+- [ ] `emit_msg` を import するのを `actions.js` だけにする（ボタン・メニュー・名前・得点・クロック・設定も）
+- [ ] `emit_msg` から `history` をなくす
+- [ ] `Board.set_turn()` と `apply()` から送信をなくし、`emit` / `predict` 引数を消す。`winner_is()` が `resign` を書き換えないようにする
+- [ ] `move` の予測に使ったダイス（11〜16）を書き込み、`apply()` のあとの `disable()` をやめる
+- [ ] `apply()` の演出を新しい type の `last_op` から出す
+- [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理と、`Clock.stop_all()` を消す
+- [ ] `tests/`・`tests/browser/` を新しい type に合わせる
+
+設計は `docs/design.md` の「メッセージ」と「クライアント」の
+「送信は `actions.js` にまとめる」「表示の更新は何も送らない」「先行実行」。
+
+- **TODO-050 のあとに行う**
+- `clicks.test.mjs` は送られた `type` / `data` を見ているので、期待値を
+  書き直す。**書き直したテストが、壊したときに落ちることを確かめる**
+- 手元の 4 つのボードの `.jsonl` は形を変えないので、そのまま読めること
+
+---
+
+## TODO-052. 判定が `gameinfo` を読むようにする
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] `Board.turn` / `resign`、`Cube.value` / `accepted` / `player`、`PlayerScore.score`、`Dice.value`、`RollButton.dice_active` を消し、`board.gameinfo` を読む
+- [ ] `gameinfo` がまだ届いていないときは、何も操作できないものとして扱う
+- [ ] `tests/browser/` の、消した属性を直接触っているテストを直す
+
+設計は `docs/design.md` の「判定は `gameinfo` だけを読む」。
+**TODO-051 のあとに行う。**
+
+---
+
+## TODO-053. `Board` からドラッグと設定を切り出す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] チェッカーとキューブの「掴む・動かす・離す」を `drag.js` へ移し、`moving_checker` と `Cube.moving` をそこで持つ
+- [ ] 音・free move・PIP の表示・cookie のプレーヤー番号を `settings.js` のクラスへ移す
+- [ ] `ui/base.js` のクラス階層図と `CLAUDE.md` の構成を直す
+
+設計は `docs/design.md` の「`Board` を分ける」。
+
+- クロックの ON/OFF と持ち時間の表示は `Board` に残す
+- ルール層の薄い包み（`get_dst_points()` など）は消さない。
+  `tests/browser/rules.test.mjs` が呼んでいる
+- **TODO-052 のあとに行う**
+
+---
+
+## TODO-054. 部品に id ではなく要素を渡す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+- [ ] `build_dom()` が作った要素を返し、`main.js` から `Board` へ渡す
+- [ ] `BgBase` が id ではなく要素を受け取るようにする
+- [ ] チェッカーがプレーヤーと通し番号を数値で持ち、`parseInt(ch.id.slice(1))` と `Board.search_checker()` をなくす
+
+設計は `docs/design.md` の「部品には要素を渡す」。
+
+- id 属性は残す（`tests/browser/` が要素を探すのに使う）
+- **画像の読み込みを待ってから `Board` を作る順番（TODO-029）は変えない。**
+  テストでは守られないので、順番に触れたら画像の応答を遅らせて配置を実測する
+- **TODO-053 のあとに行う**
+
+---
+
+## TODO-055. サーバの小さいものをまとめて直す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | verifier + reviewer |
+
+- [ ] `DATAFILE_DIR` を、import したときではなく `BackgammonServer` を作るときに環境変数から読む
+- [ ] `add_history()` の `gameinfo=None` と `History.add()` の `None` 分岐を消し、`History._cur_sn` をローカル変数にする
+- [ ] `load_data()` が件数の組ではなく、読めたかどうかを返す
+- [ ] `backward_hist()` / `forward_hist()` の docstring を `n <= 0` に揃える
+
+設計は `docs/design.md` の「サーバの細かい修正」。
+
+- `tests/conftest.py` と `tests/browser/helper.mjs` の保存先の差し替えが
+  効き続けること（利用者の `~/ytbg-*` を読み書きしない）
+- **最後に行う**（`server.py` を TODO-050 と取り合う）
+- 全部終わったら `docs/Developer.md` と `CLAUDE.md` の「状態と通信」を直し、
+  `docs/design.md` の扱いを決める
 
 ---
 
