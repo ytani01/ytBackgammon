@@ -149,31 +149,48 @@ export class Checker extends BgImage {
 
         ch.move(x, y, true);
 
-        let dice_value = [];
-
-        let dst_p = ch.board.chpos2point(ch);
-        log(`Checker.on_mouse_up_xy>dst_p=${dst_p}`);
+        const drop_p = ch.board.chpos2point(ch);
+        log(`Checker.on_mouse_up_xy>drop_p=${drop_p}`);
 
         if ( this.board.free_move ) {
-            ch.board.emit_put_checker(ch, dst_p, true);
+            ch.board.emit_put_checker(ch, drop_p, true);
             this.board.moving_checker = undefined;
             return;
         }
 
-        let active_dice = this.board.get_active_dice(ch.player);
-
         // 降順にsort
-        const koujun = (a, b) => {
-            return b - a;
-        };
-        active_dice.sort(koujun);
+        let active_dice = this.board.get_active_dice(ch.player);
+        active_dice.sort((a, b) => b - a);
         log("Checker.on_mouse_up_xy>"
                     + `active_dice=${JSON.stringify(active_dice)}`);
 
-        let available_p = this.board.get_dst_points(ch.player,
-                                                    ch.cur_point,
-                                                    active_dice);
-        log("Checker.on_mouse_up_xy>"
+        const dst = this.decide_dst(ch, drop_p, active_dice);
+        if ( dst === undefined ) {
+            // 動かせない。decide_dst() が元の位置へ戻している
+            return;
+        }
+
+        this.apply_move(ch, dst.dst_p, dst.hit_ch, active_dice);
+        this.after_move(ch);
+    } // Checker.on_mouse_up_xy()
+
+    /**
+     * 行き先を決めて、ヒットするかを調べる (TODO-045)
+     *
+     * 動かせないときは cancel_move() で元の位置へ戻し、undefined を返す。
+     *
+     * @param {Checker} ch - 動かすチェッカー (board.moving_checker)
+     * @param {number} drop_p - 離した場所のポイント
+     * @param {number[]} active_dice - 降順
+     * @return {{dst_p: number, hit_ch: Checker|undefined}|undefined}
+     */
+    decide_dst(ch, drop_p, active_dice) {
+        let dst_p = drop_p;
+
+        const available_p = this.board.get_dst_points(ch.player,
+                                                      ch.cur_point,
+                                                      active_dice);
+        log("Checker.decide_dst>"
                     + `available_p=${JSON.stringify(available_p)}`);
 
         if ( dst_p == ch.cur_point ) {
@@ -182,34 +199,51 @@ export class Checker extends BgImage {
             //
             if ( available_p.length == 0 ) {
                 this.cancel_move(ch);
-                return;
+                return undefined;
             }
 
             dst_p = available_p[0];
         }
-        
-        log("Checker.on_mouse_up_xy>"
-                    + `dst_p=${JSON.stringify(dst_p)}`);
+
+        log(`Checker.decide_dst>dst_p=${JSON.stringify(dst_p)}`);
 
         if ( available_p.indexOf(dst_p) < 0 ) {
             this.cancel_move(ch);
-            return;
+            return undefined;
         }
 
         /**
          * 移動先ポイントの状態に応じた判定
          */
         let hit_ch = undefined;
-        let checkers = ch.board.checkers_at(dst_p);
+        const checkers = ch.board.checkers_at(dst_p);
 
         if ( checkers.length == 1 && checkers[0].player != ch.player ) {
             hit_ch = checkers[0];
-            log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
+            log(`Checker.decide_dst>hit_ch.id=${hit_ch.id}`);
         }
-        
-        /**
-         * 移動OK. 以降、移動後の処理
-         */
+
+        return { dst_p: dst_p, hit_ch: hit_ch };
+    } // Checker.decide_dst()
+
+    /**
+     * 移動を反映する (TODO-045)
+     *
+     * 先行実行 (予測) → サーバへ送信 → 使ったダイスを使用済みにする。
+     *
+     * **順番を変えないこと** (TODO-030)。
+     *
+     * - dice_check() は apply() より前。apply() が ch.cur_point を
+     *   移動先に変えてしまう
+     * - 使ったダイスの disable() は apply() のあと。apply() は dice を
+     *   gameinfo の値に戻すので、先に disable() すると使用済みが消える
+     *
+     * @param {Checker} ch
+     * @param {number} dst_p
+     * @param {Checker|undefined} hit_ch
+     * @param {number[]} active_dice - 降順
+     */
+    apply_move(ch, dst_p, hit_ch, active_dice) {
         //
         // 先行実行 (TODO-030)
         //
@@ -222,7 +256,6 @@ export class Checker extends BgImage {
         // 予測が外れても、サーバから届く gameinfo で表示は戻る。
         let moves = [];
         if ( hit_ch !== undefined ) {
-            log(`Checker.on_mouse_up_xy>hit_ch.id=${hit_ch.id}`);
             moves.push({ ch: hit_ch, p: bar_point(hit_ch.player) });
         }
         moves.push({ ch: ch, p: dst_p });
@@ -233,7 +266,7 @@ export class Checker extends BgImage {
         } catch (e) {
             // 予測できないときは先行実行をあきらめる。
             // 表示はサーバから届く gameinfo で決まる
-            log(`Checker.on_mouse_up_xy>${e}`);
+            log(`Checker.apply_move>${e}`);
         }
 
         // サーバへ送る
@@ -253,8 +286,8 @@ export class Checker extends BgImage {
         //
         // **apply() より前に求める。** apply() は ch.cur_point を
         // 移動先に変える
-        dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
-        log(`Checker.on_mouse_up_xy>`
+        const dice_value = this.dice_check(active_dice, ch.cur_point, dst_p);
+        log(`Checker.apply_move>`
                     + `dice_value=${JSON.stringify(dice_value)}`);
 
         const roll_btn = this.board.roll_btn[ch.player];
@@ -284,9 +317,19 @@ export class Checker extends BgImage {
         } // for(d)
 
         roll_btn.check_disable();
+    } // Checker.apply_move()
 
-        dice_value = roll_btn.get();
-        log(`Checker.on_mouse_up_xy>`
+    /**
+     * 動かしたあとの勝敗と得点 (TODO-045)
+     *
+     * 勝っていれば turn を -1 にして得点を足し、そうでなければ
+     * ダイスの状態を履歴に積む。
+     *
+     * @param {Checker} ch
+     */
+    after_move(ch) {
+        const dice_value = this.board.roll_btn[ch.player].get();
+        log(`Checker.after_move>`
                     + `dice_value=${JSON.stringify(dice_value)}`);
 
         const score = this.board.winner_is(ch.player);
@@ -301,7 +344,7 @@ export class Checker extends BgImage {
                                dice: dice_value,
                                roll: false }, true);
         }
-    } // Checker.on_mouse_up_xy()
+    } // Checker.after_move()
 
     /**
      * @param {number} x

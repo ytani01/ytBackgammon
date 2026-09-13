@@ -357,6 +357,43 @@ describe('ドラッグの先行実行 (予測)', () => {
         await page.evaluate(() => { delete board.predict_gameinfo; });
     });
 
+    it('行けない場所で離すと、元に戻って何も送らない', async () => {
+        // decide_dst() がキャンセルしたら undefined を返し、
+        // on_mouse_up_xy() はそこで終わる (TODO-045)。
+        // 分けたことで、この返り値がキャンセルとの唯一のつなぎになった。
+        // 取り違えると、行けない場所への put_checker がサーバへ飛ぶ
+        await set_turn_dice(page, [3, 0, 0, 0]);
+        const tip = await tip_of_point6(page);
+
+        await record_sent(page);
+        await record_apply(page);
+
+        // point 6 の先端を、player1 の駒がいる point 19 へ運ぶ
+        // (player0 は番号が減る方向なので、6 から 19 へは行けない)
+        const src = await center_of(page, `#p0${String(tip).padStart(2, '0')}`);
+        const dst_id = await page.evaluate(() => board.top_checker(19).id);
+        const dst = await center_of(page, `#${dst_id}`);
+        await page.mouse.move(src.x, src.y);
+        await page.mouse.down();
+        await page.mouse.move(dst.x, dst.y, { steps: 5 });
+        await page.mouse.up();
+
+        const state = await page.evaluate(i => ({
+            point: board.checker[0][i].cur_point,
+            moving: board.moving_checker !== undefined,
+            dice: board.roll_btn[0].get(),
+        }), tip);
+
+        assert.equal(state.point, 6, '元のポイントに戻っていない');
+        assert.equal(state.moving, false, '掴んだままになっている');
+        assert.deepEqual(state.dice, [3, 0, 0, 0],
+                         'ダイスが使われてしまった');
+        assert.deepEqual(await take_sent(page), [],
+                         'キャンセルしたのに送っている');
+        assert.deepEqual(await take_applied(page), [],
+                         'キャンセルしたのに予測を反映している');
+    });
+
     it('予測はサーバへ何も送らない (turn が -1 に変わっていても)',
        async () => {
            // 予測は apply() を通るので set_turn() まで走る。

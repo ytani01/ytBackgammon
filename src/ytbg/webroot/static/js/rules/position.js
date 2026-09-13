@@ -196,7 +196,7 @@ export class Position {
      *
      * **ヒットの処理はしない。** 相手のチェッカーをバーへ送るのは、
      * 呼んだ側が別の `with_move()` として行う (`ui/checker.js` の
-     * `on_mouse_up_xy()` が `moves` に 2 手ぶん積む。TODO-030)。
+     * `apply_move()` が `moves` に 2 手ぶん積む。TODO-030、TODO-045)。
      *
      * **from_p に player の駒が無ければ例外を投げる。** 呼ぶ側は
      * 「掴んでいる駒」を渡す前提で、駒が無いことは起きない。黙って

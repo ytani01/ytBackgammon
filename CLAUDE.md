@@ -337,9 +337,13 @@ last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
 `load_gameinfo()` が名前付きの引数に直して渡すだけで、中身は持たない。
 
 ドラッグを離した瞬間の反応（**先行実行**）も同じ経路を通る。
-`Checker.on_mouse_up_xy()` は、`Board.predict_gameinfo()` で
+`Checker.on_mouse_up_xy()` は `decide_dst()`（行き先とヒットの判定）→
+`apply_move()`（予測・送信・ダイスの消費）→ `after_move()`（勝敗と得点）の
+順に呼ぶだけで（TODO-045）、`apply_move()` が `Board.predict_gameinfo()` で
 **動かしたあとの `gameinfo` を予測して作り**、`apply()` に渡す
 （共有ボードなので、サーバの応答を待つと操作感が悪い）。
+**`decide_dst()` がキャンセルしたときは `undefined` を返し、
+そこで何も送らずに終わる**（分けたことで、ここが唯一のつなぎになった）。
 
 - 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]`
   だけを書き換える。**`sn` は進めない。** 動かせるかは
