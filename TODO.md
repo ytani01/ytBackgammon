@@ -36,8 +36,6 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - **古い type はまだ消さない。** 履歴に積むかどうかも、古い type では
   今までどおりメッセージの `history` を見る。**今のクライアントのまま
   `tests/browser/` が通る**こと
-- `resign` は `{player}` と `{player, score}` の両方を受ける（`score` が
-  無ければ今の動き）。古い形は TODO-051 で消す
 - 止めるときは `Clock.stop()` を 2 回呼ぶ。**`Clock.stop_all()` は
   経過分を残り時間に反映しない**ので使わない
 - クロックを止める側は、`double` と `take` では `player`、`cancel_double`
