@@ -51,6 +51,9 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - `opening` で決まったダイスの並びは `[勝者の目, 0, 0, 敗者の目]`。
   今は `[後から振った側の目, 0, 0, 先に振った側の目]` なので、
   先手が後から振った側でないときは左右が入れ替わる。設計に合わせてよいと決めた
+- オープニングで振った 1 個の目は、`dice[player]` の 4 つのうち
+  ランダムな位置に入っている（`RollButton.roll()`）。`opening` の
+  ハンドラは位置を決め打ちせず、0 でない値を拾う
 
 ---
 
@@ -66,7 +69,8 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `Board.set_turn()` と `apply()` から送信をなくし、`emit` / `predict` 引数を消す。`winner_is()` が `resign` を書き換えないようにする
 - [ ] 先行実行で作る盤面に、`move` で使ったダイス（11〜16）も書き込み、`apply()` のあとで `disable()` するのをやめる
 - [ ] `apply()` が鳴らす音とダイスの回転を、新しい type の `last_op` から決める
-- [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理（`parse()` が `history` を必須にしているところも）と、`Clock.stop_all()` を消す
+- [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理（`parse()` が `history` を必須にしているところも）と、`Clock.stop_all()` を消す。それらだけが使っていた `GameInfo.cube()` / `set_turn()`、`Clock.set_clock()`、`CubeData` / `TurnData` / `GameInfoData` も消す
+- [ ] `GameInfo.from_dict()` から `strict` をなくし、常にキーの欠落を `KeyError` にする（`_get()` と `BoardState` / `CubeState` の `from_dict()` も）
 - [ ] `tests/`・`tests/browser/` を新しい type に合わせる
 - [ ] `CLAUDE.md` の「状態と通信」を、`actions.js` からの送信と `history` の無いメッセージに合わせて直す
 
@@ -81,6 +85,10 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
   決める。今の「動かす前の位置が 26 未満」を写すと、先行実行した画面では
   サーバの返事が届く時点で駒がもうバーにあるので、ヒットの音が鳴らない
   （コードを読む限り、今もその画面では put の音になる。実測はしていない）
+- `Board.apply_clock_sw()` / `apply_clock_limit()` と `ResignButton` が
+  別に送っている `stop_clock` 2 通もやめる（TODO-050 からサーバが止める）
+- `strict=False` は `set_gameinfo` のためだけにあった（TODO-031）。
+  部分的な dict を受けるテスト（`test_on_json.py`）は `set_gameinfo` と一緒に消える
 
 ---
 
@@ -113,6 +121,8 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 設計は `docs/design.md` の「`Board` を分ける」。
 
 - クロックの ON/OFF と持ち時間の表示は `Board` に残す
+- `PlayerPipCount` のコンストラクタ（`ui/label.js`）も PIP のチェックボックスを
+  直接読んでいるので、移したクラスから読むようにする
 - ルール層の関数を呼ぶだけの `Board` のメソッド（`get_dst_points()` など）は消さない。
   `tests/browser/rules.test.mjs` が呼んでいる
 - **TODO-052 のあとに行う**
@@ -133,6 +143,9 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 設計は `docs/design.md` の「部品には要素を渡す」。
 
 - id 属性は残す（`tests/browser/` が要素を探すのに使う）
+- 渡すのは `build_dom()` が作る要素すべて。`PlayerClock` の `p{n}clock-bg`、
+  `PlayerName` の `p{n}name-input` も含む。`index.html` にあるヘッダの
+  要素（チェックボックス、持ち時間の入力欄）は、今のまま id で拾う
 - **画像の読み込みを待ってから `Board` を作る順番（TODO-029）は変えない。**
   テストでは守られないので、順番に触れたら画像の応答を遅らせて配置を実測する
 - **TODO-053 のあとに行う**
@@ -155,7 +168,12 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 設計は `docs/design.md` の「サーバの細かい修正」。
 
 - `tests/conftest.py` と `tests/browser/helper.mjs` の保存先の差し替えが
-  効き続けること（利用者の `~/ytbg-*` を読み書きしない）
+  効き続けること（利用者の `~/ytbg-*` を読み書きしない）。
+  `conftest.py` と `test_ws.py` はクラス変数の `DATAFILE_DIR` を
+  monkeypatch しているので、環境変数 `YTBG_DATA_DIR` を差し替える形に直す。
+  `test_datafile_dir.py` がモジュールを読み直しているのも要らなくなる
+- `load_data()` の戻り値の組を見ているテスト（`test_history.py`、
+  `test_save_load.py`）も直す
 - **最後に行う**（TODO-050 と同じく `server.py` を変えるので、差分が混ざらないようにする）
 - `CLAUDE.md` は各項目で直す（途中のセッションが古い説明を読まないように）。
   ここで直すのは、この項目で変えたところだけ
