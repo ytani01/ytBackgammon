@@ -32,7 +32,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `tests/` にテストを足す（わざと壊して落ちることも確かめる）
 - [ ] `CLAUDE.md` の「状態と通信」のうち、登録表と履歴に積む type の説明を直す
 
-設計は `docs/design.md` の「メッセージ」。
+設計は `docs/design.md` の「メッセージ」の節（その下の小見出しすべて）にある。
 
 - **古い type はまだ消さない。** 履歴に積むかどうかも、古い type では
   今までどおりメッセージの `history` を見る。**今のクライアントのまま
@@ -94,8 +94,8 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `tests/`・`tests/browser/` を新しい type に合わせる
 - [ ] `CLAUDE.md` の「状態と通信」を、`actions.js` からの送信と `history` の無いメッセージに合わせて直す
 
-設計は `docs/design.md` の「メッセージ」と「クライアント」の
-「送信は `actions.js` にまとめる」「表示の更新は何も送らない」「先行実行」。
+設計は `docs/design.md` の、「メッセージ」の節のすべてと、「クライアント」の節のうち
+「送信は `actions.js` にまとめる」「表示の更新は何も送らない」「先行実行」にある。
 
 - **TODO-050 のあとに行う**
 - `clicks.test.mjs` は送られた `type` / `data` を見ているので、期待値を
@@ -141,7 +141,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `tests/browser/` の、消した属性を直接触っているテストを直す
 - [ ] `CLAUDE.md` の、消した属性を書いているところを直す
 
-設計は `docs/design.md` の「判定は `gameinfo` だけを読む」。
+設計は `docs/design.md` の「クライアント」の節の「判定は `gameinfo` だけを読む」にある。
 **TODO-051 のあとに行う。**
 
 - `Checker.cur_point`（駒がいまどのポイントにあるか）は**残す**と決めた。
@@ -161,7 +161,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] 音の ON/OFF・free move・PIP を表示するか・cookie に保存するプレーヤー番号を `settings.js` のクラスへ移す
 - [ ] `ui/base.js` のクラス階層図と `CLAUDE.md` の構成を直す
 
-設計は `docs/design.md` の「`Board` を分ける」。
+設計は `docs/design.md` の「クライアント」の節の「`Board` を分ける」にある。
 
 - クロックの ON/OFF と持ち時間の表示は `Board` に残す
 - `PlayerPipCount` のコンストラクタ（`ui/label.js`）も PIP のチェックボックスを
@@ -183,7 +183,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] チェッカーがプレーヤーと通し番号を数値で持ち、`parseInt(ch.id.slice(1))` と `Board.search_checker()` をなくす
 - [ ] `CLAUDE.md` の `dom.js` と `ui/` の説明を直す
 
-設計は `docs/design.md` の「表示部品（`ui/` のクラス）には要素を渡す」。
+設計は `docs/design.md` の「クライアント」の節の「表示部品（`ui/` のクラス）には要素を渡す」にある。
 
 - id 属性は残す（`tests/browser/` が要素を探すのに使う）
 - 渡すのは `build_dom()` が作る要素すべて。`PlayerClock` の `p{n}clock-bg`、
@@ -208,7 +208,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `docs/Developer.md` を今の構成に合わせて直す
 - [ ] `docs/design.md` を `archives/docs/design-3.md` へ移し、`CLAUDE.md` に現行仕様ではないことを書く
 
-設計は `docs/design.md` の「サーバの細かい修正」。
+設計は `docs/design.md` の「サーバの細かい修正」の節にある。
 
 - `tests/conftest.py` と `tests/browser/helper.mjs` の保存先の差し替えが
   効き続けること（利用者の `~/ytbg-*` を読み書きしない）。
