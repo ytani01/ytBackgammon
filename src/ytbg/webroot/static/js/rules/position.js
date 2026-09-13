@@ -195,8 +195,8 @@ export class Position {
      * 「UI と同じ」と見なさないこと** (TODO-027 のレビューでの指摘)。
      *
      * **ヒットの処理はしない。** 相手のチェッカーをバーへ送るのは、
-     * 呼んだ側が別の `with_move()` として行う (`ui/checker.js` の
-     * `apply_move()` が `moves` に 2 手ぶん積む。TODO-030、TODO-045)。
+     * 呼んだ側が別の `with_move()` として行う (`actions.js` の
+     * `move()` が `moves` に 2 手ぶん積む。TODO-030、TODO-051)。
      *
      * **from_p に player の駒が無ければ例外を投げる。** 呼ぶ側は
      * 「掴んでいる駒」を渡す前提で、駒が無いことは起きない。黙って

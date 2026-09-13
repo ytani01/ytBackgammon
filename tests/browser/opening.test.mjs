@@ -12,19 +12,22 @@
 // そこで free move でも 1 件見る。
 //
 // ダイスの目は roll() が乱数で決めるので、振ったあとに
-// emit_dice() でサーバ経由の値へ置き換えてから 2 秒を待つ。
+// dice を送ってサーバ経由の値へ置き換えてから 2 秒を待つ。
 // **ローカルに set() するだけでは足りない** (roll() が送った
 // メッセージへの返事が届いて、apply() が上書きしてしまう)。
 //
 // 各 it は先頭で set_opening() を呼んで turn とダイスを置き直し、
 // free move も毎回設定するので、**書いた順に依存しない**
 // (predict.test.mjs は 1 つの盤面を順に変えていくので依存する)。
+// 先手が決まったあと turn を 2 に戻す type は無いので、new で
+// 盤面ごと戻す (TODO-051)。
 //
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, launch_browser, open_board, start_server, wait_for,
+    console_errors, launch_browser, open_board, send_msg, set_turn,
+    start_server, wait_for,
 } from './helper.mjs';
 
 /** 自動クリックまでの 2 秒 + 往復のぶん */
@@ -38,11 +41,14 @@ const AUTO_CLICK_WAIT = 8000;
  * @param {number[]} dice1 - プレーヤー 1 のダイス
  */
 async function set_opening(page, dice0, dice1) {
-    await page.evaluate(([d0, d1]) => {
-        board.emit_turn(2, -1, false);
-        board.roll_btn[0].emit_dice(d0, false, false);
-        board.roll_btn[1].emit_dice(d1, false, false);
-    }, [dice0, dice1]);
+    if ( await page.evaluate(() => board.gameinfo.turn) < 2 ) {
+        await send_msg(page, 'new', {});
+        await wait_for(() => page.evaluate(() => board.gameinfo.turn),
+                       t => t === 2, { msg: 'new' });
+    }
+    await set_turn(page, 2);
+    await send_msg(page, 'dice', { player: 0, dice: dice0 });
+    await send_msg(page, 'dice', { player: 1, dice: dice1 });
 
     await wait_for(
         () => page.evaluate(() => ({
@@ -99,9 +105,10 @@ describe('先手決め (opening roll)', () => {
 
            // 自分が Roll を押す。乱数で振ったあと、2 秒後の自動クリック
            // までにサーバ経由で目を 5 に置き換える
-           await page.evaluate(() => {
+           await page.evaluate(async () => {
+               const { emit_msg } = await import('/static/js/ws.js');
                board.roll_btn[0].on_mouse_down_xy(0, 0);
-               board.roll_btn[0].emit_dice([5, 0, 0, 0], false, false);
+               emit_msg('dice', { player: 0, dice: [5, 0, 0, 0] });
            });
            await wait_for(
                () => page.evaluate(() => board.roll_btn[0].get()),
@@ -133,9 +140,10 @@ describe('先手決め (opening roll)', () => {
 
         await set_opening(page, [0, 0, 0, 0], [0, 0, 2, 0]);
 
-        await page.evaluate(() => {
+        await page.evaluate(async () => {
+            const { emit_msg } = await import('/static/js/ws.js');
             board.roll_btn[0].on_mouse_down_xy(0, 0);
-            board.roll_btn[0].emit_dice([5, 0, 0, 0], false, false);
+            emit_msg('dice', { player: 0, dice: [5, 0, 0, 0] });
         });
         await wait_for(
             () => page.evaluate(() => board.roll_btn[0].get()),

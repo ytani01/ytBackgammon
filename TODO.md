@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-051〜055。** これまでに 50 件を決着させた。
+**残っている項目: TODO-052〜055。** これまでに 51 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-056` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -14,65 +14,8 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 **TODO-042 で決めた構成の見直し（第 2 弾）の実装（TODO-043〜048）も、
 2026-09-13 に全部終わった。**
 
-**TODO-049 で決めた構成の見直し（第 3 弾）は、TODO-050〜055 で実装する（TODO-050 は済んだ）。**
+**TODO-049 で決めた構成の見直し（第 3 弾）は、TODO-050〜055 で実装する（TODO-050・051 は済んだ）。**
 設計は `docs/design.md` にある。
-
----
-
-## TODO-051. 1 つの操作を 1 通で送り、送信を `actions.js` にまとめる
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `actions.js` を作り、ゲームを進める処理と「押してよいか」の判定を `ui/` から移す
-- [ ] `emit_msg` を import するのを `actions.js` だけにする（ボタン・メニュー・名前・得点・クロック・設定も）
-- [ ] `emit_msg` から `history` をなくす
-- [ ] `Board.set_turn()` と `apply()` から送信をなくし、`emit` / `predict` 引数を消す。`winner_is()` が `resign` を書き換えないようにする
-- [ ] 先行実行で作る盤面に、`move` で使ったダイスと使えなくなったダイス（11〜16。今の `RollButton.check_disable()` が暗くするもの）も書き込み、`apply()` のあとで `disable()` するのをやめる
-- [ ] `apply()` が鳴らす音とダイスの回転を、新しい type の `last_op` から決める
-- [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理（`parse()` が `history` を必須にしているところも）と、`Clock.stop_all()` を消す。それらだけが使っていた `GameInfo.cube()` / `set_turn()`、`Clock.set_clock()`、`CubeData` / `TurnData` / `GameInfoData` も消す
-- [ ] `GameInfo.from_dict()` から `strict` をなくし、常にキーの欠落を `KeyError` にする（`_get()` と `BoardState` / `CubeState` の `from_dict()` も）
-- [ ] `tests/`・`tests/browser/` を新しい type に合わせる
-- [ ] `CLAUDE.md` の「状態と通信」を、`actions.js` からの送信と `history` の無いメッセージに合わせて直す
-
-設計は `docs/design.md` の、「メッセージ」の節のすべてと、「クライアント」の節のうち
-「送信は `actions.js` にまとめる」「表示の更新は何も送らない」「先行実行」にある。
-
-- **TODO-050 のあとに行う**
-- `clicks.test.mjs` は送られた `type` / `data` を見ているので、期待値を
-  書き直す。**書き直したテストが、壊したときに落ちることを確かめる**
-- 手元の 4 つのボードの `.jsonl` は形を変えないので、そのまま読めること
-- ヒットの音は、`move` の `moves` にバー（26 以上）へ動かすものがあるかで
-  決める。今の「動かす前の位置が 26 未満」を写すと、先行実行した画面では
-  サーバの返事が届く時点で駒がもうバーにあるので、ヒットの音が鳴らない
-  （コードを読む限り、今もその画面では put の音になる。実測はしていない）
-- `move` の音は `turn` を見ずに鳴らす。勝ちになる `move` では、返ってくる
-  `gameinfo` の `turn` がもう -1 なので、今の「`turn == -1` では鳴らさない」を
-  写すと、最後の 1 手で音が鳴らなくなる（今は `put_checker` が `set_turn` より
-  先に届くので鳴る）。`put_checker` は今のまま `turn == -1` では鳴らさない
-- 手番が変わる音は、`last_op` が `opening` か `end_turn` のときに鳴らし、
-  `turn` が変わったか（今の `set_turn()` の `prev_turn`）は見ない。
-  TODO-052 で `Board.turn` を消すため。どちらの操作でも `turn` は変わる
-- `move` は、勝ちの点数と `idx` を予測した盤面から求めてから 1 通で送る。
-  **予測に失敗したら何も送らない**（今は `put_checker` だけ送っている）。
-  行き先は `decide_dst()` が `gameinfo` から確かめたあとなので、
-  失敗するのは `gameinfo` がまだ届いていないときだけ
-- free move の `dice` から `roll` を外す。回転と振る音は `roll` の type から
-  出すので、`dice` の `roll` を読むところが無くなる
-- **プレーヤーの番号などは数に直して送る。** `board.player` は cookie から読むと
-  `"0"` のような文字列のままで、TODO-050 からサーバが型の合わない値を弾く
-- `Board.set_turn()` から `stop_clock` の送信をなくすと、「戻る」「進む」で
-  勝負のついた盤面に来たときにクロックが止まらなくなる。そう決めた（TODO-050）
-- `Board.apply_clock_sw()` / `apply_clock_limit()` と `ResignButton` が
-  別に送っている `stop_clock` 2 通もやめる（TODO-050 からサーバが止める）
-- `tests/browser/` は `board.emit_turn()` と `set_turn` で盤面を用意して
-  いる（`predict.test.mjs`、`opening.test.mjs`、`clicks.test.mjs`）。
-  テスト専用の type は残さず、残る type で作る。手番 0 / 1 は `opening`
-  （`winner` を指定）、2 は `opening`（`winner: -1`）、-1 は `moves` が空で
-  `score` が 1 の `move`、目は `dice`、駒は `put_checker`
-- `strict=False` は `set_gameinfo` のためだけにあった（TODO-031）。
-  部分的な dict を受けるテスト（`test_on_json.py`）は `set_gameinfo` と一緒に消える
 
 ---
 
@@ -94,6 +37,10 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
   `apply()` が `gameinfo` と一緒に書き直すので食い違わず、画面に出している
   駒の位置として `tests/browser/` が 23 か所で使っているため。
   判定で読んでいるところも今のままにする
+- **free move のダイスと得点の ▲▼ は、予測した盤面を先に表示してから送る**と決めた
+  （`move` と同じ先行実行）。TODO-051 では、続けて押したときに 1 回ぶん消えない
+  よう、送る前に手元の `Dice.value` / `PlayerScore.score` を変える形を残している。
+  写しを消すと、返事が届く前に続けて押した分が消えるため
 
 ---
 
@@ -114,6 +61,10 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
   直接読んでいるので、移したクラスから読むようにする
 - ルール層の関数を呼ぶだけの `Board` のメソッド（`get_dst_points()` など）は消さない。
   `tests/browser/rules.test.mjs` が呼んでいる
+- TODO-051 で `actions.js` に置いた `disable_unusable()`（使えなくなった目を 11〜16 に
+  する）を `rules/move.js` へ移し、配列を書き換えずに新しい配列を返す形にする。
+  送信と関係ないのに、`board.js` の `predict_gameinfo()` が `actions.js` を
+  import しているため（TODO-051 のレビュー）。`tests/js/` にテストを足す
 - **TODO-052 のあとに行う**
 
 ---
@@ -174,6 +125,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-051.** 1 つの操作を 1 通で送り、送信を `actions.js` にまとめる](archives/todo/TODO-051.%201%20つの操作を%201%20通で送り、送信を%20actions.js%20にまとめる.md)
 - [**TODO-050.** サーバに名前付きの操作を足し、type の登録表を 1 つにする](archives/todo/TODO-050.%20サーバに名前付きの操作を足し、type%20の登録表を%201%20つにする.md)
 - [**TODO-049.** モジュール構成とクラス構成を見直す（第 3 弾）](archives/todo/TODO-049.%20モジュール構成とクラス構成を見直す（第%203%20弾）.md)
 - [**TODO-048.** 小さいものをまとめて直す](archives/todo/TODO-048.%20小さいものをまとめて直す.md)

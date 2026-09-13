@@ -35,9 +35,8 @@ def fake_time(monkeypatch):
     return fake
 
 
-async def send(bg_server, req, msg_type, data, history=False):
-    await bg_server.on_json(
-        req, {'type': msg_type, 'data': data, 'history': history})
+async def send(bg_server, req, msg_type, data):
+    await bg_server.on_json(req, {'type': msg_type, 'data': data})
 
 
 # ---------------------------------------------------------------------
@@ -307,8 +306,6 @@ async def test_resign_ends_game_and_adds_score(fake_time, bg_server, req):
 @pytest.mark.parametrize(('msg_type', 'data'), [
     ('resign', {'player': 0, 'score': 1}),
     ('move', {'player': 0, 'moves': [], 'dice': [0, 0, 0, 0], 'score': 1}),
-    # 古い type にも効く
-    ('set_turn', {'turn': -1, 'resign': -1}),
 ])
 async def test_turn_to_minus1_stops_both_clocks(
         fake_time, bg_server, req, emitted, msg_type, data):
@@ -331,7 +328,9 @@ async def test_turn_already_minus1_does_not_stop_clock(
     bg_server._gameinfo.turn = -1
     bg_server._clock.start(0)
 
-    await send(bg_server, req, 'set_turn', {'turn': -1, 'resign': -1})
+    # 勝負がついたあとの move は捨てずに処理する (turn は -1 のまま)
+    await send(bg_server, req, 'move',
+               {'player': 0, 'moves': [], 'dice': [0, 0, 0, 0], 'score': 1})
     await send(bg_server, req, 'set_score', {'player': 0, 'score': 1})
 
     assert bg_server._clock.active == [True, False]
@@ -374,15 +373,12 @@ def test_table_history_values():
     stacked = {t for t, e in MESSAGE_TYPES.items() if e.history}
 
     assert stacked == set(NAMED) | {
-        'put_checker', 'dice', 'set_playername', 'set_score',
-        # TODO-051 で消す古い type
-        'cube', 'set_turn'}
+        'put_checker', 'dice', 'set_playername', 'set_score'}
 
 
 @pytest.mark.parametrize('msg_type', list(NAMED))
-async def test_named_ops_append_history_without_flag(
-        bg_server, req, msg_type):
-    """名前付きの操作は、メッセージの history が偽でも 1 手積む"""
+async def test_named_ops_append_history(bg_server, req, msg_type):
+    """名前付きの操作は 1 通で 1 手積む"""
     data, turn, cube0 = NAMED[msg_type]
     bg_server._gameinfo.turn = turn
     bg_server._gameinfo.board.cube = copy.deepcopy(cube0)
@@ -390,7 +386,7 @@ async def test_named_ops_append_history_without_flag(
     bg_server.add_history(bg_server._gameinfo)
     hist_len0 = len(bg_server._hist.entries)
 
-    await send(bg_server, req, msg_type, data, history=False)
+    await send(bg_server, req, msg_type, data)
 
     assert len(bg_server._hist.entries) == hist_len0 + 1
 
@@ -399,13 +395,13 @@ async def test_named_ops_append_history_without_flag(
     ('stop_clock', {'player': 0}),
     ('set_clock_switch', {'switch': True}),
 ])
-async def test_table_false_types_do_not_append_even_with_flag(
+async def test_table_false_types_do_not_append(
         bg_server, req, monkeypatch, msg_type, data):
-    """表で積まない type は、history が真でも add_history() を呼ばない"""
+    """表で積まない type は add_history() を呼ばない"""
     called = []
     monkeypatch.setattr(bg_server, 'add_history', called.append)
 
-    await send(bg_server, req, msg_type, data, history=True)
+    await send(bg_server, req, msg_type, data)
 
     assert called == []
 

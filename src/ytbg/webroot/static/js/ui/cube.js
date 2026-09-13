@@ -1,5 +1,5 @@
 import { log } from "../log.js";
-import { emit_msg } from "../ws.js";
+import { can_hold_cube, cancel_double, double, take } from "../actions.js";
 import { BgImage } from "./base.js";
 
 /**
@@ -56,18 +56,6 @@ export class Cube extends BgImage {
         this.move(this.x0, this.board.h / 2, true);
     } // Cube.constructor()
 
-    emit(val, player=undefined, accepted) {
-        if ( player < 0 ) {
-            player = undefined;
-        }
-
-        let side = player;
-        if ( side === undefined ) {
-            side = -1;
-        }
-        emit_msg("cube", { side: side, value: val, accepted: accepted }, true);
-    } // Cube.emit()
-
     /**
      * @param {number} val
      * @param {number} player
@@ -117,58 +105,6 @@ export class Cube extends BgImage {
     } // Cube.set()
 
     /**
-     * 
-     */
-    double(player=undefined) {
-        log(`Cube.double(player=${player})`);
-
-        if ( player === undefined ) {
-            return;
-        }
-
-        this.player = 1 - player;
-        log("Cube.double> this.player=" + this.player);
-
-        let val = this.value * 2;
-        if ( val > 64 ) {
-            val = 64;
-        }
-
-        // ダブルは手番を渡すのと同じ扱いにする。掛けた側のクロックを
-        // 止めて、相手のクロックを動かす (テイクかパスかを考える時間は
-        // 相手の持ち時間から使う)。stop() では自分の画面しか止まらず、
-        // サーバへ知らせないので、返ってきた gameinfo で動き出す
-        // (TODO-015)
-        this.board.player_clock[player].change_turn();
-        this.emit(val, this.player, false);
-    } // Cube.double()
-
-    /**
-     *
-     */
-    accept_double() {
-        log("Cube.accept_double()");
-
-        this.board.player_clock[1-this.board.turn].change_turn();
-        this.emit(this.value, this.player, true);
-    } // Cube.accept_double()
-
-    /**
-     *
-     */
-    cancel_double() {
-        log("Cube.cancel_double()");
-        
-        let val = this.value / 2;
-        let player = 1 - this.player;
-        if ( val == 1 ) {
-            player = undefined;
-        }
-        this.board.player_clock[this.player].change_turn();
-        this.emit(val, player, true);
-    } // Cube.cancel_double()
-
-    /**
      * @param {number} x
      * @param {number} y
      */
@@ -176,32 +112,9 @@ export class Cube extends BgImage {
         log(`Cube.on_mouse_down_xy():this.plyaer=${this.player}`);
         log(`Cube.on_mouse_down_xy():this.board.plyaer=${this.board.player}`);
         log(`Cube.on_mouse_down_xy():this.board.turn=${this.board.turn}`);
-        if ( this.board.turn >= 2 || this.board.turn < 0 ) {
-            // ゲーム開始時、終了時は、触れない
+        // 触れてよいかの判定は actions.js (TODO-051)
+        if ( ! can_hold_cube(this.board) ) {
             return false;
-        }
-
-        if ( this.player !== undefined && this.player != this.board.player ) {
-            // 相手側にあるキューブは、触れない
-            return false;
-        }
-        
-        if ( this.accepted ) {
-            if ( this.board.turn != this.board.player ) {
-                // 自分の番にしかダブルを掛けられない
-                return false;
-            }
-            if ( this.player && this.player != this.board.player ) {
-                // 相手側にあるキューブは、触れない
-                return false;
-            }
-        }
-
-        for (let rb of this.board.roll_btn) {
-            // ダイスがアクティブのときは、キューブに触れない
-            if ( rb.dice_active ) {
-                return false;
-            }
         }
 
         this.moving = true;
@@ -239,32 +152,31 @@ export class Cube extends BgImage {
             if ( this.player == this.board.player ) {
                 if ( this.src_y == this.y1[0] ) {
                     if ( this.y >= this.y0 ) {
-                        this.accept_double();
+                        take(this.board, this.player);
                     } else {
                         // redouble
-                        this.double(0);
+                        double(this.board, 0, true);
                     }
                 }
                 if ( this.src_y == this.y1[1] ) {
                     if ( this.y <= this.y0 ) {
-                        this.accept_double();
+                        take(this.board, this.player);
                     } else {
                         // redouble
-                        this.double(1);
+                        double(this.board, 1, true);
                     }
                 }
                 
                 return false;
             }
-            this.cancel_double();
+            // 掛けた側 (キューブの反対側) が取り消す
+            cancel_double(this.board, 1 - this.player);
             return false;
         }
 
         // this.accepted == true
         if (this.player === undefined || this.player == this.board.player) {
-            if ( this.value < 64 ) {
-                this.double(this.board.player);
-            }
+            double(this.board, this.board.player);
         }
         return false;
     } // Cube.on_mouse_down_xy()

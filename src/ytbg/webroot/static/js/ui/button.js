@@ -1,5 +1,5 @@
 import { log } from "../log.js";
-import { emit_msg } from "../ws.js";
+import { history_op, resign, score_clear, score_up } from "../actions.js";
 import { BgImage } from "./base.js";
 
 /**
@@ -28,35 +28,24 @@ export class ResignButton extends BgImage {
      * @param {number} y
      */
     on_mouse_down_xy(x, y) {
-        let score;
-        if ( ! this.board.cube.accepted ) {
-            // ダブルを掛けられて降りる場合、ダブルを掛ける前の値
-            score = this.board.cube.value / 2;
-        } else {
-            // ダブルを掛けれてないときに降りる場合は、
-            // 「バックギャモン」(3倍)扱い
-            score = this.board.cube.value * 3;
-        }
-        log(`ResignButton.on_mouse_down_xy>score=${score}`);
-        this.board.player_clock[0].emit_stop();
-        this.board.player_clock[1].emit_stop();
-        this.board.emit_turn(-1, this.board.player, false);
-        this.board.score[1 - this.board.player].up(score);
+        // 点数の計算と送信は actions.js (TODO-051)
+        resign(this.board);
     } // ResignButton.on_mouse_down_xy()
 } // class ResignButton
 
 /**
- * 押すと type と data をそのままサーバへ送るボタン
+ * 押すと履歴の操作 (type と data) をサーバへ送るボタン
  *
  * 前は type ごとにサブクラス (BackButton, FwdButton ...) があったが、
  * 違うのは引数だけなので、生成するときに渡す (TODO-028)。
+ * 送るのは actions.js の history_op() (TODO-051)。
  */
 export class EmitButton extends BgImage {
     /**
      * @param {string} id
      * @param {Board} board
-     * @param {string} type - emit_msg() の type
-     * @param {Object} data - emit_msg() の data
+     * @param {string} type - 履歴の操作の type
+     * @param {Object} data - その data
      * @param {number} x
      * @param {number} y
      */
@@ -68,7 +57,7 @@ export class EmitButton extends BgImage {
     } // EmitButton.constructor()
 
     on_mouse_down_xy(x, y) {
-        emit_msg(this.type, this.data);
+        history_op(this.type, this.data);
     } // EmitButton.on_mouse_down_xy()
 } // class EmitButton
 
@@ -103,10 +92,11 @@ export class ScoreButton extends BgImage {
     on_mouse_down_xy(x, y) {
         log(`ScoreButton.on_mouse_down_xy()`);
         log(`ScoreButton.on_mouse_down_xy>offset=${this.offset}`);
+        // 送るのは actions.js (TODO-051)
         if ( this.offset > 0 ) {
-            this.score_obj.up(1);
+            score_up(this.board, this.score_obj.player);
         } else {
-            this.score_obj.clear();
+            score_clear(this.board, this.score_obj.player);
         }
     } // ScoreButton.on_mouse_down_xy()
 } // class ScoreButton

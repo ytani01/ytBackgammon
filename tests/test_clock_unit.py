@@ -172,31 +172,6 @@ def test_reset_uses_the_current_limit(fake_time):
     assert clock.cur(1) == [120, 12]
 
 
-def test_set_clock_restarts_counting(fake_time):
-    """set_clock() で入れ替えた値から数え直す"""
-    clock = Clock()
-    clock.start(0)
-    fake_time.advance(5)
-
-    clock.set_clock(0, [90, 10])
-    fake_time.advance(3)
-
-    assert clock.cur(0) == [90, 7]
-
-
-def test_stop_all_keeps_remaining(fake_time):
-    """stop_all() は止めるだけで、残り時間は変えない"""
-    clock = Clock()
-    clock.set_clock(1, [80, 5])
-    clock.start(0)
-
-    clock.stop_all()
-    fake_time.advance(30)
-
-    assert clock.active == [False, False]
-    assert clock.clock[1] == [80, 5]
-
-
 def test_state_carries_limit_and_current_clock(fake_time):
     """state() は sw / active / clock / limit の 4 つ"""
     clock = Clock(limit=[60, 6])

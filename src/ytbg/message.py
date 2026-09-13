@@ -51,36 +51,12 @@ class HistStepData(_FromDict):
     n: int
 
 @dataclass(frozen=True)
-class GameInfoData:
-    """
-    set_gameinfo。data は gameinfo の dict そのもの。
-
-    GameInfo.from_dict() が足りないキーを既定値で補うので、ここでは
-    中身を見ない (TODO-024 と同じ扱い)。
-    """
-
-    gameinfo: dict[str, Any]
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> GameInfoData:
-        return cls(gameinfo=data)
-
-
-@dataclass(frozen=True)
 class PutCheckerData(_FromDict):
     """put_checker。ch は checker の ID (player * 100 + i)"""
 
     ch: int
     p: int
     idx: int
-
-@dataclass(frozen=True)
-class CubeData(_FromDict):
-    """cube"""
-
-    side: int
-    value: int
-    accepted: bool
 
 @dataclass(frozen=True)
 class DiceData(_FromDict):
@@ -94,13 +70,6 @@ class DiceData(_FromDict):
 
     player: int
     dice: list[int]
-
-@dataclass(frozen=True)
-class TurnData(_FromDict):
-    """set_turn"""
-
-    turn: int
-    resign: int
 
 @dataclass(frozen=True)
 class PlayerNameData(_FromDict):
@@ -122,7 +91,7 @@ class PlayerData(_FromDict):
     プレーヤーを指すだけの type 用。
 
     end_turn / double / take / cancel_double と、
-    クロックの start / resume / stop。
+    クロックの resume / stop。
     """
 
     player: int
@@ -173,16 +142,6 @@ class ClockLimitData(_FromDict):
     clock_limit: float
 
 @dataclass(frozen=True)
-class PlayerClockData(_FromDict):
-    """
-    set_player_clock。clock は [持ち時間(秒), 猶予(秒)]。
-    DiceData と同じ理由で、届いた list をそのまま持つ
-    """
-
-    player: int
-    clock: list[float]
-
-@dataclass(frozen=True)
 class ClockSwitchData(_FromDict):
     """set_clock_switch。クロック機能そのものの ON/OFF"""
 
@@ -205,6 +164,5 @@ class Message:
 
     type: str
     data: Any
-    history: bool
     raw: dict[str, Any]
 ##

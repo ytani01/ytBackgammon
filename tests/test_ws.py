@@ -76,7 +76,7 @@ def recv_json(ws, timeout=RECV_TIMEOUT):
 def put_checker_msg(ch=0, p=5, idx=0):
     """チェッカーを動かすメッセージ"""
     return {'src': 'test', 'type': 'put_checker',
-            'data': {'ch': ch, 'p': p, 'idx': idx}, 'history': False}
+            'data': {'ch': ch, 'p': p, 'idx': idx}}
 
 
 def test_index_routes(client):
@@ -183,7 +183,7 @@ def test_error_in_on_json_keeps_connection(client):
 
         # data に 'ch' が無いので、on_json() の中で KeyError になる
         ws.send_json({'src': 'test', 'type': 'put_checker',
-                      'data': {}, 'history': False})
+                      'data': {}})
 
         ws.send_json(put_checker_msg(ch=2, p=3, idx=0))
         msg = recv_json(ws)
@@ -220,7 +220,7 @@ def test_unknown_type_keeps_connection(client):
         recv_json(ws)
 
         ws.send_json({'src': 'test', 'type': 'no_such_type',
-                      'data': {}, 'history': True})
+                      'data': {}})
 
         ws.send_json(put_checker_msg(ch=3, p=7, idx=0))
         msg = recv_json(ws)

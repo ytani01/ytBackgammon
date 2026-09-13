@@ -1,5 +1,4 @@
 import { log } from "../log.js";
-import { emit_msg } from "../ws.js";
 import { BgText } from "./base.js";
 
 /**
@@ -74,15 +73,6 @@ export class PlayerName extends BgText {
     off() {
         this.el.style.color = "rgba(0, 0, 0, 0.8)";
     } // PlayerName.off()
-
-    /**
-     * @param {string} name
-     * @param {boolean} add_hist
-     */
-    emit(name, add_hist=true) {
-        emit_msg("set_playername", { player: parseInt(this.player),
-                                     name: name }, add_hist);
-    } // PlayerName.emit()
 
     /**
      * 
@@ -190,32 +180,4 @@ export class PlayerScore extends BgText {
     get() {
         return parseInt(super.get());
     }
-
-    /**
-     * @param {number} score
-     */
-    up(score) {
-        this.score += score;
-        if ( this.score > 99 ) {
-            this.score = 99;
-        }
-        this.emit(this.score, true);
-    }
-
-    /**
-     *
-     */
-    clear() {
-        this.score = 0;
-        this.emit(this.score, true);
-    }
-
-    /**
-     * @param {number} score
-     * @param {boolean} add_hist
-     */
-    emit(score, add_hist=true) {
-        emit_msg("set_score", { player: parseInt(this.player),
-                                score: parseInt(score) }, add_hist);
-    } // PlayerScore.emit()
 } // class PlayerScore

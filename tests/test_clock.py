@@ -45,28 +45,35 @@ def fake_time(monkeypatch):
 async def clock_on(bg_server, req):
     """clock_sw を on にする。クロックはこれが on の間だけ進む"""
     await bg_server.on_json(
-        req, {'type': 'set_clock_switch', 'data': {'switch': True},
-              'history': False})
+        req, {'type': 'set_clock_switch', 'data': {'switch': True}})
 
 
 async def send(bg_server, req, msg_type, player):
-    """クロックの動作そのものを表す 4 つの type を送る"""
+    """data が {player} だけの type を送る"""
     await bg_server.on_json(
-        req, {'type': msg_type, 'data': {'player': player},
-              'history': False})
+        req, {'type': msg_type, 'data': {'player': player}})
 
 
 # ---------------------------------------------------------------------
 # 動作中フラグと残り時間
 # ---------------------------------------------------------------------
 
-async def test_start_clock_resets_delay_and_activates(
+def start_clock(bg_server, player):
+    """
+    クロックを猶予を戻して動かす。start_clock の type は TODO-051 で
+    消したので、サーバのクロックを直接動かす
+    """
+    bg_server._clock.start(player)
+
+
+async def test_end_turn_resets_delay_and_activates(
         fake_time, bg_server, req):
-    """start_clock は猶予を clock_limit[1] に戻して動作中にする"""
+    """end_turn は相手のクロックの猶予を clock_limit[1] に戻して動かす"""
     await clock_on(bg_server, req)
+    bg_server._gameinfo.turn = 1
     bg_server._clock.clock[0] = [100, 0]
 
-    await send(bg_server, req, 'start_clock', 0)
+    await send(bg_server, req, 'end_turn', 1)
 
     assert bg_server._clock.active == [True, False]
     assert bg_server._clock.cur(0) == [100, 12]
@@ -76,7 +83,7 @@ async def test_running_clock_counts_down_the_delay(
         fake_time, bg_server, req):
     """動作中は経過した分だけ猶予が減る。持ち時間は減らない"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
 
     fake_time.advance(5)
 
@@ -86,7 +93,7 @@ async def test_running_clock_counts_down_the_delay(
 async def test_delay_overflow_reduces_main_clock(fake_time, bg_server, req):
     """猶予を使い切ると、はみ出した分が持ち時間から引かれる"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
 
     fake_time.advance(20)
 
@@ -107,7 +114,7 @@ async def test_stopped_clock_does_not_count_down(fake_time, bg_server, req):
 async def test_stop_clock_freezes_elapsed(fake_time, bg_server, req):
     """stop_clock は、そこまで進んだ分を Clock に書き戻して止める"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
 
     fake_time.advance(5)
     await send(bg_server, req, 'stop_clock', 0)
@@ -122,7 +129,7 @@ async def test_stop_clock_freezes_elapsed(fake_time, bg_server, req):
 async def test_resume_clock_keeps_remaining_delay(fake_time, bg_server, req):
     """resume_clock は猶予を戻さず、残っているところから再開する"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
     fake_time.advance(5)
     await send(bg_server, req, 'stop_clock', 0)
 
@@ -131,19 +138,6 @@ async def test_resume_clock_keeps_remaining_delay(fake_time, bg_server, req):
 
     assert bg_server._clock.active == [True, False]
     assert bg_server._clock.cur(0) == [120, 5]
-
-
-async def test_start_clock_affects_only_target_player(
-        fake_time, bg_server, req):
-    """相手のクロックは動かない"""
-    await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 1)
-
-    fake_time.advance(5)
-
-    assert bg_server._clock.active == [False, True]
-    assert bg_server._clock.cur(0) == [120, 12]
-    assert bg_server._clock.cur(1) == [120, 7]
 
 
 # ---------------------------------------------------------------------
@@ -164,16 +158,14 @@ async def test_clock_sw_starts_on(fake_time, bg_server):
 async def test_set_clock_switch_updates_flag(fake_time, bg_server, req):
     """set_clock_switch は clock_sw を持ち替える"""
     await bg_server.on_json(
-        req, {'type': 'set_clock_switch', 'data': {'switch': False},
-              'history': False})
+        req, {'type': 'set_clock_switch', 'data': {'switch': False}})
     assert bg_server._clock.sw is False
 
     await clock_on(bg_server, req)
     assert bg_server._clock.sw is True
 
     await bg_server.on_json(
-        req, {'type': 'set_clock_switch', 'data': {'switch': False},
-              'history': False})
+        req, {'type': 'set_clock_switch', 'data': {'switch': False}})
     assert bg_server._clock.sw is False
 
 
@@ -181,13 +173,12 @@ async def test_clock_does_not_advance_while_switch_off(
         fake_time, bg_server, req):
     """clock_sw が off の間は、動作中でも進まない (ui/clock.js と同じ)"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
     fake_time.advance(5)
 
     # off にした時点までは進み、そこからは止まる
     await bg_server.on_json(
-        req, {'type': 'set_clock_switch', 'data': {'switch': False},
-              'history': False})
+        req, {'type': 'set_clock_switch', 'data': {'switch': False}})
     fake_time.advance(60)
 
     assert bg_server._clock.cur(0) == [120, 7]
@@ -206,21 +197,6 @@ async def test_clock_does_not_advance_while_switch_off(
 # 他の type との組み合わせ
 # ---------------------------------------------------------------------
 
-async def test_set_player_clock_restarts_counting_from_new_value(
-        fake_time, bg_server, req):
-    """set_player_clock で入れ替えた値から数え直す"""
-    await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
-    fake_time.advance(5)
-
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 0, 'clock': [90, 10]}, 'history': False})
-    fake_time.advance(3)
-
-    assert bg_server._clock.cur(0) == [90, 7]
-
-
 async def test_set_clock_limit_resets_both_clocks(fake_time, bg_server, req):
     """
     set_clock_limit は両方のクロックを clock_limit に戻して止める。
@@ -230,12 +206,12 @@ async def test_set_clock_limit_resets_both_clocks(fake_time, bg_server, req):
     サーバのこの動きがそのまま画面に出る。
     """
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
     fake_time.advance(5)
 
     await bg_server.on_json(
         req, {'type': 'set_clock_limit',
-              'data': {'index': 0, 'clock_limit': 60}, 'history': False})
+              'data': {'index': 0, 'clock_limit': 60}})
 
     assert bg_server._clock.active == [False, False]
     assert bg_server._clock.cur(0) == [60, 12]
@@ -245,27 +221,13 @@ async def test_set_clock_limit_resets_both_clocks(fake_time, bg_server, req):
 async def test_new_stops_the_clock(fake_time, bg_server, req):
     """new は止まった状態で始める"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
 
-    await bg_server.on_json(req, {'type': 'new', 'data': {},
-                                  'history': False})
+    await bg_server.on_json(req, {'type': 'new', 'data': {}})
     fake_time.advance(30)
 
     assert bg_server._clock.active == [False, False]
     assert bg_server._clock.cur(0) == [120, 12]
-
-
-async def test_set_gameinfo_stops_the_clock(fake_time, bg_server, req):
-    """set_gameinfo は盤面ごと入れ替わるので、クロックも止める"""
-    await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
-
-    gameinfo = bg_server._gameinfo.to_dict()
-    await bg_server.on_json(req, {'type': 'set_gameinfo', 'data': gameinfo,
-                                  'history': False})
-    fake_time.advance(30)
-
-    assert bg_server._clock.active == [False, False]
 
 
 async def test_clock_is_not_in_history(fake_time, bg_server, req):
@@ -276,7 +238,7 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
     載せると back / fwd でクロックの発着まで巻き戻る。
     """
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
     # クロックの操作は gameinfo を書き換えないので、直前と同じなら
     # 積まれない (TODO-032)。積んだ実物を確かめるため、1 手ぶん変えてから
     # 積む
@@ -294,9 +256,7 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
     'msg_type, data',
     [
         ('set_clock_limit', {'index': 0, 'clock_limit': 300}),
-        ('set_player_clock', {'player': 0, 'clock': [100.0, 5.0]}),
         ('set_clock_switch', {'switch': True}),
-        ('start_clock', {'player': 0}),
         ('resume_clock', {'player': 0}),
         ('stop_clock', {'player': 0}),
     ],
@@ -304,7 +264,7 @@ async def test_clock_is_not_in_history(fake_time, bg_server, req):
 async def test_clock_types_do_not_append_history(
         fake_time, bg_server, req, msg_type, data):
     """
-    クロック系の 6 つの type は、history: true で届いても積まない
+    クロック系の 4 つの type は、履歴に積まない
     (TODO-032)。
 
     gameinfo を書き換えないので、積むと sn 以外すべて 1 つ前と
@@ -313,7 +273,7 @@ async def test_clock_types_do_not_append_history(
     hist_len0 = len(bg_server._hist.entries)
 
     await bg_server.on_json(
-        req, {'type': msg_type, 'data': data, 'history': True})
+        req, {'type': msg_type, 'data': data})
 
     assert len(bg_server._hist.entries) == hist_len0
 
@@ -322,9 +282,7 @@ async def test_clock_types_do_not_append_history(
     'msg_type, data',
     [
         ('set_clock_limit', {'index': 0, 'clock_limit': 300}),
-        ('set_player_clock', {'player': 0, 'clock': [100.0, 5.0]}),
         ('set_clock_switch', {'switch': True}),
-        ('start_clock', {'player': 0}),
         ('resume_clock', {'player': 0}),
         ('stop_clock', {'player': 0}),
     ],
@@ -346,7 +304,7 @@ async def test_clock_types_skip_add_history_call(
     monkeypatch.setattr(bg_server, 'add_history', fake_add_history)
 
     await bg_server.on_json(
-        req, {'type': msg_type, 'data': data, 'history': True})
+        req, {'type': msg_type, 'data': data})
 
     assert called == []
 
@@ -359,7 +317,7 @@ async def test_clock_state_carries_current_clock(
         fake_time, bg_server, req, emitted):
     """clock_state には、経過分を引いたいまの残り時間が入る"""
     await clock_on(bg_server, req)
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
     fake_time.advance(5)
 
     await bg_server.emit_gameinfo()
@@ -379,7 +337,7 @@ async def test_clock_state_carries_current_clock(
 async def test_clock_ops_send_gameinfo_with_clock_state(
         fake_time, bg_server, req, emitted):
     """
-    クロックの 5 つの type も gameinfo で返り、動作中かどうかは
+    クロックを変える type も gameinfo で返り、動作中かどうかは
     clock_state に入る (TODO-015)。
 
     受け取った msg をそのまま転送するのをやめたので、クライアントは
@@ -388,12 +346,13 @@ async def test_clock_ops_send_gameinfo_with_clock_state(
     await clock_on(bg_server, req)
     emitted.clear()
 
-    await send(bg_server, req, 'start_clock', 1)
+    bg_server._gameinfo.turn = 0
+    await send(bg_server, req, 'end_turn', 0)
 
     sent = emitted.last
     assert len(emitted.messages) == 1
     assert sent['type'] == 'gameinfo'
-    assert sent['data']['last_op']['type'] == 'start_clock'
+    assert sent['data']['last_op']['type'] == 'end_turn'
     assert sent['data']['clock_state']['active'] == [False, True]
 
     fake_time.advance(5)
@@ -414,8 +373,7 @@ async def test_clock_ops_send_gameinfo_with_clock_state(
     assert sent['data']['clock_state']['clock'][1] == [120, 7]
 
     await bg_server.on_json(
-        req, {'type': 'set_clock_switch', 'data': {'switch': False},
-              'history': False})
+        req, {'type': 'set_clock_switch', 'data': {'switch': False}})
 
     sent = emitted.last
     assert sent['data']['last_op']['type'] == 'set_clock_switch'
@@ -430,7 +388,7 @@ async def test_on_connect_sends_running_clock(
     これが TODO-016 で直したかったこと。
     """
     await clock_on(bg_server_raw, req)
-    await send(bg_server_raw, req, 'start_clock', 1)
+    start_clock(bg_server_raw, 1)
     fake_time.advance(5)
 
     ws = make_client('late')
@@ -458,20 +416,17 @@ async def test_back_does_not_rewind_running_clock(
     # 履歴を 2 手ぶん積む (変わるのは盤面だけ)
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 0, 'p': 5, 'idx': 0}, 'history': True})
+              'data': {'ch': 0, 'p': 5, 'idx': 0}})
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 0, 'p': 4, 'idx': 0}, 'history': True})
+              'data': {'ch': 0, 'p': 4, 'idx': 0}})
 
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 0, 'clock': [100, 12]}, 'history': False})
-    await send(bg_server, req, 'start_clock', 0)
+    bg_server._clock.clock[0] = [100, 12]
+    start_clock(bg_server, 0)
     fake_time.advance(5)
     assert bg_server._clock.cur(0) == [100, 7]
 
-    await bg_server.on_json(req, {'type': 'back', 'data': {'n': 1},
-                                  'history': False})
+    await bg_server.on_json(req, {'type': 'back', 'data': {'n': 1}})
 
     # 盤面は 1 手戻るが、クロックは戻らずそのまま進み続ける
     assert bg_server._gameinfo.board.checker[0][0] == [5, 0]
@@ -487,18 +442,14 @@ async def test_fwd_does_not_rewind_running_clock(
 
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 0, 'p': 5, 'idx': 0}, 'history': True})
-    await bg_server.on_json(req, {'type': 'back', 'data': {'n': 1},
-                                  'history': False})
+              'data': {'ch': 0, 'p': 5, 'idx': 0}})
+    await bg_server.on_json(req, {'type': 'back', 'data': {'n': 1}})
 
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 0, 'clock': [100, 12]}, 'history': False})
-    await send(bg_server, req, 'start_clock', 0)
+    bg_server._clock.clock[0] = [100, 12]
+    start_clock(bg_server, 0)
     fake_time.advance(5)
 
-    await bg_server.on_json(req, {'type': 'fwd', 'data': {'n': 1},
-                                  'history': False})
+    await bg_server.on_json(req, {'type': 'fwd', 'data': {'n': 1}})
 
     assert bg_server._gameinfo.board.checker[0][0] == [5, 0]
     assert bg_server._clock.cur(0) == [100, 7]
@@ -510,13 +461,12 @@ async def test_new_resets_clock_to_limit(fake_time, bg_server, req):
     """
     await bg_server.on_json(
         req, {'type': 'set_clock_limit',
-              'data': {'index': 0, 'clock_limit': 60}, 'history': False})
+              'data': {'index': 0, 'clock_limit': 60}})
     await bg_server.on_json(
         req, {'type': 'set_clock_limit',
-              'data': {'index': 1, 'clock_limit': 6}, 'history': False})
+              'data': {'index': 1, 'clock_limit': 6}})
 
-    await bg_server.on_json(req, {'type': 'new', 'data': {},
-                                  'history': False})
+    await bg_server.on_json(req, {'type': 'new', 'data': {}})
 
     assert bg_server._clock.clock == [[60, 6], [60, 6]]
     assert bg_server._clock.cur(0) == [60, 6]
@@ -532,16 +482,14 @@ async def test_clear_hist_keeps_running_clock(fake_time, bg_server, req):
     副作用が漏れないことを固定しておく。
     """
     await clock_on(bg_server, req)
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 0, 'clock': [100, 12]}, 'history': True})
+    bg_server._clock.clock[0] = [100, 12]
 
-    await send(bg_server, req, 'start_clock', 0)
+    start_clock(bg_server, 0)
     fake_time.advance(5)
     assert bg_server._clock.cur(0) == [100, 7]
 
     await bg_server.on_json(
-        req, {'type': 'clear_hist', 'data': {}, 'history': False})
+        req, {'type': 'clear_hist', 'data': {}})
 
     assert bg_server._clock.sw is True
     assert bg_server._clock.active == [True, False]

@@ -21,29 +21,24 @@ import pytest
 from ytbg.message import (
     ClockLimitData,
     ClockSwitchData,
-    CubeData,
     DiceData,
-    GameInfoData,
     HistStepData,
     MoveData,
     NoData,
     OpeningData,
-    PlayerClockData,
     PlayerData,
     PlayerNameData,
     PutCheckerData,
     ResignData,
     ScoreData,
-    TurnData,
     UnknownMessageType,
 )
 from ytbg.server import MESSAGE_TYPES, parse
 
 
-def make_msg(msg_type, data, history=False):
-    """クライアントが送る形の msg"""
-    return {'src': 'client', 'type': msg_type,
-            'data': data, 'history': history}
+def make_msg(msg_type, data):
+    """クライアントが送る形の msg。history は無い (TODO-051)"""
+    return {'src': 'client', 'type': msg_type, 'data': data}
 
 
 # type ごとの (data, 期待する dataclass)
@@ -56,15 +51,10 @@ SAMPLES = [
     ('fwd_all', {}, NoData()),
     ('clear_hist', {}, NoData()),
     ('new', {}, NoData()),
-    ('set_gameinfo', {'sn': 5}, GameInfoData(gameinfo={'sn': 5})),
     ('put_checker', {'ch': 101, 'p': 5, 'idx': 2},
      PutCheckerData(ch=101, p=5, idx=2)),
-    ('cube', {'side': 1, 'value': 4, 'accepted': False},
-     CubeData(side=1, value=4, accepted=False)),
     ('dice', {'player': 1, 'dice': [3, 4, 0, 0]},
      DiceData(player=1, dice=[3, 4, 0, 0])),
-    ('set_turn', {'turn': 1, 'resign': 0},
-     TurnData(turn=1, resign=0)),
     ('set_playername', {'player': 1, 'name': 'Alice'},
      PlayerNameData(player=1, name='Alice')),
     ('set_score', {'player': 1, 'score': 5},
@@ -88,11 +78,8 @@ SAMPLES = [
     ('cancel_double', {'player': 0}, PlayerData(player=0)),
     ('set_clock_limit', {'index': 1, 'clock_limit': 60},
      ClockLimitData(index=1, clock_limit=60)),
-    ('set_player_clock', {'player': 1, 'clock': [90, 5]},
-     PlayerClockData(player=1, clock=[90, 5])),
     ('set_clock_switch', {'switch': False},
      ClockSwitchData(switch=False)),
-    ('start_clock', {'player': 1}, PlayerData(player=1)),
     ('resume_clock', {'player': 0}, PlayerData(player=0)),
     ('stop_clock', {'player': 1}, PlayerData(player=1)),
 ]
@@ -117,13 +104,22 @@ def test_samples_cover_all_types():
     assert {s[0] for s in SAMPLES} == set(MESSAGE_TYPES)
 
 
-def test_parse_keeps_history_and_raw():
-    """history と、last_op に使う raw (受け取った msg そのまま)"""
-    msg = make_msg('new', {}, history=True)
+def test_parse_keeps_raw():
+    """last_op に使う raw (受け取った msg そのまま)"""
+    msg = make_msg('new', {})
     m = parse(msg)
 
-    assert m.history is True
     assert m.raw is msg
+
+
+def test_parse_does_not_need_history():
+    """msg に history が無くても読める。付いていても読み捨てる (TODO-051)"""
+    m = parse(make_msg('set_score', {'player': 0, 'score': 1}))
+    assert m.data == ScoreData(player=0, score=1)
+
+    msg = make_msg('set_score', {'player': 0, 'score': 1})
+    msg['history'] = True
+    assert not hasattr(parse(msg), 'history')
 
 
 def test_parse_data_is_frozen():
@@ -142,9 +138,7 @@ def test_parse_data_is_frozen():
         ('put_checker', {'p': 5, 'idx': 2}, 'ch'),
         ('put_checker', {'ch': 101, 'idx': 2}, 'p'),
         ('put_checker', {'ch': 101, 'p': 5}, 'idx'),
-        ('cube', {'side': 1, 'value': 4}, 'accepted'),
         ('dice', {'player': 1}, 'dice'),
-        ('set_turn', {'turn': 1}, 'resign'),
         ('set_playername', {'player': 1}, 'name'),
         ('set_score', {'player': 1}, 'score'),
         ('resign', {'player': 1}, 'score'),
@@ -155,9 +149,8 @@ def test_parse_data_is_frozen():
                   'dice': [0, 0, 0, 0], 'score': 0}, 'idx'),
         ('end_turn', {}, 'player'),
         ('set_clock_limit', {'index': 1}, 'clock_limit'),
-        ('set_player_clock', {'player': 1}, 'clock'),
         ('set_clock_switch', {}, 'switch'),
-        ('start_clock', {}, 'player'),
+        ('stop_clock', {}, 'player'),
     ],
 )
 def test_parse_raises_on_missing_key(msg_type, data, missing):
@@ -168,7 +161,7 @@ def test_parse_raises_on_missing_key(msg_type, data, missing):
     assert e.value.args[0] == missing
 
 
-@pytest.mark.parametrize('key', ['type', 'data', 'history'])
+@pytest.mark.parametrize('key', ['type', 'data'])
 def test_parse_raises_on_missing_msg_key(key):
     """msg そのもののキーが足りないときも KeyError"""
     msg = make_msg('put_checker', {'ch': 101, 'p': 5, 'idx': 2})
@@ -235,7 +228,6 @@ def test_parse_ignores_extra_data_keys():
     ('roll', {'player': 0, 'dice': [1, True, 0, 0]}),
     ('move', {'player': 0, 'moves': [{'ch': '0', 'p': 5, 'idx': 0}],
               'dice': [0, 0, 0, 0], 'score': 0}),
-    ('set_player_clock', {'player': 0, 'clock': [90, 'x']}),
     # float に bool
     ('set_clock_limit', {'index': 0, 'clock_limit': True}),
     # str に数

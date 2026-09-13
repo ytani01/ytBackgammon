@@ -6,7 +6,9 @@
 //   node --test tests/browser/
 //
 // 1 項目ごとに「何を押して、何が送られたか (type と data)、
-// board のどの属性が変わったか」を見る。
+// board のどの属性が変わったか」を見る。1 つの操作は 1 通で送るので
+// (TODO-051)、盤面を変える操作では、送ったのがその 1 通だけかも見る。
+// メッセージに history は付かない。
 //
 // 送ったメッセージは WebSocket.prototype.send を包んで window.__sent に
 // 貯める。confirm() (New Game と 履歴を削除) は自動で OK する。
@@ -19,8 +21,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, launch_browser, open_board, sleep, start_server,
-    wait_for,
+    center_of, console_errors, launch_browser, open_board, send_msg,
+    set_turn, sleep, start_server, wait_for,
 } from './helper.mjs';
 
 /**
@@ -70,7 +72,7 @@ let settle_n = 0;
  * 返事を返さないメッセージ (登録表に無い type、連続再生) もあるので、
  * 送った数と届いた数を比べる形にはしない。
  *
- * 目印には、プレーヤー 1 の名前を今の値のまま送る (history: false)。
+ * 目印には、プレーヤー 1 の名前を今の値のまま送る。
  * このファイルはプレーヤー 1 の名前を変えないので、盤面は変わらない。
  * 元の send で送るので __sent には入らない。
  *
@@ -82,7 +84,7 @@ async function settle(page) {
         const name = board.gameinfo.board.playername[1];
         window.__orig_send.call(window.__ws, JSON.stringify({
             src: src, type: 'set_playername',
-            data: { player: 1, name: name }, history: false,
+            data: { player: 1, name: name },
         }));
     }, src);
     await wait_for(
@@ -117,20 +119,42 @@ async function wait_sent(page, match, msg) {
 }
 
 /**
- * type のメッセージが送られるまで待ち、data と history を比べる。
- *
- * history の期待値は、TODO-028 で分ける前の ytbg.js (390e397) が
- * 送っていた値に合わせてある。今のコードから写さないこと。
+ * type のメッセージが送られるまで待ち、data を比べる。
+ * history が付いていないことも見る (TODO-051)。
  *
  * @param {import('playwright').Page} page
  * @param {string} type
  * @param {any} data
- * @param {boolean} history
  */
-async function assert_sent(page, type, data, history) {
+async function assert_sent(page, type, data) {
     const m = await wait_sent(page, m => m.type === type, type);
     assert.deepEqual(m.data, data);
-    assert.equal(m.history, history, `${type}: history`);
+    assert.equal('history' in m, false, `${type}: history を送っている`);
+}
+
+/**
+ * type のメッセージが送られるのを待ち、返事が出揃ってから、送ったのが
+ * その 1 通だけであることを確かめる (TODO-051)。
+ *
+ * 1 つの操作が何通にも分かれていた頃は、手番を渡すだけで 5 通
+ * (dice / stop_clock / set_player_clock / start_clock / set_turn) 送っていた。
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} type
+ * @param {any} data - 関数なら data を渡して判定する
+ */
+async function assert_only_sent(page, type, data) {
+    await wait_sent(page, m => m.type === type, type);
+    await settle(page);
+    const sent = await take_sent(page);
+    assert.deepEqual(sent.map(m => m.type), [type],
+                     `1 通だけではない: ${JSON.stringify(sent)}`);
+    if (typeof data === 'function') {
+        assert.ok(data(sent[0].data), JSON.stringify(sent[0].data));
+    } else {
+        assert.deepEqual(sent[0].data, data);
+    }
+    assert.equal('history' in sent[0], false, `${type}: history を送っている`);
 }
 
 /**
@@ -139,22 +163,14 @@ async function assert_sent(page, type, data, history) {
  * 押したのと同じタスクの中で読む。サーバの返事の load_gameinfo() →
  * set_turn() もバナーを全部 off() にするので、返事が届いてから見ると
  * on_pass の off() を確かめたことにならない。
- * change_turn() はインスタンスの上で包んで数え、終わったら外す。
  *
  * @param {import('playwright').Page} page
  * @param {'click'|'space'} how - バナーを押すか、スペースキーか
- * @return {Promise<{shown: boolean, active: boolean, called: number}>}
+ * @return {Promise<{shown: boolean, active: boolean}>}
  */
 function press_pass(page, how) {
     return page.evaluate(how => {
         const btn = board.pass_btn[0];
-        const clock = board.player_clock[0];
-        let called = 0;
-        const orig = clock.change_turn;
-        clock.change_turn = function (...args) {
-            called++;
-            return orig.apply(this, args);
-        };
 
         if (how === 'space') {
             // Roll ボタンが出ているとスペースキーはそちらへ行く
@@ -175,8 +191,7 @@ function press_pass(page, how) {
         }
 
         const active = btn.active;
-        delete clock.change_turn;   // prototype のものに戻す
-        return { shown, active, called };
+        return { shown, active };
     }, how);
 }
 
@@ -252,7 +267,7 @@ describe('クリックでの操作', () => {
         it(`メニュー「${text}」→ ${type} ${JSON.stringify(data)} を送る`,
            async () => {
                await menu(text);
-               await assert_sent(page, type, data, false);
+               await assert_sent(page, type, data);
            });
     }
 
@@ -300,42 +315,46 @@ describe('クリックでの操作', () => {
         assert.equal(await board_attr('disp_pip'), false);
     });
 
-    it('ヘッダ Clock → set_clock_switch {switch: false} を送る', async () => {
-        await take_sent(page);
-        await page.locator('#clock_sw').click();
-        await assert_sent(page, 'set_clock_switch', { switch: false },
-                          false);
+    it('ヘッダ Clock → set_clock_switch {switch: false} だけを送る',
+       async () => {
+           // クロックを止めるのはサーバ (TODO-050)。stop_clock は送らない
+           await settle(page);
+           await take_sent(page);
+           await page.locator('#clock_sw').click();
+           await assert_only_sent(page, 'set_clock_switch',
+                                  { switch: false });
 
-        // 元に戻す
-        await take_sent(page);
-        await page.locator('#clock_sw').click();
-        await assert_sent(page, 'set_clock_switch', { switch: true },
-                          false);
-    });
+           // 元に戻す
+           await page.locator('#clock_sw').click();
+           await assert_only_sent(page, 'set_clock_switch',
+                                  { switch: true });
+       });
 
     // gameinfo が届くたびに、持ち時間の入力は 2 つともサーバの値で
     // 書き戻される (Board.load_gameinfo())。1 つ目の返事が届く前に
     // 2 つ目を触ると、入れた値が消えて揺れるので、届くのを待ってから
     // 次へ進む。change は fill() のあとの blur() で 1 回だけ起こす
-    it('ヘッダ 持ち時間 (分) → set_clock_limit {index: 0} を送る',
+    it('ヘッダ 持ち時間 (分) → set_clock_limit {index: 0} だけを送る',
        async () => {
+           await settle(page);
            await take_sent(page);
            await page.locator('#clock_limit0').fill('3');
            await page.locator('#clock_limit0').blur();
-           await assert_sent(page, 'set_clock_limit',
-                             { index: 0, clock_limit: 180 }, false);
+           await assert_only_sent(page, 'set_clock_limit',
+                                  { index: 0, clock_limit: 180 });
            await wait_for(
                () => page.evaluate(() => board.clock_limit.limit[0]),
                v => v === 180, { msg: 'clock_limit[0]' });
        });
 
-    it('ヘッダ 持ち時間 (秒) → set_clock_limit {index: 1} を送る',
+    it('ヘッダ 持ち時間 (秒) → set_clock_limit {index: 1} だけを送る',
        async () => {
+           await settle(page);
            await take_sent(page);
            await page.locator('#clock_limit1').fill('15');
            await page.locator('#clock_limit1').blur();
-           await assert_sent(page, 'set_clock_limit',
-                             { index: 1, clock_limit: 15 }, false);
+           await assert_only_sent(page, 'set_clock_limit',
+                                  { index: 1, clock_limit: 15 });
            await wait_for(
                () => page.evaluate(() => board.clock_limit.limit[1]),
                v => v === 15, { msg: 'clock_limit[1]' });
@@ -347,7 +366,7 @@ describe('クリックでの操作', () => {
         await page.locator('#p0name-input').blur();
         // onChange と onFocusOut の両方から送られるので、有無だけを見る
         await assert_sent(page, 'set_playername',
-                          { player: 0, name: 'Alice' }, true);
+                          { player: 0, name: 'Alice' });
     });
 
     // 名前の <input> は focusout と change の両方から emit_playername() を
@@ -370,7 +389,7 @@ describe('クリックでの操作', () => {
            await page.locator('#p0name-input').blur();
 
            await assert_sent(page, 'set_playername',
-                             { player: 0, name: 'Bob' }, true);
+                             { player: 0, name: 'Bob' });
        });
 
     it('名前の入力: 打って Enter → フォーカスを外す前に set_playername を'
@@ -391,7 +410,7 @@ describe('クリックでの操作', () => {
                'p0name-input', 'フォーカスが外れている');
 
            await assert_sent(page, 'set_playername',
-                             { player: 0, name: 'Carol' }, true);
+                             { player: 0, name: 'Carol' });
 
            // 次の項目のためにフォーカスを戻しておく
            await page.locator('#p0name-input').blur();
@@ -403,13 +422,13 @@ describe('クリックでの操作', () => {
     it('盤面の戻すボタン → back {n: 1} を送る', async () => {
         await take_sent(page);
         await page.locator('#button-back').click({ force: true });
-        await assert_sent(page, 'back', { n: 1 }, false);
+        await assert_sent(page, 'back', { n: 1 });
     });
 
     it('盤面の進めるボタン → fwd {n: 1} を送る', async () => {
         await take_sent(page);
         await page.locator('#button-fwd').click({ force: true });
-        await assert_sent(page, 'fwd', { n: 1 }, false);
+        await assert_sent(page, 'fwd', { n: 1 });
     });
 
     it('盤面の回転ボタン → board.player が反転する', async () => {
@@ -421,17 +440,18 @@ describe('クリックでの操作', () => {
     });
 
     it('スコアの ▲ → set_score {player: 0, score: +1} を送る', async () => {
+        await settle(page);
         const s0 = await page.evaluate(() => board.score[0].score);
         await take_sent(page);
         await page.locator('#score_up0').click({ force: true });
-        await assert_sent(page, 'set_score', { player: 0, score: s0 + 1 },
-                          true);
+        await assert_only_sent(page, 'set_score',
+                               { player: 0, score: s0 + 1 });
     });
 
     it('スコアの ▼ → set_score {player: 0, score: 0} を送る', async () => {
         await take_sent(page);
         await page.locator('#score_down0').click({ force: true });
-        await assert_sent(page, 'set_score', { player: 0, score: 0 }, true);
+        await assert_only_sent(page, 'set_score', { player: 0, score: 0 });
     });
 
     it('スコアの ▲ / ▼ の上に、押せなくする要素が重なっていない', async () => {
@@ -467,34 +487,172 @@ describe('クリックでの操作', () => {
                          `ボタンが覆われている: ${JSON.stringify(covered)}`);
     });
 
+    // --- ゲームを進める操作 (TODO-051) ---
+
+    it('キューブを動かす → double {player: 0} だけを送る', async () => {
+        // New Game のあとなので、キューブは中央でテイク済み、ダイスは空。
+        // 手番を自分 (プレーヤー 0) にする
+        await set_turn(page, 0);
+        await settle(page);
+        await take_sent(page);
+
+        const pos = await center_of(page, '#cube');
+        await page.mouse.move(pos.x, pos.y);
+        await page.mouse.down();
+        await page.mouse.move(pos.x + 5, pos.y + 5, { steps: 2 });
+        await page.mouse.up();
+
+        await assert_only_sent(page, 'double', { player: 0 });
+        await wait_for(
+            () => page.evaluate(() => board.gameinfo.board.cube),
+            c => c.side === 1 && c.value === 2 && c.accepted === false,
+            { msg: 'double' });
+
+        // 後始末: プレーヤー 1 がテイクしたことにする (次の Roll のため)
+        await send_msg(page, 'take', { player: 1 });
+        await wait_for(
+            () => page.evaluate(() => board.gameinfo.board.cube.accepted),
+            a => a === true, { msg: 'take' });
+    });
+
+    /**
+     * キューブを今の位置から dy だけドラッグする
+     *
+     * @param {number} dy
+     */
+    const drag_cube = async (dy) => {
+        // サーバの返事で置き直したキューブは move_sec (0.3 秒) かけて動く。
+        // 動いている途中の位置を押すと掴めない
+        await sleep(500);
+        const pos = await center_of(page, '#cube');
+        await page.mouse.move(pos.x, pos.y);
+        await page.mouse.down();
+        await page.mouse.move(pos.x, pos.y + dy, { steps: 20 });
+        await page.mouse.up();
+    };
+
+    /**
+     * サーバのキューブが want になるまで待つ
+     *
+     * @param {{side: number, value: number, accepted: boolean}} want
+     */
+    const wait_cube = want => wait_for(
+        () => page.evaluate(() => board.gameinfo.board.cube),
+        c => c.side === want.side && c.value === want.value
+            && c.accepted === want.accepted,
+        { msg: `cube ${JSON.stringify(want)}` });
+
+    it('掛けられたキューブを反対側へ動かす (リダブル) → double {player: 0} '
+       + 'だけを送る', async () => {
+        // 上の項目のあと: キューブは 2 でプレーヤー 1 の側、テイク済み、
+        // turn は 0。プレーヤー 1 に掛けさせて、自分 (0) の側に未テイクで置く
+        await set_turn(page, 1);
+        await send_msg(page, 'double', { player: 1 });
+        await wait_cube({ side: 0, value: 4, accepted: false });
+        await settle(page);
+        await take_sent(page);
+
+        // 自分の側 (下) から中央より上へ動かす
+        const dy = await page.evaluate(
+            () => board.cube.y1[1] - board.cube.y1[0]);
+        await drag_cube(dy);
+
+        await assert_only_sent(page, 'double', { player: 0 });
+        await wait_cube({ side: 1, value: 8, accepted: false });
+    });
+
+    it('掛けられたキューブを自分の側で動かす (テイク) → take {player: 0} '
+       + 'だけを送る', async () => {
+        // プレーヤー 1 にテイクさせてから掛けさせ、自分の側に未テイクで置く
+        await send_msg(page, 'take', { player: 1 });
+        await wait_cube({ side: 1, value: 8, accepted: true });
+        await send_msg(page, 'double', { player: 1 });
+        await wait_cube({ side: 0, value: 16, accepted: false });
+        await settle(page);
+        await take_sent(page);
+
+        // 中央を越えない
+        await drag_cube(5);
+
+        await assert_only_sent(page, 'take', { player: 0 });
+        await wait_cube({ side: 0, value: 16, accepted: true });
+
+        // 次の Roll のために手番を自分に戻す
+        await set_turn(page, 0);
+    });
+
+    it('Roll ボタン → roll {player: 0, dice} だけを送る', async () => {
+        await settle(page);
+        await take_sent(page);
+        await page.locator('#rollbutton0').click({ force: true });
+        // 2 個 (ゾロ目なら 4 個)。使えない目は 11〜16
+        await assert_only_sent(page, 'roll', d =>
+            d.player === 0 && d.dice.length === 4
+                && [2, 4].includes(d.dice.filter(v => v !== 0).length)
+                && d.dice.every(v => v === 0 || (v % 10 >= 1 && v % 10 <= 6)));
+    });
+
+    it('クロックを押す → 止まっていれば resume_clock、動いていれば '
+       + 'stop_clock を 1 通だけ送る', async () => {
+        // キューブの操作でクロックが切り替わっているので、動いているか
+        // どうかはここで読む
+        await settle(page);
+        const active0 = await page.evaluate(() => board.player_clock[0].active);
+        for (const active of [active0, !active0]) {
+            await take_sent(page);
+            await page.locator('#p0clock').click({ force: true });
+            await assert_only_sent(
+                page, active ? 'stop_clock' : 'resume_clock', { player: 0 });
+            await wait_for(
+                () => page.evaluate(() => board.player_clock[0].active),
+                a => a === !active, { msg: 'clock' });
+        }
+    });
+
+    it('使えるダイスが無いときにダイスを押す → end_turn {player: 0} '
+       + 'だけを送る', async () => {
+        // Roll のあとなので turn は 0。目を使えないもの (11〜16) にする
+        await send_msg(page, 'dice', { player: 0, dice: [13, 15, 0, 0] });
+        await wait_for(
+            () => page.evaluate(() => board.roll_btn[0].get()),
+            d => d[0] === 13 && d[1] === 15, { msg: 'dice' });
+        await settle(page);
+        await take_sent(page);
+
+        await page.locator('#dice00').click({ force: true });
+
+        await assert_only_sent(page, 'end_turn', { player: 0 });
+        await wait_for(() => board_attr('turn'), t => t === 1,
+                       { msg: 'turn' });
+    });
+
     // --- バナー (押したときの動作は on_click で渡している) ---
 
-    it('パスのバナー → その場で消えて change_turn() を呼び、'
-       + 'set_turn {turn: 1} を送る',
+    it('パスのバナー → その場で消えて、end_turn {player: 0} だけを送る',
        async () => {
+           await set_turn(page, 0);
            await settle(page);
            await take_sent(page);
            const r = await press_pass(page, 'click');
            assert.equal(r.shown, true, 'パスのバナーが出ていない');
            assert.equal(r.active, false, 'パスのバナーが消えていない');
-           assert.equal(r.called, 1, 'change_turn() が呼ばれていない');
-           await assert_sent(page, 'set_turn', { turn: 1, resign: -1 }, true);
+           await assert_only_sent(page, 'end_turn', { player: 0 });
 
-           // サーバの返事で turn が 1 になるのを待つ (次の項目のため)
+           // サーバの返事で turn が 1 になるのを待つ
            await wait_for(() => board_attr('turn'), t => t === 1,
                           { msg: 'turn' });
        });
 
     it('スペースキー (パスのバナーが出ているとき) → その場で消えて '
-       + 'change_turn() を呼び、set_turn {turn: 1} を送る',
+       + 'end_turn {player: 0} だけを送る',
        async () => {
+           await set_turn(page, 0);
            await settle(page);
            await take_sent(page);
            const r = await press_pass(page, 'space');
            assert.equal(r.shown, true, 'パスのバナーが出ていない');
            assert.equal(r.active, false, 'パスのバナーが消えていない');
-           assert.equal(r.called, 1, 'change_turn() が呼ばれていない');
-           await assert_sent(page, 'set_turn', { turn: 1, resign: -1 }, true);
+           await assert_only_sent(page, 'end_turn', { player: 0 });
        });
 
     for (const [name, list] of [['投了', 'resign_banner_btn'],
@@ -538,9 +696,21 @@ describe('クリックでの操作', () => {
                     key: k, ctrlKey: true, bubbles: true,
                 }));
             }, key);
-            await assert_sent(page, type, { n: 1 }, false);
+            await assert_sent(page, type, { n: 1 });
         });
     }
+
+    it('投了ボタン → resign {player: 0, score} だけを送る', async () => {
+        // TODO-051 より前は stop_clock 2 通・set_turn・set_score を送っていた
+        await settle(page);
+        const cube = await page.evaluate(() => board.gameinfo.board.cube);
+        const score = cube.accepted ? cube.value * 3 : cube.value / 2;
+        await take_sent(page);
+        await page.locator('#button-resign').click({ force: true });
+        await assert_only_sent(page, 'resign', { player: 0, score: score });
+        await wait_for(() => board_attr('turn'), t => t === -1,
+                       { msg: 'resign' });
+    });
 
     it('コンソールエラーが出ていない', async () => {
         const errors = console_errors(page, server.url);

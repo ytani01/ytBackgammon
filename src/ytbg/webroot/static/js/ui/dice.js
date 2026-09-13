@@ -1,7 +1,6 @@
 import { log } from "../log.js";
-import { emit_msg } from "../ws.js";
+import { click_dice, roll } from "../actions.js";
 import { BgImage } from "./base.js";
-import { usable_dice } from "../rules/move.js";
 import { BannerButton } from "./button.js";
 
 /**
@@ -128,85 +127,15 @@ export class Dice extends BgImage {
     } // Dice.set()
 
     /**
+     * 押したときの判定と送信は actions.js の click_dice() (TODO-051)
+     *
      * @param {number} x
      * @param {number} y
      */
     on_mouse_down_xy(x, y) {
         log(`Dice.on_mouse_down_xy(${x},${y})`);
-
-        const roll_btn = this.board.roll_btn[this.player];
-        const roll_btn1 = this.board.roll_btn[1-this.player];
-
-        if ( this.board.free_move ) {
-
-            if ( this.value < 1 ) {
-                return false;
-            }
-            if ( this.value > 6 ) {
-                this.set(this.value % 10);
-                roll_btn.emit_dice(roll_btn.get(), false, true);
-                return false;
-            }
-            let val = this.value + 1;
-            if ( val > 6 ) {
-                val = 1;
-            }
-            this.set(val);
-
-            // if ( this.baord.is_double() ) {
-            //   
-            // }
-            
-            roll_btn.emit_dice(roll_btn.get(), false, true);
-            return false;
-        }
-
-        if ( this.board.turn < 0 ) {
-            log(
-                `Dice.on_mouse_down_xy>turn=${this.board.turn} .. ignored`);
-            return false;
-        }
-
-        if ( this.board.turn >= 2 ) {
-            log(`Dice.on_mouse_down_xy>turn=${this.board.turn}`);
-            // Opening roll
-            if ( ! roll_btn1.dice_active ) {
-                return false;
-            }
-
-            // 双方が振った後、数値が大きい方が先手
-            const d0 = roll_btn.get_active_dice()[0];
-            const d1 = roll_btn1.get_active_dice()[0];
-
-            if ( d0 > d1 ) {
-                roll_btn1.clear(true, false);
-                roll_btn.emit_dice([d0, 0, 0, d1], false);
-                this.board.emit_turn(this.player, -1, true);
-                return false;
-            }
-            if ( d0 < d1 ) {
-                roll_btn.clear(true, false);
-                roll_btn1.emit_dice([d0, 0, 0, d1], false);
-                this.board.emit_turn(1-this.player, -1, true);
-                return false;
-            }
-
-            // 同じ目だった場合は、もう一度
-            roll_btn.clear(true, false);
-            roll_btn1.clear(true, false);
-            this.board.emit_turn(2, -1, true);
-            return false;
-        }
-
-        if ( roll_btn.get_active_dice().length > 0 ) {
-            return false;
-        }
-
-        roll_btn.clear(true, false);
-
-        this.board.player_clock[this.player].change_turn();
-        this.board.emit_turn(1 - this.player, -1, true);
-
+        click_dice(this.board, this.player,
+                   this.board.roll_btn[this.player].dice.indexOf(this));
         return false;
     } // Dice.on_mouse_down_xy()
 } // class Dice
@@ -357,94 +286,12 @@ export class RollButton extends BannerButton {
     } // RollButton.get_active_dice()
     
     /**
-     * 使えないダイスを確認してdisable()する
-     * @return {boolean} - modified
+     *
      */
-    check_disable() {
-        // log(`RollButton.check_disable()`);
-        let modified = false;
-        const usable = usable_dice(this.board.position(), this.player,
-                                   this.get());
-        log(`RollButton.check_disable>`
-                    + `usable=${JSON.stringify(usable)}`);
-
-        for (let i=0; i < usable.length; i++) {
-            if ( usable[i] ) {
-                continue;
-            }
-            this.dice[i].disable();
-            modified = true;
-        } // for(i)
-
-        return modified;
-    } // RollButton.check_disable()
-
-    /**
-     * Roll dices
-     * @return {number[]} - dice values
-     */
-    roll() {
-        // log(`RollButton.roll()`);
-        this.clear();
-
-        let d1 = Math.floor(Math.random()  * 4);
-        let d2 = d1;
-        while ( d1 == d2 ) {
-            d2 = Math.floor(Math.random()  * 4);
-        }
-        log(`RollButton.roll> [d1, d2]=[${d1}, ${d2}]`);
-
-        this.dice_active = true;
-
-        const value1 = Math.floor(Math.random() * 6) + 1;
-        const value2 = Math.floor(Math.random() * 6) + 1;
-
-        if ( this.board.turn >= 2 ) {
-            this.dice[d1].set(value1);
-        } else if ( value1 != value2 ) {
-            this.dice[d1].set(value1);
-            this.dice[d2].set(value2);
-        } else {
-            for ( let d = 0; d < 4; d++ ) {
-                this.dice[d].set(value1);
-            }
-        }
-        
-        this.check_disable();
-        const dice_values = this.get();
-        this.clear();
-        this.emit_dice(dice_values, true, true);
-        
-        return dice_values;
-    } // RollButton.roll()
-
-    /**
-     * @param {number[]} dice
-     * @param {boolean} roll
-     * @param {boolean} add_hist
-     */
-    emit_dice(dice, roll=false, add_hist=false) {
-        emit_msg("dice", { player: this.player,
-                           dice: dice,
-                           roll: roll }, add_hist);
-    } // RollButton.emit_dice
-
-    /**
-     * @param {boolean} emit
-     * @param {boolean} add_hist
-     */
-    clear(emit=false, add_hist=false) {
-        // log(`RollButton.clear(emit=${emit})`);
-
+    clear() {
         this.dice_active = false;
         for ( let d=0; d < 4; d++ ) {
             this.dice[d].clear();
-        }
-
-        if ( emit ) {
-            emit_msg("dice", { player: this.player,
-                               dice: [0, 0, 0, 0],
-                               roll: false }, add_hist);
         }
         return [];
     } // RollButton.clear()
@@ -456,19 +303,17 @@ export class RollButton extends BannerButton {
     on_mouse_down_xy(x, y) {
         log(`RollButton.on_mouse_down_xy>player=${this.player}`);
 
-        if ( ! this.board.cube.accepted ) {
+        // 振ってよいかの判定と送信は actions.js (TODO-051)
+        if ( ! roll(this.board, this.player) ) {
             return;
         }
 
         this.off();
 
-        this.roll();
-
         if ( this.another().dice_active ) {
             log(`settimeout`);
-            const click_dice =
-                  this.dice[0].on_mouse_down_xy.bind(this.dice[0]);
-            setTimeout(click_dice, 2000);
+            const click0 = this.dice[0].on_mouse_down_xy.bind(this.dice[0]);
+            setTimeout(click0, 2000);
         }
     } // RollButton.on_mouse_down_xy()
 } // class RollButton

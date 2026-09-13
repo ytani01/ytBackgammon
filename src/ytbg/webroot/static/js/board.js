@@ -1,5 +1,8 @@
 import { log } from "./log.js";
-import { emit_msg } from "./ws.js";
+import { disable_unusable,
+         end_turn as action_end_turn,
+         set_clock_switch as action_set_clock_switch,
+         set_clock_limit as action_set_clock_limit } from "./actions.js";
 import { BX, BY, label_geometry, point_geometry,
          score_geometry } from "./layout.js";
 import { CookieBase, get_sound_query, get_server_id } from "./settings.js";
@@ -173,8 +176,9 @@ export class Board extends BgImage {
                 `p${p}clock`, this, p, g.x, g.y, g.deg));
         }
 
-        this.clock_sw = false;
-        this.apply_clock_sw();
+        // 表示の更新なので送らない (TODO-051)。つないだあとは
+        // サーバから届く clock_state で合わせる
+        this.clock_sw = document.getElementById("clock_sw").checked;
 
         const update_clock = () => {
             this.player_clock[0].update();
@@ -228,8 +232,7 @@ export class Board extends BgImage {
             log(`pass banner.on_click>player=${btn.player}`);
 
             btn.off();
-            this.player_clock[btn.player].change_turn();
-            this.emit_turn(1 - btn.player, -1, true);
+            action_end_turn(this, btn.player);
         };
         const on_win = (btn) => {
             log(`win banner.on_click>player=${btn.player}`);
@@ -357,13 +360,12 @@ export class Board extends BgImage {
     } // Board.set_clock_switch()
 
     /**
-     *
+     * ヘッダの Clock を切り替えたとき。両方のクロックはサーバが止める
+     * (TODO-050)
      */
     apply_clock_sw() {
         this.clock_sw = document.getElementById("clock_sw").checked;
-        emit_msg("set_clock_switch", { switch: this.clock_sw }, false);
-        this.player_clock[0].emit_stop();
-        this.player_clock[1].emit_stop();
+        action_set_clock_switch(this, this.clock_sw);
     } // Board.apply_clock_sw()
     
     /**
@@ -379,17 +381,15 @@ export class Board extends BgImage {
         }
         log(`Board.apply_clock_limit(${index}):limit=${limit}`);
 
-        this.player_clock[0].emit_stop();
-        this.player_clock[1].emit_stop();
-
-        this.clock_limit.emit_set(index, limit);
+        // 両方のクロックはサーバが止める (TODO-050)
+        action_set_clock_limit(this, index, limit);
     } // Board.apply_clock_limit()
 
     /**
      * load player number from cookie
      *
      * cookie の値は文字列なので数に直す (TODO-050)。直さないと "0" の
-     * まま残り、投了で set_turn の resign に文字列を送ってしまう
+     * まま残り、投了で resign の player に文字列を送ってしまう
      * (サーバは data の型を確かめて弾く)。値が無ければ undefined のまま
      */
     load_player() {
@@ -428,21 +428,6 @@ export class Board extends BgImage {
     } // Board.search_checker()
 
     /**
-     * @param {number} turn
-     *   <= -1 : all off
-     *       0 : player 0
-     *       1 : player 1
-     *   >=  2 : all on
-     * @param {boolean} add_hist
-     */
-    emit_turn(turn, resign=-1, add_hist=false) {
-        log(`Boad.emit_turn(turn=${turn},resign=${resign},add_hist=${add_hist})`);
-        // this.turn = turn;
-        emit_msg("set_turn", { turn: turn,
-                               resign: resign }, add_hist);
-    } // Board.emit_turn()
-
-    /**
      * ターンを設定
      *
      * @param {number} turn
@@ -451,14 +436,12 @@ export class Board extends BgImage {
      *       1 : player 1
      *   >=  2 : all on
      * @param {number} resign
-     * @param {boolean} sound - sound switch
-     * @param {boolean} [emit=true] - サーバへ送ってよいか。
-     *     **予測 (先行実行) から呼ぶときは false。**
-     *     予測は最後に届いた gameinfo の turn をなぞるだけなので、
-     *     ここで送ると同じ stop_clock が 2 回飛ぶ (TODO-030)
+     * @param {boolean} sound - 手番が変わる音を鳴らすか
+     *
+     * **サーバへは何も送らない** (TODO-051)。勝負がついたときに
+     * クロックを止めるのはサーバ (TODO-050)。
      */
-    set_turn(turn, resign=-1, sound=true, emit=true) {
-        const prev_turn = this.turn;
+    set_turn(turn, resign=-1, sound=true) {
         this.turn = turn;
         this.resign = resign;
         
@@ -488,22 +471,6 @@ export class Board extends BgImage {
 
             if ( winner >= 0 ) {
                 log(`Board.set_turn>plyaer${winner} win ${score}!`);
-                // 動いているときだけ止める (TODO-015)
-                //
-                // set_turn() は apply() から毎回呼ばれる。
-                // 無条件に emit_stop() を送ると、サーバが返す gameinfo で
-                // また apply() が走り、stop_clock を送り直す。
-                // stop_clock は turn も resign も変えないので、止まる条件が
-                // 無いまま回り続ける (実測: 5 秒で 606 通)。
-                // active を見れば 1 巡で収まる。サーバが Clock.active を
-                // false にすると、次の clock_state で resume() されなくなり、
-                // active が false のままになるため
-                // 予測 (emit=false) からは送らない。掴んでいる間に
-                // turn が -1 に変わると、離した瞬間の予測でも
-                // ここを通る (TODO-030 で実測した)
-                if ( emit && this.player_clock[winner].active ) {
-                    this.player_clock[winner].emit_stop();
-                }
                 this.win_btn[winner].on();
                 this.player_name[winner].on();
             }
@@ -520,7 +487,7 @@ export class Board extends BgImage {
         }
             
         // turn == 0 or 1
-        if ( turn != prev_turn && sound ) {
+        if ( sound ) {
             let playpromise = this.sound_turn_change.play();
         }
 
@@ -625,22 +592,18 @@ export class Board extends BgImage {
     /**
      * player の勝ちなら、その点数を返す。
      *
-     * 判定は rules/judge.js。投了による勝ちだったときに
-     * this.resign を戻すのはここ (TODO-027)。
+     * 判定は rules/judge.js。**判定するだけで、状態は書き換えない**
+     * (TODO-051。以前は投了による勝ちのときに this.resign を戻していた)。
      *
      * @param {number} player
      * @return {number} points - 0 なら勝ちではない
      */
     winner_is(player) {
-        const result = rule_winner_is(this.position(), player, {
+        return rule_winner_is(this.position(), player, {
             resign: this.resign,
             cube_value: this.cube.value,
             cube_accepted: this.cube.accepted,
-        });
-        if ( result.by_resign ) {
-            this.resign = -1;
-        }
-        return result.score;
+        }).score;
     } // Board.winner_is()
 
     /**
@@ -725,20 +688,19 @@ export class Board extends BgImage {
      * @param {Object} [opts.last_op] - 直前の操作 {type, data, ..}。
      *     無ければ null。**予測のときは渡さない** (音は、サーバから
      *     gameinfo が届いたときに鳴らす)
-     * @param {boolean} [opts.predict=false] - 予測 (先行実行) かどうか。
-     *     true のときは、表示を変えるだけで**サーバへ何も送らない**
-     *     (TODO-030)
+     *
+     * **サーバへは何も送らない** (TODO-051)。
      */
     apply(gameinfo, {sec=2, history_flag=false, clock_state=undefined,
-                     last_op=undefined, predict=false} = {}) {
+                     last_op=undefined} = {}) {
         this.gameinfo = gameinfo;
 
         // last_op は無いこともある (履歴の再生、接続時)。
         // サーバは JSON の null で送ってくるので、真偽で見る
         const op_type = last_op ? last_op.type : undefined;
 
-        // put / hit の音は動かす前の位置で決まるので、チェッカーを
-        // 配り直す前に控えておく (TODO-015)
+        // put_checker の put / hit の音は動かす前の位置で決まるので、
+        // チェッカーを配り直す前に控えておく (TODO-015)
         let put_ch = undefined;
         let put_prev_p = undefined;
         if ( op_type == "put_checker" ) {
@@ -843,12 +805,12 @@ export class Board extends BgImage {
 
         // dice
         //
-        // 振ったときだけ、そのプレーヤーの dice を回して音を鳴らす
-        // (TODO-015)。turn == -1 (操作不可) では演出しない
+        // 振ったとき (roll) だけ、そのプレーヤーの dice を回して音を
+        // 鳴らす (TODO-015、TODO-051)。turn == -1 (操作不可) では演出しない
         const d = gameinfo.board.dice;
         // log(`Board.apply> dice=${JSON.stringify(d)}`);
         let roll_player = -1;
-        if ( op_type == "dice" && last_op.data.roll && gameinfo.turn != -1 ) {
+        if ( op_type == "roll" && gameinfo.turn != -1 ) {
             roll_player = last_op.data.player;
         }
         this.roll_btn[0].set(d[0], roll_player == 0);
@@ -858,11 +820,12 @@ export class Board extends BgImage {
         //
         // turn
         //
-        // turn_change の音は set_turn が鳴らす。turn が変わったときだけ
-        // 鳴るので、set_turn の操作で来たときだけ許す (TODO-015)
+        // turn_change の音は set_turn が鳴らす。手番が変わる操作
+        // (opening と end_turn) で来たときだけ許す。turn が変わったかは
+        // 見ない (TODO-051。どちらの操作でも turn は変わる)
         log(`Board.apply>turn=${gameinfo.turn}`);
-        this.set_turn(gameinfo.turn, this.resign, op_type == "set_turn",
-                      ! predict);
+        this.set_turn(gameinfo.turn, this.resign,
+                      op_type == "opening" || op_type == "end_turn");
 
         // pip count
         this.pip_count(0);
@@ -871,9 +834,21 @@ export class Board extends BgImage {
         // put / hit の音 (TODO-015)
         //
         // 盤面はもう gameinfo で揃っているので、ここで出すのは音だけ。
-        // turn == -1 (操作不可) では鳴らさない
+        // put_checker (free move) は turn == -1 (操作不可) では鳴らさない
         if ( put_ch !== undefined && this.turn != -1 ) {
             if ( last_op.data.p >= 26 && put_prev_p < 26 ) {
+                this.sound_hit.play();
+            } else {
+                this.sound_put.play();
+            }
+        }
+
+        // move は turn を見ずに鳴らす (TODO-051)。勝ちになる move では、
+        // 届いた gameinfo の turn がもう -1 になっている。
+        // ヒットは moves にバーへの移動があるかで決める。動かす前の位置を
+        // 見ると、先行実行した画面では駒がもうバーにあるので見分けられない
+        if ( op_type == "move" ) {
+            if ( last_op.data.moves.some((mv) => mv.p >= 26) ) {
                 this.sound_hit.play();
             } else {
                 this.sound_put.play();
@@ -906,22 +881,24 @@ export class Board extends BgImage {
      *
      * サーバの応答を待たずに表示を変えるための「予測」。土台は
      * this.gameinfo (apply() が最後に受け取ったもの) で、動かした
-     * チェッカーの [point, idx] だけを書き換える。
+     * チェッカーの [point, idx] を書き換える。
      *
      * - **sn は書き換えない。** 予測はサーバの通し番号を進めない
      * - **動かせるかを Position.with_move() で確かめる。**
      *   駒が無ければ例外になる (TODO-027)
-     * - idx は、そのポイントに既にある枚数。emit_put_checker() が
-     *   送る idx も、この予測から取る
-     * - **dice だけは画面の方が新しいことがある** (使ったダイスを
-     *   disable() したのが、まだサーバへ届いていない)。
-     *   予測が古い値に戻してしまわないよう、roll_btn から写す
+     * - idx は、そのポイントに既にある枚数。move で送る idx も、
+     *   この予測から取る
+     * - player を渡すと、そのプレーヤーのダイスも書き換える (TODO-051)。
+     *   used_dice の目を 11〜16 にし、動かしたあとの盤面で使えなく
+     *   なった目も 11〜16 にする。move で送る dice はこれ
      *
      * @param {{ch: Checker, p: number}[]} moves - 動かす順に並べる
+     * @param {number} [player] - ダイスを書き換えるプレーヤー
+     * @param {number[]} [used_dice=[]] - 使ったダイスの目
      * @return {Object} - 新しい gameinfo (this.gameinfo は変えない)
      * @throws {Error} gameinfo がまだ無いとき、動かせないとき
      */
-    predict_gameinfo(moves) {
+    predict_gameinfo(moves, player=undefined, used_dice=[]) {
         if ( this.gameinfo === undefined ) {
             throw new Error("Board.predict_gameinfo: gameinfo が無い");
         }
@@ -940,8 +917,16 @@ export class Board extends BgImage {
             gameinfo.board.checker[ch.player][ch_i] = [mv.p, idx];
         } // for (mv)
 
-        gameinfo.board.dice = [this.roll_btn[0].get(),
-                               this.roll_btn[1].get()];
+        if ( player !== undefined ) {
+            const dice = gameinfo.board.dice[player];
+            for (let d1 of used_dice) {
+                const i = dice.indexOf(d1);
+                if ( i >= 0 ) {
+                    dice[i] += 10;
+                }
+            } // for (d1)
+            disable_unusable(pos, player, dice);
+        }
 
         return gameinfo;
     } // Board.predict_gameinfo()
@@ -980,27 +965,6 @@ export class Board extends BgImage {
     } // Board.chpos2point()
 
     /**
-     * @param {Checker} ch
-     * @param {number} p - point index
-     * @param {boolean} [add_hist=true]
-     * @param {number} [idx] - 省くと、今の表示の枚数から数える。
-     *     予測した gameinfo から取った値を渡すこともできる (TODO-030)
-     */
-    emit_put_checker(ch, p, add_hist, idx=undefined) {
-        if ( idx === undefined ) {
-            idx = this.checkers_at(p).length;
-        }
-        log("Board.emit_put_checker("
-                    + `cd.id=${ch.id},`
-                    + `p=${p},`
-                    + `add_hist=${add_hist})`);
-
-        emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
-                                  p:  p,
-                                  idx: idx }, add_hist);
-    } // Board.emit_put_checker()
-
-    /**
      * チェッカーを 1 枚動かして、表示を更新する。
      *
      * 予測した gameinfo を作って apply() に渡すだけ (TODO-030)。
@@ -1021,7 +985,7 @@ export class Board extends BgImage {
                         data: { ch: parseInt(ch.id.slice(1)), p: p } };
         }
 
-        this.apply(gameinfo, {sec: sec, last_op: last_op, predict: true});
+        this.apply(gameinfo, {sec: sec, last_op: last_op});
     } // Board.put_checker()
 
     /**

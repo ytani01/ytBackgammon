@@ -112,19 +112,22 @@ describe('Board とルール層のつながり', () => {
         assert.deepEqual(score, [0, 0]);
     });
 
-    it('winner_is() が投了の勝ちを返し、board.resign を戻す', async () => {
-        // resign はこの it の中で立てる。winner_is() が -1 に戻すので、
-        // 戻ったことを確かめれば、盤面も元のまま
-        const r = await page.evaluate(() => {
-            board.resign = 1;
-            const score = board.winner_is(0);
-            return { score: score, resign: board.resign };
-        });
-        // 初期配置では、相手が point 1 (player0 のインナー) に
-        // 残っているので backgammon 扱いの 3
-        assert.equal(r.score, 3);
-        assert.equal(r.resign, -1, 'resign が戻っていない');
-    });
+    it('winner_is() が投了の勝ちを返し、board.resign は書き換えない',
+       async () => {
+           // 判定するだけで状態は変えない (TODO-051。以前は -1 に戻して
+           // いた)。resign はこの it の中で立てて、最後に戻す
+           const r = await page.evaluate(() => {
+               board.resign = 1;
+               const score = board.winner_is(0);
+               const resign = board.resign;
+               board.resign = -1;
+               return { score: score, resign: resign };
+           });
+           // 初期配置では、相手が point 1 (player0 のインナー) に
+           // 残っているので backgammon 扱いの 3
+           assert.equal(r.score, 3);
+           assert.equal(r.resign, 1, 'resign を書き換えている');
+       });
 
     it('初期配置ではクローズアウトしていない', async () => {
         const co = await page.evaluate(

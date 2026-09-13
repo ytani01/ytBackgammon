@@ -16,8 +16,8 @@ import asyncio
 
 import pytest
 
-BACK_ALL = {'type': 'back_all', 'data': {}, 'history': False}
-FWD_ALL = {'type': 'fwd_all', 'data': {}, 'history': False}
+BACK_ALL = {'type': 'back_all', 'data': {}}
+FWD_ALL = {'type': 'fwd_all', 'data': {}}
 
 
 def make_history(bg_server, n):
@@ -57,7 +57,7 @@ async def test_running_replay_is_stopped_by_next_request(bg_server, req):
     assert hist_mid > 1
 
     await bg_server.on_json(
-        req, {'type': 'fwd', 'data': {'n': 1}, 'history': False})
+        req, {'type': 'fwd', 'data': {'n': 1}})
 
     assert task.cancelled()
     # 止まった位置から 1 手進んだだけ (back_all は再開しない)
@@ -114,7 +114,7 @@ async def test_two_back_msgs_move_two_steps(bg_server, req, emitted,
     fwd_len0 = len(bg_server._hist.fwd_entries)
     emitted.clear()
 
-    msg = {'type': 'back', 'data': {'n': 1}, 'history': False}
+    msg = {'type': 'back', 'data': {'n': 1}}
     await asyncio.gather(
         bg_server.on_json(req, dict(msg)),
         bg_server.on_json(req, dict(msg)),

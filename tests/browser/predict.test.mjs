@@ -5,15 +5,17 @@
 //
 //   node --test tests/browser/
 //
-// Checker.on_mouse_up_xy() は、サーバの応答を待たずに
-// 「動かしたあとの gameinfo」を予測して Board.apply() に渡す。
-// ここで見るのは次の 4 つ。
+// ドラッグを離すと、actions.js の move() がサーバの応答を待たずに
+// 「動かしたあとの gameinfo」を予測して Board.apply() に渡し、
+// move を 1 通送る (TODO-051)。ここで見るのは次のとおり。
 //
 //   1. 応答が無くても表示が変わる (先行実行)
-//   2. 予測のあとで、使ったダイスが使用済みになる
-//      (順番が逆だと、apply() が gameinfo の値に戻してしまう)
+//   2. 予測した盤面に、使ったダイスと使えなくなったダイス (11〜16) が
+//      入っている。送る dice もそれ
 //   3. ヒットのときは 2 手ぶん (相手をバーへ、自分を移動先へ)
 //   4. **予測が外れても、サーバから届く gameinfo で表示が戻る**
+//   5. 予測に失敗したら何も送らない
+//   6. 勝ちになる move は、予測した盤面から求めた点数を載せる
 //
 // 「予測はサーバへ何も送らない (turn が -1 に変わっていても)」は
 // TODO-050 で消した。turn が -1 に変わるとサーバが両方のクロックを
@@ -46,8 +48,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    center_of, console_errors, launch_browser, open_board, start_server,
-    wait_for,
+    center_of, console_errors, launch_browser, open_board, send_msg,
+    set_turn, start_server, wait_for,
 } from './helper.mjs';
 
 /**
@@ -127,24 +129,73 @@ function take_applied(page) {
 }
 
 /**
- * ターンとダイスをサーバに設定して、届くまで待つ。
+ * ターン (プレーヤー 0) とダイスをサーバに設定して、届くまで待つ。
  *
  * @param {import('playwright').Page} page
  * @param {number[]} dice - [d0, d1, d2, d3]
  */
 async function set_turn_dice(page, dice) {
-    await page.evaluate(d => {
-        board.emit_turn(0, -1, false);
-        board.roll_btn[0].emit_dice(d, false, false);
-    }, dice);
+    await set_turn(page, 0);
+    await send_msg(page, 'dice', { player: 0, dice: dice });
 
     await wait_for(
         () => page.evaluate(() => ({
             turn: board.turn,
-            dice: board.roll_btn[0].get_active_dice(),
+            dice: board.roll_btn[0].get(),
         })),
-        s => s.turn === 0 && s.dice.length > 0,
+        s => s.turn === 0 && JSON.stringify(s.dice) === JSON.stringify(dice),
         { msg: 'set_turn_dice' });
+}
+
+/**
+ * プレーヤー 1 のチェッカー 0 (#p100) を、サーバの盤面で p へ置く
+ *
+ * @param {import('playwright').Page} page
+ * @param {number} p
+ */
+async function put_p100(page, p) {
+    await page.evaluate(async p => {
+        const { put_checker } = await import('/static/js/actions.js');
+        put_checker(board, board.checker[1][0], p);
+    }, p);
+    await wait_for(
+        () => page.evaluate(() => board.checker[1][0].cur_point),
+        cur => cur === p, { msg: `put_p100(${p})` });
+}
+
+/**
+ * サーバへは送らずに、手元の盤面だけを差し替える。
+ *
+ * player 0 の手番で、checker[0][0] を src に、残り 14 枚をゴール (0) に
+ * 置く。player 1 は blocks の各ポイントに 2 枚ずつ、残りをゴール (25) に
+ * 置く。ダイスは dice。**元に戻すのは呼んだ側** (返す gameinfo を
+ * apply() する)。
+ *
+ * @param {import('playwright').Page} page
+ * @param {{src: number, blocks: number[], dice: number[]}} opts
+ * @return {Promise<Object>} - 差し替える前の gameinfo
+ */
+function apply_local(page, opts) {
+    return page.evaluate(({ src, blocks, dice }) => {
+        const save = JSON.parse(JSON.stringify(board.gameinfo));
+        const gi = JSON.parse(JSON.stringify(board.gameinfo));
+        gi.turn = 0;
+        gi.resign = -1;
+        gi.board.cube = { side: -1, value: 1, accepted: true };
+        gi.board.dice = [dice, [0, 0, 0, 0]];
+        gi.board.checker[0] = Array.from(
+            { length: 15 }, (_, i) => (i === 0 ? [src, 0] : [0, i - 1]));
+        let c1 = [];
+        for (const b of blocks) {
+            c1.push([b, 0], [b, 1]);
+        }
+        while (c1.length < 15) {
+            c1.push([25, c1.length - blocks.length * 2]);
+        }
+        gi.board.checker[1] = c1;
+        board.apply(gi, { sec: 0 });
+        return save;
+    }, opts);
 }
 
 /**
@@ -214,9 +265,9 @@ describe('ドラッグの先行実行 (予測)', () => {
             sn: board.gameinfo.sn,
             pip: board.pip[0].pip_count,
             // 使ったダイスは使用済み (3 -> 13) になっている。
-            // 予測を反映する前に disable() すると、apply() が
-            // gameinfo の値 (3) に戻してしまう
+            // 予測した gameinfo に入っている (TODO-051)
             dice: board.roll_btn[0].get(),
+            gi_dice: board.gameinfo.board.dice[0],
             active_dice: board.roll_btn[0].get_active_dice(),
         }), tip);
 
@@ -232,6 +283,7 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         // 使ったダイス
         assert.deepEqual(state.dice, [13, 0, 0, 0]);
+        assert.deepEqual(state.gi_dice, [13, 0, 0, 0]);
         assert.deepEqual(state.active_dice, []);
 
         // apply() は予測で 1 回だけ呼ばれた。last_op も clock_state も無い
@@ -241,29 +293,22 @@ describe('ドラッグの先行実行 (予測)', () => {
         assert.equal(applied[0].has_clock_state, false);
         assert.equal(applied[0].point[0][tip], 3);
 
-        // 送ったメッセージ (TODO-030 より前と同じ)
+        // 送ったのは move 1 通だけ (TODO-051)
         const sent = await page.evaluate(() => window.__sent);
-        assert.deepEqual(
-            sent.filter(m => m.type === 'put_checker').map(
-                m => [m.data.ch, m.data.p, m.data.idx, m.history]),
-            [[tip, 3, 0, false]]);
-        assert.deepEqual(
-            sent.filter(m => m.type === 'dice').map(
-                m => [m.data.player, m.data.dice, m.data.roll, m.history]),
-            [[0, [13, 0, 0, 0], false, true]]);
+        assert.deepEqual(sent.map(m => [m.type, m.data]), [
+            ['move', { player: 0, moves: [{ ch: tip, p: 3, idx: 0 }],
+                       dice: [13, 0, 0, 0], score: 0 }],
+        ]);
+        assert.ok(sent.every(m => !('history' in m)), 'history を送っている');
 
         // 送信を元に戻す。この it の操作はサーバへ届いていないので、
         // 次の it が送るメッセージへの返事で、表示はサーバの盤面に戻る
         await record_sent(page);
     });
 
-    it('ヒットのときは 2 手ぶん動かし、2 本送る', async () => {
+    it('ヒットのときは 2 手ぶん動かし、move 1 通に 2 手載せる', async () => {
         // 相手のチェッカーを point 3 に 1 枚置く (ブロット)
-        await page.evaluate(
-            () => board.emit_put_checker(board.checker[1][0], 3, false));
-        await wait_for(
-            () => page.evaluate(() => board.checker[1][0].cur_point),
-            p => p === 3, { msg: 'blot' });
+        await put_p100(page, 3);
 
         await set_turn_dice(page, [3, 0, 0, 0]);
         const tip = await tip_of_point6(page);
@@ -283,10 +328,10 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         // 送ったメッセージ: 相手をバーへ、そのあと自分を移動先へ
         const sent = await page.evaluate(() => window.__sent);
+        assert.deepEqual(sent.map(m => m.type), ['move']);
         assert.deepEqual(
-            sent.filter(m => m.type === 'put_checker').map(
-                m => [m.data.ch, m.data.p, m.data.idx, m.history]),
-            [[100, 27, 0, false], [tip, 3, 0, false]]);
+            sent[0].data.moves.map(m => [m.ch, m.p, m.idx]),
+            [[100, 27, 0], [tip, 3, 0]]);
 
         // サーバの返事でも同じ盤面になる
         await wait_for(
@@ -298,12 +343,8 @@ describe('ドラッグの先行実行 (予測)', () => {
             s => s.mine === 3 && s.hit === 27,
             { msg: 'hit' });
 
-        // 後始末: バーの駒を point 3 へ戻す (次の it のため)
-        await page.evaluate(
-            () => board.emit_put_checker(board.checker[1][0], 1, false));
-        await wait_for(
-            () => page.evaluate(() => board.checker[1][0].cur_point),
-            p => p === 1, { msg: 'restore' });
+        // 後始末: バーの駒を point 1 へ戻す (次の it のため)
+        await put_p100(page, 1);
     });
 
     it('予測が外れても、サーバの gameinfo で表示が戻る', async () => {
@@ -317,8 +358,9 @@ describe('ドラッグの先行実行 (予測)', () => {
         // サーバへ送る移動先 (3) ではなく 20 へ置いたことにする
         await page.evaluate(() => {
             const orig = board.predict_gameinfo;
-            board.predict_gameinfo = function (moves) {
-                const gameinfo = orig.call(this, moves);
+            board.predict_gameinfo = function (...args) {
+                const gameinfo = orig.apply(this, args);
+                const moves = args[0];
                 const ch = moves[moves.length - 1].ch;
                 const ch_i = parseInt(ch.id.slice(1)) % 100;
                 gameinfo.board.checker[ch.player][ch_i] = [20, 0];
@@ -339,9 +381,9 @@ describe('ドラッグの先行実行 (予測)', () => {
         // サーバへ送った移動先は、予測を外しても 3 のまま
         const sent = await page.evaluate(() => window.__sent);
         assert.deepEqual(
-            sent.filter(m => m.type === 'put_checker').map(
-                m => [m.data.ch, m.data.p]),
-            [[tip, 3]]);
+            sent.filter(m => m.type === 'move').map(
+                m => m.data.moves.map(mv => [mv.ch, mv.p])),
+            [[[tip, 3]]]);
 
         // サーバから届く gameinfo で、正しいところへ戻る
         const state = await wait_for(
@@ -364,7 +406,7 @@ describe('ドラッグの先行実行 (予測)', () => {
         // decide_dst() がキャンセルしたら undefined を返し、
         // on_mouse_up_xy() はそこで終わる (TODO-045)。
         // 分けたことで、この返り値がキャンセルとの唯一のつなぎになった。
-        // 取り違えると、行けない場所への put_checker がサーバへ飛ぶ
+        // 取り違えると、行けない場所への move がサーバへ飛ぶ
         await set_turn_dice(page, [3, 0, 0, 0]);
         const tip = await tip_of_point6(page);
 
@@ -395,6 +437,93 @@ describe('ドラッグの先行実行 (予測)', () => {
                          'キャンセルしたのに送っている');
         assert.deepEqual(await take_applied(page), [],
                          'キャンセルしたのに予測を反映している');
+    });
+
+    it('予測に失敗したら何も送らず、元の位置へ戻す', async () => {
+        // gameinfo がまだ届いていないときなど。TODO-051 より前は
+        // put_checker だけを送っていた
+        await set_turn_dice(page, [3, 0, 0, 0]);
+        const tip = await tip_of_point6(page);
+
+        await record_sent(page);
+        await record_apply(page);
+        await page.evaluate(() => {
+            board.predict_gameinfo = function () {
+                throw new Error('predict failed (test)');
+            };
+        });
+
+        try {
+            await one_touch_move(page);
+
+            const state = await page.evaluate(i => ({
+                point: board.checker[0][i].cur_point,
+                moving: board.moving_checker !== undefined,
+                dice: board.roll_btn[0].get(),
+            }), tip);
+            assert.equal(state.point, 6, '元のポイントに戻っていない');
+            assert.equal(state.moving, false, '掴んだままになっている');
+            assert.deepEqual(state.dice, [3, 0, 0, 0]);
+            assert.deepEqual(await take_sent(page), [],
+                             '予測に失敗したのに送っている');
+            assert.deepEqual(await take_applied(page), []);
+        } finally {
+            await page.evaluate(() => { delete board.predict_gameinfo; });
+        }
+    });
+
+    it('動かしたあとに使えなくなったダイスも 11〜16 にして送る', async () => {
+        // checker[0][0] を 9 に置き、残りはゴール。相手は 3 に 2 枚。
+        // ダイスは [5, 1]。ワンタッチでは 9 -> 4 (5 を使う)。4 から 1 では
+        // 3 (相手が 2 枚) に行けないので、1 も使えなくなる。
+        // 動かす前は 9 -> 8 に行けるので、1 は使える
+        await record_sent(page, true);
+        const save = await apply_local(
+            page, { src: 9, blocks: [3], dice: [5, 1, 0, 0] });
+        try {
+            await record_apply(page);
+            await one_touch_move(page);
+
+            const state = await page.evaluate(() => ({
+                point: board.checker[0][0].cur_point,
+                gi_dice: board.gameinfo.board.dice[0],
+                dice: board.roll_btn[0].get(),
+            }));
+            assert.equal(state.point, 4, '先行実行で動いていない');
+            assert.deepEqual(state.gi_dice, [15, 11, 0, 0],
+                             '予測した gameinfo のダイス');
+            assert.deepEqual(state.dice, [15, 11, 0, 0], '表示のダイス');
+
+            const sent = await take_sent(page);
+            assert.deepEqual(sent.map(m => [m.type, m.data]), [
+                ['move', { player: 0, moves: [{ ch: 0, p: 4, idx: 0 }],
+                           dice: [15, 11, 0, 0], score: 0 }],
+            ]);
+        } finally {
+            await page.evaluate(g => board.apply(g, { sec: 0 }), save);
+            await record_sent(page);
+        }
+    });
+
+    it('勝ちになる move は、予測した盤面から求めた点数を載せる', async () => {
+        // checker[0][0] を 1 に置き、残りはゴール。1 の目で上がると勝ち。
+        // 相手は 24 に 2 枚、残り 13 枚はゴールにあるので、シングル
+        // (キューブ 1 で 1 点)
+        await record_sent(page, true);
+        const save = await apply_local(
+            page, { src: 1, blocks: [24], dice: [1, 0, 0, 0] });
+        try {
+            await one_touch_move(page);
+
+            const sent = await take_sent(page);
+            assert.deepEqual(sent.map(m => [m.type, m.data]), [
+                ['move', { player: 0, moves: [{ ch: 0, p: 0, idx: 14 }],
+                           dice: [11, 0, 0, 0], score: 1 }],
+            ]);
+        } finally {
+            await page.evaluate(g => board.apply(g, { sec: 0 }), save);
+            await record_sent(page);
+        }
     });
 
     it('コンソールエラーが出ていない', async () => {

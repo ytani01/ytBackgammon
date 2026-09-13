@@ -120,15 +120,15 @@ describe('ブラウザでの基本の動作確認', () => {
             gi.board.checker[0][0][1] = 4;
             gi.board.checker[0][4][1] = 0;
 
-            // predict: true なのでサーバへは何も送らない
-            board.apply(gi, { sec: 0, predict: true });
+            // apply() はサーバへ何も送らない (TODO-051)
+            board.apply(gi, { sec: 0 });
             const at6 = board.checkers_at(6);
             const out = { before,
                           ids: at6.map((c) => c.id),
                           z: at6.map((c) => c.z),
                           tip: board.top_checker(6).id };
 
-            board.apply(save, { sec: 0, predict: true });  // 後始末
+            board.apply(save, { sec: 0 });  // 後始末
             return out;
         });
 

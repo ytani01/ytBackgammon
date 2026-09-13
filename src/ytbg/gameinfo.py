@@ -19,7 +19,6 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from .message import (
-    CubeData,
     DiceData,
     MoveData,
     OpeningData,
@@ -27,7 +26,6 @@ from .message import (
     PlayerNameData,
     ResignData,
     ScoreData,
-    TurnData,
 )
 from .mylog import getLogger
 
@@ -60,17 +58,16 @@ def init_dice() -> list[list[int]]:
     return [[0, 0, 0, 0], [0, 0, 0, 0]]
 
 
-def _get(data: dict[str, Any], key: str, default: Any, strict: bool) -> Any:
+def _require_dict(data: object) -> None:
     """
-    strict なら、キーの欠落を KeyError にする。
+    from_dict() の入口。dict でなければ KeyError にする (TODO-051)。
 
-    保存したファイルを読むときは、キーの欠落を「壊れたファイル」として
-    扱いたい。黙って既定値にすると、綴りを間違えた履歴が初期配置の
-    盤面として読まれてしまう (TODO-024)。
+    保存したファイルの "board": null や "cube": 3 を、キーの欠けと同じ
+    「壊れたファイル」として扱うため (storage.py の LOAD_ERRORS)。
+    TypeError のまま抜けさせると、サーバが起動しなくなる
     """
-    if strict:
-        return data[key]
-    return data.get(key, default)
+    if not isinstance(data, dict):
+        raise KeyError(f'dict ではない: {data!r}')
 
 
 @dataclass
@@ -82,13 +79,13 @@ class CubeState:
     accepted: bool = True
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any],
-                  strict: bool = False) -> CubeState:
-        base = cls()
+    def from_dict(cls, data: dict[str, Any]) -> CubeState:
+        """dict から作る。キーが欠けていると KeyError"""
+        _require_dict(data)
         return cls(
-            side=_get(data, 'side', base.side, strict),
-            value=_get(data, 'value', base.value, strict),
-            accepted=_get(data, 'accepted', base.accepted, strict),
+            side=data['side'],
+            value=data['value'],
+            accepted=data['accepted'],
         )
 
 
@@ -102,22 +99,18 @@ class BoardState:
     checker: list[list[list[int]]] = field(default_factory=init_checker)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any],
-                  strict: bool = False) -> BoardState:
+    def from_dict(cls, data: dict[str, Any]) -> BoardState:
         """
         dict から作る。知らないキーは読み捨てる。
 
-        strict なら、キーが欠けていると KeyError になる。
+        キーが欠けていると KeyError になる (GameInfo.from_dict() と同じ理由)。
         """
-        base = cls()
+        _require_dict(data)
         return cls(
-            playername=list(
-                _get(data, 'playername', base.playername, strict)),
-            cube=CubeState.from_dict(
-                _get(data, 'cube', None, strict) or {}, strict),
-            dice=copy.deepcopy(_get(data, 'dice', base.dice, strict)),
-            checker=copy.deepcopy(_get(data, 'checker', base.checker,
-                                       strict)),
+            playername=list(data['playername']),
+            cube=CubeState.from_dict(data['cube']),
+            dice=copy.deepcopy(data['dice']),
+            checker=copy.deepcopy(data['checker']),
         )
 
 
@@ -186,25 +179,10 @@ class GameInfo:
         self.__log.debug('board.checker[{}][{}]=[{},{}]',
                          player, ch_i, p, idx)
 
-    def cube(self, data: CubeData) -> None:
-        """キューブ (TODO-038 で dataclass 受け取りにした)"""
-        self.__log.debug('data={}', data)
-
-        self.board.cube = CubeState(side=data.side, value=data.value,
-                                    accepted=data.accepted)
-
-        self.__log.debug('board.cube={}', self.board.cube)
-
     def dice(self, data: DiceData) -> None:
         """指定したプレーヤーの目だけを変える"""
         self.__log.debug('data={}', data)
         self.board.dice[data.player] = list(data.dice)
-
-    def set_turn(self, data: TurnData) -> None:
-        """turn と resign"""
-        self.__log.debug('data={}', data)
-        self.turn = data.turn
-        self.resign = data.resign
 
     def set_playername(self, data: PlayerNameData) -> None:
         """指定したプレーヤーの名前だけを変える"""
@@ -357,33 +335,25 @@ class GameInfo:
         return copy.deepcopy(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any],
-                  strict: bool = False) -> GameInfo:
+    def from_dict(cls, data: dict[str, Any]) -> GameInfo:
         """
-        dict から作る。
+        dict から作る。**知らないキーは読み捨てる。**
 
-        **知らないキーは読み捨て、足りないキーは既定値になる。**
-
-        strict なら、to_dict() が出すキーが 1 つでも欠けていると
-        KeyError になる。保存したファイル (.jsonl) を読むときに使う。
-        綴り違いを黙って既定値にすると、壊れた履歴が初期配置の盤面として
-        読まれてしまうため (TODO-024)。
-
-        **既定が strict=False なのは、クライアントから届く
-        set_gameinfo のため** (TODO-031)。こちらは部分的な dict でも
-        受ける (`tests/test_on_json.py` が見ている)。
+        to_dict() が出すキーが 1 つでも欠けていると KeyError になる。
+        保存したファイル (.jsonl) を読むときに、綴り違いを黙って既定値に
+        すると、壊れた履歴が初期配置の盤面として読まれてしまうため
+        (TODO-024)。部分的な dict を受けていた set_gameinfo は
+        TODO-051 で消した
         """
-        base = cls()
+        _require_dict(data)
         return cls(
-            sn=_get(data, 'sn', base.sn, strict),
-            server_version=_get(data, 'server_version',
-                                base.server_version, strict),
-            game_num=_get(data, 'game_num', base.game_num, strict),
-            match_score=_get(data, 'match_score', base.match_score, strict),
-            score=list(_get(data, 'score', base.score, strict)),
-            turn=_get(data, 'turn', base.turn, strict),
-            resign=_get(data, 'resign', base.resign, strict),
-            board=BoardState.from_dict(
-                _get(data, 'board', None, strict) or {}, strict),
+            sn=data['sn'],
+            server_version=data['server_version'],
+            game_num=data['game_num'],
+            match_score=data['match_score'],
+            score=list(data['score']),
+            turn=data['turn'],
+            resign=data['resign'],
+            board=BoardState.from_dict(data['board']),
         )
 ##

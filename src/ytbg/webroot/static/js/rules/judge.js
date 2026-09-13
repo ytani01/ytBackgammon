@@ -2,8 +2,7 @@
  * 盤面の判定 (TODO-027)。
  *
  * **ここは DOM も Board も見ない。値を返すだけで、表示も状態も変えない。**
- * 表示の更新 (`pip[player].set()`) と状態の書き換え (`resign = -1`) は
- * 呼んだ側が行う。
+ * 表示の更新 (`pip[player].set()`) は呼んだ側が行う。
  */
 
 import { bar_point, get_pip, goal_point } from "./position.js";
@@ -69,7 +68,7 @@ export const calc_gammon = (position, player, cube_value, cube_accepted) => {
  * player の勝ちかどうかの判定。
  *
  * **`resign` は書き換えない** (TODO-027)。投了による勝ちだったことは
- * `by_resign` で返すので、`resign = -1` は呼んだ側が行う。
+ * `by_resign` で返す (TODO-051 からは、使っているのはテストだけ)。
  *
  * @param {Position} position
  * @param {number} player - 0 or 1

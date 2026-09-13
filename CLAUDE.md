@@ -88,8 +88,11 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `get_dst_points()` をページの中で呼ぶ。ほかの 2 つはドラッグを
   free move で行うので、ルール判定を通らない
 - `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
-  ボタン・バナーを実際に押し、**送られたメッセージの `type` / `data` /
-  `history`** と、変わった `board` の属性を見る（TODO-028）。
+  ボタン・バナー・キューブ・クロックを実際に押し、**送られたメッセージの
+  `type` / `data`** と、変わった `board` の属性を見る（TODO-028）。
+  盤面を変える操作では、**送ったのがその 1 通だけか**と、`history` が
+  付いていないことも見る（TODO-051）。キューブのダブル・リダブル・テイク、
+  使えるダイスが無いときにダイスを押す `end_turn` もここで見る。
   `WebSocket.prototype.send` を包んで送ったものを貯め、`confirm()` は
   自動で OK する。サーバの返事を待つ目印に、プレーヤー 1 の名前を
   変えずに送り直しているので、**このファイルの中でプレーヤー 1 の名前を
@@ -104,10 +107,22 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `open_board()` が貯めるのは console の `error` だけなので、
   このファイルは `log` を数える形で自分でページを開く
 - `predict.test.mjs` — ドラッグを離した瞬間の先行実行（TODO-030）。
-  予測で表示が変わり、外れてもサーバから届く `gameinfo` で戻るか
+  予測で表示が変わり、外れてもサーバから届く `gameinfo` で戻るか。
+  `move` 1 通の中身（使ったダイスと使えなくなったダイスの 11〜16、
+  勝ちの点数）と、予測に失敗したら何も送らないこと（TODO-051）
+- `last_op.test.mjs` — 音とダイスの回転を `last_op` から決めているか
+  （TODO-051）。`apply()` に `last_op` を渡し、鳴らした音と回したダイスを数える
 - `opening.test.mjs` — オープニングロールで先手が決まるか（TODO-041）
 - `player_cookie.test.mjs` — cookie から読んだプレーヤー番号が数になって
   いるか（TODO-050）。文字列のままだと、サーバが型の合わない値として弾く
+
+**テスト専用の type は無い**（TODO-051）。盤面の用意は残っている type で
+行う。`helper.mjs` の `send_msg()` がページの中で `ws.js` の `emit_msg()` を
+呼び、`set_turn()` が turn を変える（0 / 1 は `opening`、2 は
+`opening`（`winner: -1`）、-1 は `moves` が空で `score` が 1 の `move`、
+0 と 1 の間は `end_turn`）。目は `dice`、駒は `put_checker`。
+**0 / 1 / -1 から 2 へは戻せず、-1 からはどこへも戻せない**（`opening` は
+`turn` が 2 以上のときしか受け付けない）ので、そのときは `new` で盤面ごと戻す
 
 注意する点:
 
@@ -220,8 +235,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   クライアントから届いたメッセージの分岐（`on_json()`）と、盤面・履歴・
   クロック・保存・配信のとりまとめ。HTTP の応答は持たない
 - `src/ytbg/gameinfo.py` — `GameInfo` / `BoardState` / `CubeState`（TODO-024）。
-  盤面の状態そのものを表す dataclass。`put_checker()` / `cube()` /
-  `dice()` / `set_turn()` / `set_playername()` / `set_score()` /
+  盤面の状態そのものを表す dataclass。`put_checker()` /
+  `dice()` / `set_playername()` / `set_score()` /
   `resign_game()` / `new_game()` という更新のメソッドもここが持つ
   （TODO-025 で `ytBackgammon` を吸収した。`resign` は dataclass の
   フィールド名なので、メソッドは `resign_game()`）。
@@ -231,13 +246,17 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   相手の得点も足す。**盤面と合わないときは何も変えずに `False` を返す**
   （`move()` だけは戻り値が無い）。
   **更新のメソッドは `message.py` の dataclass をそのまま受け取る**
-  （`cube(CubeData)` の形。TODO-038。`server.py` で `asdict()` に
+  （`dice(DiceData)` の形。TODO-038。`server.py` で `asdict()` に
   戻していたのをやめた）。そのため `gameinfo.py` は `message.py` に
   依存する（`message.py` の側は何も import しないので循環しない）。
   `to_dict()` は
-  `dataclasses.asdict()`、`from_dict()` は手で書いている。**ファイルから読むときだけは
-  必須キーの欠落を例外にする**（黙って初期配置になると、壊れたファイルが
-  「初期配置の N 手」として読まれてしまう）
+  `dataclasses.asdict()`、`from_dict()` は手で書いている。**必須キーの
+  欠落は常に `KeyError` にする**（黙って初期配置になると、壊れたファイルが
+  「初期配置の N 手」として読まれてしまう）。渡されたものが dict でない
+  とき（`"board": null` など）も入口で `KeyError` にする。`storage.py` の
+  `LOAD_ERRORS` は `TypeError` を拾わないので、そのままだとサーバが
+  起動しない（TODO-051）。部分的な dict を受けていた
+  `set_gameinfo` は TODO-051 で消した
 - `src/ytbg/clock.py` — `Clock`（TODO-024）。クロックは `gameinfo` の外に置く
 - `src/ytbg/history.py` — `History`（TODO-025）。戻す側（`_history`）と
   進む側（`_fwd_hist`）の 2 つのスタックと通し番号。**保存は持たない**
@@ -276,7 +295,14 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     **どちらもテストでは守られない。** `wait_images()` を外しても
     `tests/browser/` は全件通る（no-op なので当然）。
     この順序を変えるときは、画像の応答を遅らせて配置を実測すること
-  - `ws.js`（接続・再接続・送信）、`log.js`（**`?debug` を付けて開いたとき
+  - `actions.js` — サーバへ送る操作（TODO-051）。**`emit_msg` を import
+    するのはここだけ。** ゲームを進める処理（`roll()` / `click_dice()` /
+    `end_turn()` / `drop_checker()` / `move()` / `double()` / `take()` /
+    `cancel_double()` / `resign()`）と「押してよいか」の判定
+    （`can_pick_checker()` / `can_hold_cube()`）、名前・得点・クロック・
+    設定・履歴の操作の送信を並べる。どれも `board` を受け取り、
+    送る値は数に直す。`ui/` の表示部品と `main.js` / `board.js` はここを呼ぶ
+  - `ws.js`（接続・再接続・送信。`emit_msg(type, data)`）、`log.js`（**`?debug` を付けて開いたとき
     だけ `console.log` へ出す**。TODO-048）、`layout.js`（盤面の座標）、
     `settings.js`（`CookieBase`、クエリ文字列から `sound` を読む
     `get_sound_query()` と `debug` の有無を見る `get_debug_query()`、
@@ -290,14 +316,14 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()`。
     **DOM も `Board` も見ず、値を返すだけ**で、
     import してよいのは `rules/` の中だけ。表示の更新
-    （`pip[player].set()`、`dice[i].disable()`）と状態の書き換え
-    （`resign = -1`）は `Board` と `RollButton` の側で行う。
+    （`pip[player].set()`）は `Board` の側で行う。
     `Board.position()` が `Position.from_gameinfo(this.gameinfo)` を
     返す（TODO-044。`this.gameinfo` がまだ無いときは空の盤面）
   - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
     ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
     `label.js` / `button.js`。`board` と `player` は基底のコンストラクタの
-    options で渡す
+    options で渡す。**マウスの処理と表示だけを受け持ち、サーバへは
+    送らない**（判定と送信は `actions.js`。TODO-051）
 - `src/ytbg/webroot/templates/index.html` — ボード 1 面。
   `<script type="module" src="/static/js/main.js">` の 1 行で読み込む。
   **中身は `<header>` と空の `<div id="board">` だけ**で、盤面の要素は
@@ -335,52 +361,77 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 減る方向、プレーヤー 1 は増える方向に進む（`calc_dst_point()`）。
 
 メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
-`{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
-履歴に 1 手として積むかは、`server.py` の登録表 `MESSAGE_TYPES` の
-`history` で type ごとに決める（TODO-050）。積むのは名前付きの 8 つの操作
-（`roll` / `opening` / `move` / `end_turn` / `double` / `take` /
-`cancel_double` / `resign`）と `put_checker` / `dice` / `set_playername` /
-`set_score`、それに TODO-051 で消す `cube` / `set_turn`。クロック系の 6 つ
-（`set_clock_limit` / `set_player_clock` / `set_clock_switch` /
-`start_clock` / `resume_clock` / `stop_clock`）は `gameinfo` を書き換えない
-ので積まない（TODO-032）。**名前付きの 8 つは表だけを見る。古い type は、
-表で積み、かつメッセージの `history` が真のときだけ積む**（TODO-051 で
-`history` を見る条件を消す。`server.py` の `NAMED_TYPES` もそのとき消す）。
-1 つ前のエントリと `sn` 以外が同じ場合も積まない（TODO-032）。
+`{src, type, data}` の形（TODO-051）。**クライアントで送るのは
+`actions.js` だけ**で、`ws.js` の `emit_msg(type, data)` を呼ぶ。
+**1 つの操作を 1 通で送る**（手番を渡すのは `end_turn` 1 通。以前は
+`dice` / `stop_clock` / `set_player_clock` / `start_clock` / `set_turn` の
+5 通だった）。**プレーヤー番号などは数に直して送る**（サーバが型を確かめて
+弾く。cookie から読んだ値は文字列のことがある）。
+
+メッセージに `history` は無い。履歴に 1 手として積むかは、`server.py` の
+登録表 `MESSAGE_TYPES` の `history` で type ごとに決める（TODO-050、TODO-051）。
+積むのは名前付きの 8 つの操作（`roll` / `opening` / `move` / `end_turn` /
+`double` / `take` / `cancel_double` / `resign`）と `put_checker`（free move
+での移動）/ `dice`（free move での目の変更）/ `set_playername` /
+`set_score`。クロック系の 4 つ（`set_clock_limit` / `set_clock_switch` /
+`resume_clock` / `stop_clock`）は `gameinfo` を書き換えないので積まない
+（TODO-032）。1 つ前のエントリと `sn` 以外が同じ場合も積まない（TODO-032）。
+`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo` は
+TODO-051 で消した（届いても登録表に無い type として無視する）。
 
 **`type` を書くのはクライアント → サーバの向きだけ**で、分岐はサーバの
 `on_json()` にしかない（TODO-015）。サーバが返すのは `gameinfo` 1 本で、
 `data` に直前の操作が `last_op`（受け取った msg そのまま。操作に紐づかない
 送信では `None`）として入る。クライアントは `gameinfo` で盤面を作り直し、
-**音と dice の回転だけを `last_op` から出す**（`Board.apply()`）。
+**音と dice の回転だけを `last_op` から出す**（`Board.apply()`。TODO-051）。
+
+- `roll`: 振ったプレーヤーのダイスを回し、振る音を鳴らす（`turn` が -1 なら
+  出さない）。free move の `dice` は回さない
+- `move`: **`turn` を見ずに**駒を置く音を鳴らす（勝ちになる `move` では、
+  届く `gameinfo` の `turn` がもう -1）。**ヒットの音は `moves` にバー
+  （26 以上）へ動かすものがあるか**で決める（動かす前の位置を見ると、
+  先行実行した画面では駒がもうバーにあって見分けられない）
+- `put_checker`: 今までどおり、`turn` が -1 では鳴らさない。ヒットは
+  「行き先が 26 以上で、動かす前が 26 未満」
+- `opening` / `end_turn`: 手番が変わる音。**`turn` が変わったかは見ない**
+  （鳴らすのは `turn` が 0 / 1 になるときだけ。同じ目の `opening` で
+  `turn` が 2 に戻るときは鳴らない）
 
 **表示を変えるのは `Board.apply(gameinfo, {sec, history_flag, clock_state,
-last_op, predict})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
+last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
 `load_gameinfo()` が名前付きの引数に直して渡すだけで、中身は持たない。
+**`apply()` と `Board.set_turn()` はサーバへ何も送らない**（TODO-051。
+以前は勝負がついた盤面で `stop_clock` を送っていた）。`Board.winner_is()` も
+判定するだけで `resign` を書き換えない。
 
 ドラッグを離した瞬間の反応（**先行実行**）も同じ経路を通る。
-`Checker.on_mouse_up_xy()` は `decide_dst()`（行き先とヒットの判定）→
-`apply_move()`（予測・送信・ダイスの消費）→ `after_move()`（勝敗と得点）の
-順に呼ぶだけで（TODO-045）、`apply_move()` が `Board.predict_gameinfo()` で
-**動かしたあとの `gameinfo` を予測して作り**、`apply()` に渡す
+`Checker.on_mouse_up_xy()` は `actions.js` の `drop_checker()` を呼ぶだけで、
+`drop_checker()` が `decide_dst()`（行き先とヒットの判定）→ `move()`
+（予測・送信・表示）の順に呼ぶ（TODO-045、TODO-051）。`move()` が
+`Board.predict_gameinfo()` で**動かしたあとの `gameinfo` を予測して作り**、
+そこから `idx`・ダイス・勝ちの点数を求めて `move` を 1 通送り、`apply()` に渡す
 （共有ボードなので、サーバの応答を待つと操作感が悪い）。
-**`decide_dst()` がキャンセルしたときは `undefined` を返し、
-そこで何も送らずに終わる**（3 つに分けたので、途中で止まるのはここだけになった）。
+**`drop_checker()` が `false` を返したら（`decide_dst()` がキャンセルしたか、
+予測に失敗した）、何も送らずに `Checker` が元の位置へ戻す。**
 
-- 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]`
-  だけを書き換える。**`sn` は進めない。** 動かせるかは
+- 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]` と、
+  動かしたプレーヤーのダイスを書き換える。**`sn` は進めない。** 動かせるかは
   `Position.with_move()` が確かめる（駒が無ければ例外）
+- **ダイスは、使った目と、動かしたあとの盤面で使えなくなった目を 11〜16 に
+  する**（TODO-051）。送る `dice` もこれ。表示もこの `gameinfo` から作るので、
+  `apply()` のあとで `disable()` する順番の縛りは無くなった
 - **ヒットのときは 2 手ぶん**（相手をバーへ、自分を移動先へ）。
-  サーバへ送る `put_checker` の `idx` も、この予測から取る
+  `move` の `moves` に 2 つ載せ、`idx` もこの予測から取る
+- **勝ちの点数も予測した盤面から求める**（`rules/judge.js` の `winner_is()`）。
+  `score` が 1 以上ならサーバが `turn` を -1 にして得点を足す
+- **予測に失敗したら何も送らない**。行き先は `decide_dst()` が確かめた
+  あとなので、失敗するのは `gameinfo` がまだ届いていないときだけ
 - **予測のときは `clock_state` と `last_op` を渡さない。**
   クロックは古い残り時間から数え直しになり、音は二重に鳴る
 - **予測が外れても、サーバから届く `gameinfo` で表示は戻る**
   （`apply()` は毎回チェッカーを配り直す）。
   確認は `tests/browser/predict.test.mjs`
-- `apply()` は dice を `gameinfo` の値に戻すので、**使ったダイスの
-  `disable()` は `apply()` のあとで行う**。先にやると使用済みが消える。
-  予測が古い値へ戻さないよう、**dice だけは `roll_btn` から写す**
-- **free move のときは先行実行しない**（`emit` して return する）。
+- **free move のときは先行実行しない**（`put_checker` を送るだけ）。
   ルール判定を通らないので、行き先を確かめられない
 - **予測は、動かした駒と dice 以外を「最後に届いた `gameinfo`」へ戻す。**
   `score` / `playername` / `cube` / `turn` は `apply()` が毎回
@@ -393,8 +444,9 @@ last_op, predict})` だけ**（TODO-030）。サーバから届いた `gameinfo`
 `type` ごとの frozen dataclass に組み立てるので、**`data` のキーが
 足りなければ入口で `KeyError` になる**（奥の `msg['data']['n']` まで
 持ち越さない）。`parse()` が返す `Message` は
-`{type, data, history, raw}` で、`raw` が `last_op` に要る受け取った
-msg そのもの。**`data` と `history` は全ての `type` で必須**になった。
+`{type, data, raw}` で、`raw` が `last_op` に要る受け取った
+msg そのもの。**`data` は全ての `type` で必須**になった（`history` は
+TODO-051 で無くなり、付いていても読まない）。
 `back` や `clear_hist` のように中身を使わない `type` でも、キーが
 無ければ `parse()` で `KeyError` になる（旧 `on_json()` は読まずに
 `return` していた）。
@@ -417,16 +469,15 @@ float のフィールドには int も通す。**`list` のフィールドは `f
 
 ハンドラは全て `async def` で、戻り値で共通の後処理を分ける。
 `None` は「自分で送信済み」（`back` / `back2` / `back_all` / `fwd` /
-`fwd2` / `fwd_all` / `clear_hist` / `new` / `set_gameinfo` の 9 つ。表の
+`fwd2` / `fwd_all` / `clear_hist` / `new` の 8 つ。表の
 `history` は見ないので `False`）か「盤面と合わないので捨てた」（下を見ること）、`float` は「アニメーションの秒数」
-（盤面とクロックを変える 20 個）。秒数を返すのは `put_checker` と `move`
+（盤面とクロックを変える 16 個）。秒数を返すのは `put_checker` と `move`
 （`SEC_CHECKER_MOVE`）だけで、残りは `0`。`float` のときの後処理は、
 次の順に行う。
 
 1. **`turn` が -1 に変わったら、両方のクロックを `Clock.stop()` で止める**
    （処理の前から -1 なら止めない。勝負がついたあとでもクロックを押せば
-   再開できるように）。古い `set_turn` にも効く。`Clock.stop_all()` は
-   経過分を残り時間に反映しないので使わない
+   再開できるように）。`Clock.stop()` は経過分を残り時間に反映して止める
 2. 表の `history` を見て履歴へ積む
 3. `emit_gameinfo()`
 
@@ -470,8 +521,8 @@ float のフィールドには int も通す。**`list` のフィールドは `f
 ### クロック
 
 **表示を進めるのはクライアント側だけ**だが、残り時間の基準はサーバも持つ
-（TODO-016）。`set_clock_limit` / `set_player_clock` / `set_clock_switch` /
-`start_clock` / `stop_clock` / `resume_clock` のハンドラは、いずれも `0` を返し、
+（TODO-016）。`set_clock_limit` / `set_clock_switch` /
+`stop_clock` / `resume_clock` のハンドラは、いずれも `0` を返し、
 `on_json()` の末尾で履歴の判定と `emit_gameinfo()` を通る。
 
 **クロックは `Clock`（`clock.py`）が持ち、`gameinfo` には入れない**
@@ -496,9 +547,10 @@ float のフィールドには int も通す。**`list` のフィールドは `f
 クロックの状態はファイルの 1 行目に書かれる（下の「履歴」）。保存するのは
 `limit` / `sw` / 残り時間で、**`active` は保存しない**。サーバが落ちている
 間の時間は数えられないので、読み込んだときは必ず止まった状態で始める。
-`set_clock_limit` と `set_clock_switch` は、`history: false` で届いても保存する
-（クライアントがそう送るので、そこで保存しないと、変えたまま再起動しても
-`limit` や `sw` が戻ってしまう）。
+`set_clock_limit` と `set_clock_switch` は履歴に積まないので、ハンドラが
+自分で保存する（そこで保存しないと、変えたまま再起動しても
+`limit` や `sw` が戻ってしまう）。どちらも両方のクロックをサーバが止めるので、
+クライアントは `stop_clock` を別に送らない（TODO-050、TODO-051）。
 
 ### 履歴（戻す・進める）
 

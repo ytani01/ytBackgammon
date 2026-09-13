@@ -261,3 +261,58 @@ export async function wait_for(get, ok, opts = {}) {
 export function sleep(msec) {
     return new Promise(resolve => setTimeout(resolve, msec));
 }
+
+/**
+ * メッセージを 1 通、サーバへ送る (TODO-051)。
+ *
+ * ページの中で ws.js を import して emit_msg() を呼ぶ。main.js が
+ * 読んだものと同じ URL なので、同じモジュール (つないである
+ * WebSocket) が使われる。テスト専用の type は無いので、盤面の用意も
+ * 残っている type で行う。
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} type
+ * @param {Object} data
+ * @return {Promise<void>}
+ */
+export function send_msg(page, type, data) {
+    return page.evaluate(async ([type, data]) => {
+        const { emit_msg } = await import('/static/js/ws.js');
+        emit_msg(type, data);
+    }, [type, data]);
+}
+
+/**
+ * サーバの turn を変えて、届くまで待つ (TODO-051)。
+ *
+ * - 0 / 1: turn が 2 以上なら opening (winner を指定)。
+ *   0 と 1 の間は end_turn
+ * - 2: turn が 2 以上なら opening (winner: -1)
+ * - -1: moves が空で score が 1 の move (得点が 1 増える)
+ *
+ * 0 / 1 / -1 から 2 へは戻せない (opening は turn が 2 以上のときしか
+ * 受け付けない)。そのときは例外にする。
+ *
+ * @param {import('playwright').Page} page
+ * @param {number} turn
+ */
+export async function set_turn(page, turn) {
+    const cur = await page.evaluate(() => board.gameinfo.turn);
+    if (cur === turn) {
+        return;
+    }
+    if (turn === -1) {
+        await send_msg(page, 'move', {
+            player: 0, moves: [], dice: [0, 0, 0, 0], score: 1,
+        });
+    } else if (cur >= 2) {
+        await send_msg(page, 'opening', { winner: turn >= 2 ? -1 : turn });
+    } else if ((cur === 0 || cur === 1) && turn === 1 - cur) {
+        await send_msg(page, 'end_turn', { player: cur });
+    } else {
+        throw new Error(`set_turn: ${cur} -> ${turn} はできない`);
+    }
+    await wait_for(
+        () => page.evaluate(() => board.gameinfo.turn),
+        t => t === turn, { msg: `set_turn(${turn})` });
+}

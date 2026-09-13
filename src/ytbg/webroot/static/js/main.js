@@ -1,5 +1,6 @@
 import { log } from "./log.js";
-import { emit_msg, ws_connect } from "./ws.js";
+import { ws_connect } from "./ws.js";
+import { history_op, set_playername } from "./actions.js";
 import { get_sound_query } from "./settings.js";
 import { set_global_sound_switch } from "./sound.js";
 import { build_dom, wait_images } from "./dom.js";
@@ -32,7 +33,7 @@ const menu_emit = (type, data={}, confirm_msg=undefined) => {
     if ( confirm_msg !== undefined && ! confirm(confirm_msg) ) {
         return;
     }
-    emit_msg(type, data, false);
+    history_op(type, data);
 };
 
 /**
@@ -42,15 +43,14 @@ const emit_playername = (player) => {
     const el = document.getElementById(`p${player}name-input`);
     const name = el.value;
 
-    const player_name = board.player_name[player];
-    const cur_name = player_name.get();
+    const cur_name = board.player_name[player].get();
 
     log(`emit_playername2>player=${player},`
                 + `cur_name=${cur_name},`
                 + `name=${name}`
                 + ")");
-    
-    player_name.emit(name, true);
+
+    set_playername(board, player, name);
 
     el.style.zIndex = -2;
 };
