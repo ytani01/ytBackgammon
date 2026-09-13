@@ -27,19 +27,30 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 - [ ] 名前付きの 8 つの操作（`roll` / `opening` / `move` / `end_turn` / `double` / `take` / `cancel_double` / `resign`）のハンドラと dataclass を足す
 - [ ] type ごとの「`data` の型・ハンドラ・履歴に積むか」を `server.py` の 1 つの表にまとめ、`DATA_TYPES` と `NO_HISTORY_TYPES` を消す
-- [ ] `turn` が -1 になったら、共通の後処理で両方のクロックを止める
-- [ ] `set_clock_limit` / `set_clock_switch` を受けたら、両方のクロックを止める
+- [ ] `turn` が -1 に変わったら（処理の前は -1 でなかったときだけ）、共通の後処理で両方のクロックを止める
+- [ ] `set_clock_switch` を受けたら、両方のクロックを止める（`set_clock_limit` は `Clock.reset()` で既に止めている）
 - [ ] `tests/` にテストを足す（わざと壊して落ちることも確かめる）
+- [ ] `CLAUDE.md` の「状態と通信」のうち、登録表と履歴に積む type の説明を直す
 
 設計は `docs/design.md` の「メッセージ」。
 
 - **古い type はまだ消さない。** 履歴に積むかどうかも、古い type では
   今までどおりメッセージの `history` を見る。**今のクライアントのまま
   `tests/browser/` が通る**こと
+- `resign` の `data` は `{player, score}` にする。`{player}` で送っている
+  Python のテスト（`test_on_json.py` / `test_message.py`）も直す
 - 止めるときは `Clock.stop()` を 2 回呼ぶ。**`Clock.stop_all()` は
   経過分を残り時間に反映しない**ので使わない
 - クロックを止める側は、`double` と `take` では `player`、`cancel_double`
-  では `1 - player`（今の `change_turn()` の呼び方と同じ）
+  では `1 - player`。**`take` は今のコードと違う。** 今の
+  `Cube.accept_double()` は `1 - turn` のクロックを止めるので、
+  リダブルされたあとのテイクでは、受ける側ではなく掛けた側を止めている。
+  設計のほう（受ける側を止める）に合わせる
+- `turn` を -1 のまま保つ操作では止めない。勝負がついたあとでも、
+  クロックを押せば再開できるようにするため
+- `opening` で決まったダイスの並びは `[勝者の目, 0, 0, 敗者の目]`。
+  今は `[後から振った側の目, 0, 0, 先に振った側の目]` なので、
+  先手が後から振った側でないときは左右が入れ替わる。設計に合わせてよいと決めた
 
 ---
 
@@ -55,8 +66,9 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `Board.set_turn()` と `apply()` から送信をなくし、`emit` / `predict` 引数を消す。`winner_is()` が `resign` を書き換えないようにする
 - [ ] `move` の予測に使ったダイス（11〜16）を書き込み、`apply()` のあとの `disable()` をやめる
 - [ ] `apply()` の演出を新しい type の `last_op` から出す
-- [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理と、`Clock.stop_all()` を消す
+- [ ] サーバから使わなくなった type（`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo`）と、`history` を見る処理（`parse()` が `history` を必須にしているところも）と、`Clock.stop_all()` を消す
 - [ ] `tests/`・`tests/browser/` を新しい type に合わせる
+- [ ] `CLAUDE.md` の「状態と通信」を、`actions.js` からの送信と `history` の無いメッセージに合わせて直す
 
 設計は `docs/design.md` の「メッセージ」と「クライアント」の
 「送信は `actions.js` にまとめる」「表示の更新は何も送らない」「先行実行」。
@@ -65,6 +77,10 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - `clicks.test.mjs` は送られた `type` / `data` を見ているので、期待値を
   書き直す。**書き直したテストが、壊したときに落ちることを確かめる**
 - 手元の 4 つのボードの `.jsonl` は形を変えないので、そのまま読めること
+- ヒットの音は、`move` の `moves` にバー（26 以上）へ動かすものがあるかで
+  決める。今の「動かす前の位置が 26 未満」を写すと、先行実行した画面では
+  サーバの返事が届く時点で駒がもうバーにあるので、ヒットの音が鳴らない
+  （コードを読む限り、今もその画面では put の音になる。実測はしていない）
 
 ---
 
@@ -77,6 +93,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `Board.turn` / `resign`、`Cube.value` / `accepted` / `player`、`PlayerScore.score`、`Dice.value`、`RollButton.dice_active` を消し、`board.gameinfo` を読む
 - [ ] `gameinfo` がまだ届いていないときは、何も操作できないものとして扱う
 - [ ] `tests/browser/` の、消した属性を直接触っているテストを直す
+- [ ] `CLAUDE.md` の、消した属性を書いているところを直す
 
 設計は `docs/design.md` の「判定は `gameinfo` だけを読む」。
 **TODO-051 のあとに行う。**
@@ -111,6 +128,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `build_dom()` が作った要素を返し、`main.js` から `Board` へ渡す
 - [ ] `BgBase` が id ではなく要素を受け取るようにする
 - [ ] チェッカーがプレーヤーと通し番号を数値で持ち、`parseInt(ch.id.slice(1))` と `Board.search_checker()` をなくす
+- [ ] `CLAUDE.md` の `dom.js` と `ui/` の説明を直す
 
 設計は `docs/design.md` の「部品には要素を渡す」。
 
@@ -131,14 +149,16 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 - [ ] `add_history()` の `gameinfo=None` と `History.add()` の `None` 分岐を消し、`History._cur_sn` をローカル変数にする
 - [ ] `load_data()` が件数の組ではなく、読めたかどうかを返す
 - [ ] `backward_hist()` / `forward_hist()` の docstring を `n <= 0` に揃える
+- [ ] `docs/Developer.md` を今の構成に合わせて直す
+- [ ] `docs/design.md` を `archives/docs/design-3.md` へ移し、`CLAUDE.md` に現行仕様ではないことを書く
 
 設計は `docs/design.md` の「サーバの細かい修正」。
 
 - `tests/conftest.py` と `tests/browser/helper.mjs` の保存先の差し替えが
   効き続けること（利用者の `~/ytbg-*` を読み書きしない）
 - **最後に行う**（`server.py` を TODO-050 と取り合う）
-- 全部終わったら `docs/Developer.md` と `CLAUDE.md` の「状態と通信」を直し、
-  `docs/design.md` の扱いを決める
+- `CLAUDE.md` は各項目で直す（途中のセッションが古い説明を読まないように）。
+  ここで直すのは、この項目で変えたところだけ
 
 ---
 
