@@ -117,7 +117,7 @@ export class Dice extends BgImage {
             this.disable();
         }
 
-        this.el.children[0].src = this.get_filename(val % 10);
+        this.image_el.src = this.get_filename(val % 10);
 
         if ( roll_flag ) {
             this.deg = Math.floor(Math.random() * 720 - 360);
@@ -399,8 +399,6 @@ export class RollButton extends BannerButton {
         const value1 = Math.floor(Math.random() * 6) + 1;
         const value2 = Math.floor(Math.random() * 6) + 1;
 
-        let dice = [0, 0, 0, 0];
-
         if ( this.board.turn >= 2 ) {
             this.dice[d1].set(value1);
         } else if ( value1 != value2 ) {
@@ -412,7 +410,7 @@ export class RollButton extends BannerButton {
             }
         }
         
-        const modified = this.check_disable();
+        this.check_disable();
         const dice_values = this.get();
         this.clear();
         this.emit_dice(dice_values, true, true);

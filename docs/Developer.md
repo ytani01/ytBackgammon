@@ -93,7 +93,10 @@ graph TD
 `cube` / `dice` / `checker`）。**履歴に積まれるのもこれ。**
 
 - チェッカーは `checker[player][i] = [point, idx]` の配列で、**ID は
-  `player * 100 + i`**
+  `player * 100 + i`**。`idx` はそのポイントでの積み順
+- **クライアントも、盤面の状態はこの `checker` しか持たない。**
+  ポイントの部品（`BoardPoint`）は座標の計算だけで、「そのポイントに
+  どの駒があるか」は毎回 `gameinfo` から引く（`Board.checkers_at()`）
 - ポイント番号は 0〜25 が盤上（0 と 25 がゴール）、**26 と 27 がバー**。
   プレーヤー 0 は番号が減る方向、1 は増える方向へ進む
 
@@ -170,6 +173,18 @@ sequenceDiagram
 - **予測が外れても、サーバから届く `gameinfo` で表示は戻る**
 - free move のときは予測しない（ルール判定を通らないので行き先を確かめられない）
 
+離したときの処理（`Checker.on_mouse_up_xy()`）は 3 段に分かれている。
+
+| メソッド | すること |
+|----------|----------|
+| `decide_dst()` | 行き先の決定とヒットの判定。行けなければ元に戻して終わる |
+| `apply_move()` | 予測・サーバへの送信・使ったダイスを使用済みにする |
+| `after_move()` | 勝敗と得点 |
+
+`apply_move()` の中の順番には縛りがある。使ったダイスの組み合わせは
+`apply()` より前に求め（`apply()` が駒の位置を変える）、使用済みにするのは
+`apply()` のあと（`apply()` がダイスを `gameinfo` の値へ戻す）。
+
 ## 履歴
 
 戻す側（`_history`）と進む側（`_fwd_hist`）の 2 つのスタック。
@@ -202,7 +217,7 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 | `ws.js` | 接続・再接続・送信 |
 | `layout.js` | 盤面の座標 |
 | `settings.js` | Cookie、クエリ文字列、`<body>` の `data-*` |
-| `sound.js`, `log.js` | 音、ログ |
+| `sound.js`, `log.js` | 音、ログ（`?debug` を付けて開いたときだけ出す） |
 | `rules/` | ルール層（純粋関数） |
 | `ui/` | 表示部品 |
 
@@ -249,6 +264,10 @@ graph TD
 ```
 
 `board` と `player` は中間クラスを作らず、コンストラクタの options で渡す。
+
+部品の座標は `layout.js` が計算して返し（`point_geometry()` /
+`score_geometry()` / `label_geometry()`）、部品を作るのは `Board` の
+コンストラクタ。`layout.js` は何も import しない。
 
 **表示を変えるのは `Board.apply()` だけ。** サーバから届いた `gameinfo` も、
 先行実行の予測も、同じ入口を通る。

@@ -15,6 +15,17 @@ export function get_sound_query() {
 } // get_sound_query()
 
 /**
+ * クエリ文字列に `debug` があるか (TODO-048)
+ *
+ * `?debug` / `?debug=1` / `?debug=` のどれでも true。値は見ない。
+ *
+ * @return {boolean}
+ */
+export function get_debug_query() {
+    return new URLSearchParams(window.location.search).has("debug");
+} // get_debug_query()
+
+/**
  *
  */
 export class CookieBase {

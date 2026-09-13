@@ -141,7 +141,7 @@ export class Board extends BgImage {
         // Score buttons
         const score_btn = (id, p, key, offset) => {
             const g = score_geo[p][key];
-            return new ScoreButton(id, this, 0, g.x, g.y, g.w, g.h,
+            return new ScoreButton(id, this, g.x, g.y, g.w, g.h,
                                    this.score[p], offset);
         };
         this.score_btn = [{}, {}];

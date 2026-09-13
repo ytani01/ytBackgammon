@@ -99,6 +99,10 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   **`?sound=`（`=` はあるが値が空）は「値が無い」扱い**で、鳴る側になる
   （`URLSearchParams` が `?sound` と区別できないため。手書きの
   パーサだった頃は鳴らない側だった）
+- `debug.test.mjs` — `?debug` のクエリで `log()` の出力が切り替わるか
+  （TODO-048）。**既定では `console.log` を 1 件も出さない。**
+  `open_board()` が貯めるのは console の `error` だけなので、
+  このファイルは `log` を数える形で自分でページを開く
 
 注意する点:
 
@@ -261,9 +265,11 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     **どちらもテストでは守られない。** `wait_images()` を外しても
     `tests/browser/` は全件通る（no-op なので当然）。
     この順序を変えるときは、画像の応答を遅らせて配置を実測すること
-  - `ws.js`（接続・再接続・送信）、`log.js`、`layout.js`（盤面の座標）、
+  - `ws.js`（接続・再接続・送信）、`log.js`（**`?debug` を付けて開いたとき
+    だけ `console.log` へ出す**。TODO-048）、`layout.js`（盤面の座標）、
     `settings.js`（`CookieBase`、クエリ文字列から `sound` を読む
-    `get_sound_query()`、`<body>` の `data-*` から読む
+    `get_sound_query()` と `debug` の有無を見る `get_debug_query()`、
+    `<body>` の `data-*` から読む
     `get_image_dir()` / `get_server_id()`）、`sound.js`
   - `board.js` — `Board`
   - `rules/` — ルール層（TODO-027）。`position.js` に `Position` と

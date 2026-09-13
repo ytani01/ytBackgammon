@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-048。** これまでに 47 件を決着させた。
+**残っている項目: 無し。** これまでに 48 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-049` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、これで全部終わった。**
@@ -11,28 +11,8 @@
 TODO-037（削除）・038（集約）・039（標準機能への置き換え）として
 すべて片付いた。
 
----
-
-## TODO-048. 小さいものをまとめて直す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Sonnet 5 / effort medium | verifier + reviewer |
-
-- [ ] 下の 6 つを直す
-
-| 直すもの | 場所 |
-|----------|------|
-| `?debug` のときだけ `log()` を出す（既定では出さない） | `log.js`、`settings.js` に `get_debug_query()` を足す |
-| `ScoreButton` の `player` 引数が呼び出し 4 か所とも 0 で、使っていない | `ui/button.js`、`board.js` |
-| `PlayerScore.on_mouse_down_xy()` と `ScoreButton.on_mouse_down_xy()` が同じことをしている | `ui/label.js` 側を消す |
-| `Dice.set()` が `this.image_el` を持っているのに `this.el.children[0]` を触っている | `ui/dice.js` |
-| `RollButton.roll()` の `let dice = [0,0,0,0]` と `const modified = ...` が未使用 | `ui/dice.js` |
-| `Checker.is_inner()` が未使用（TODO-043 で `Board.all_inner()` がルール層へ移り、唯一の呼び出し元が消えた） | `ui/checker.js` |
-| `<html lang="jp">` | `index.html`（`ja` が正しい） |
-
-**最後にやる。** 触るファイルが他の項目と重なるので、差分に無関係な修正が
-混ざらないようにする。
+**TODO-042 で決めた構成の見直し（第 2 弾）の実装（TODO-043〜048）も、
+2026-09-13 に全部終わった。**
 
 ---
 
@@ -41,6 +21,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-048.** 小さいものをまとめて直す](archives/todo/TODO-048.%20小さいものをまとめて直す.md)
 - [**TODO-047.** `message.py` の `from_dict` をまとめる](archives/todo/TODO-047.%20message.py%20の%20from_dict%20をまとめる.md)
 - [**TODO-046.** `Board` のコンストラクタから配置を切り出す](archives/todo/TODO-046.%20Board%20のコンストラクタから配置を切り出す.md)
 - [**TODO-045.** `Checker.on_mouse_up_xy()` を分ける](archives/todo/TODO-045.%20Checker.on_mouse_up_xy()%20を分ける.md)

@@ -76,8 +76,8 @@ export class EmitButton extends BgImage {
  *
  */
 export class ScoreButton extends BgImage {
-    constructor(id, board, player, x, y, w, h, score_obj, offset) {
-        super(id, x, y, 0, {board: board, player: player});
+    constructor(id, board, x, y, w, h, score_obj, offset) {
+        super(id, x, y, 0, {board: board});
         this.set_wh(w, h);
         this.score_obj = score_obj;
         this.offset = offset;

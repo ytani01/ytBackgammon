@@ -428,6 +428,45 @@ describe('クリックでの操作', () => {
                           true);
     });
 
+    it('スコアの ▼ → set_score {player: 0, score: 0} を送る', async () => {
+        await take_sent(page);
+        await page.locator('#score_down0').click({ force: true });
+        await assert_sent(page, 'set_score', { player: 0, score: 0 }, true);
+    });
+
+    it('スコアの ▲ / ▼ の上に、押せなくする要素が重なっていない', async () => {
+        // 数字の要素 (p0score / p1score) は ▲ の 7 割、▼ の 4 割を
+        // 覆っている。pointer-events: none でクリックを下のボタンへ
+        // 通している (TODO-048)。付け忘れると、覆われた部分を押しても
+        // 何も起きない (クリックを受ける数字の側に振り分けが無いため)。
+        // 上の 2 件はボタンの中心を押すだけなので、中心が覆われて
+        // いなければ気づけない。ボタンの範囲を 2px 刻みで全部見る
+        const covered = await page.evaluate(() => {
+            let bad = {};
+            for (const id of ['score_up0', 'score_down0',
+                              'score_up1', 'score_down1']) {
+                const el = document.getElementById(id);
+                const r = el.getBoundingClientRect();
+                let n = 0;
+                for (let dx = 1; dx < r.width; dx += 2) {
+                    for (let dy = 1; dy < r.height; dy += 2) {
+                        const hit = document.elementFromPoint(
+                            r.left + dx, r.top + dy);
+                        if ( ! el.contains(hit) ) {
+                            n += 1;
+                        }
+                    }
+                }
+                if ( n > 0 ) {
+                    bad[id] = n;
+                }
+            }
+            return bad;
+        });
+        assert.deepEqual(covered, {},
+                         `ボタンが覆われている: ${JSON.stringify(covered)}`);
+    });
+
     // --- バナー (押したときの動作は on_click で渡している) ---
 
     it('パスのバナー → その場で消えて change_turn() を呼び、'

@@ -169,6 +169,9 @@ export class PlayerScore extends BgText {
         this.el.style.fontSize = "30px";
         this.el.style.transform = "rotate(-90deg)";
         this.el.style.transformOrigin = "left top";
+        // ▲ / ▼ のボタン (ScoreButton) に重なっているので、クリックは
+        // 下へ通す。スコアを操作するのは ScoreButton だけ (TODO-048)
+        this.el.style.pointerEvents = "none";
 
         this.set("");
     } // Score.constructor()
@@ -215,13 +218,4 @@ export class PlayerScore extends BgText {
         emit_msg("set_score", { player: parseInt(this.player),
                                 score: parseInt(score) }, add_hist);
     } // PlayerScore.emit()
-
-    on_mouse_down_xy(x, y) {
-        log(`PlayerScore[${this.player}].on_mouse_down_xy()`);
-        if ( this.board.score_btn[this.player].up.in_this(x, y) ) {
-            this.up(1);
-        } else if ( this.board.score_btn[this.player].down.in_this(x, y) ) {
-            this.clear();
-        }
-    }
 } // class PlayerScore

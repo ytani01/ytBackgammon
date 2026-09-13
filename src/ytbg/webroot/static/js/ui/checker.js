@@ -33,17 +33,6 @@ export class Checker extends BgImage {
     } // Checker.get_pip()
 
     /**
-     * @return {boolean}
-     */
-    is_inner() {
-        if ( this.player == 0 ) {
-            return (this.cur_point <= 6);
-        } else {
-            return (this.cur_point >= 19 && this.cur_point <= 25);
-        }
-    } // Checker.is_inner()
-
-    /**
      * 移動に使用するダイスの目の組み合わせを取得する
      *
      * 判定は rules/move.js (TODO-043)
