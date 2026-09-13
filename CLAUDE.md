@@ -225,7 +225,7 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   戻していたのをやめた）。そのため `gameinfo.py` は `message.py` に
   依存する（`message.py` の側は何も import しないので循環しない）。
   `to_dict()` は
-  `dataclasses.asdict()`、`from_dict()` は自前。**ファイルから読むときだけは
+  `dataclasses.asdict()`、`from_dict()` は手で書いている。**ファイルから読むときだけは
   必須キーの欠落を例外にする**（黙って初期配置になると、壊れたファイルが
   「初期配置の N 手」として読まれてしまう）
 - `src/ytbg/clock.py` — `Clock`（TODO-024）。クロックは `gameinfo` の外に置く
@@ -233,7 +233,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   進む側（`_fwd_hist`）の 2 つのスタックと通し番号。**保存は持たない**
   （保存には `Storage` とクロックが要るので `BackgammonServer` の担当）
 - `src/ytbg/hub.py` — `ClientHub`（TODO-025）。接続中の WebSocket と、
-  全員への送信（`broadcast()`）。**`BackgammonServer` に素通しは無い**
+  全員への送信（`broadcast()`）。**`BackgammonServer` に `broadcast()` を
+  呼ぶだけのメソッドは無く**、`self._hub.broadcast()` を直接呼ぶ
 - `src/ytbg/replay.py` — `Replayer`（TODO-025）。連続再生の Task を
   1 本だけ持つ。`start()` は Task にして投げ、`run()` はロックを
   握ったまま走り切る
@@ -312,8 +313,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **クロックはここに入っていない**（TODO-024。下の「クロック」を見ること）。
 
 チェッカーは `checker[player][i] = [point, idx]` の配列で、**ID は
-`player * 100 + i`**（例: 012, 101）。**盤面の状態はこれだけ**で、
-表示側は持たない（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
+`player * 100 + i`**（例: 012, 101）。**チェッカーの位置はこれでしか
+持たず**、表示の部品は持たない（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
 積み順を決めているのは `Board.checker_order()` だけで、`apply()` の
 配り直しと `Board.checkers_at()` / `top_checker()` がそれを使う。
 
@@ -339,7 +340,7 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **音と dice の回転だけを `last_op` から出す**（`Board.apply()`）。
 
 **表示を変えるのは `Board.apply(gameinfo, {sec, history_flag, clock_state,
-last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
+last_op, predict})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
 `load_gameinfo()` が名前付きの引数に直して渡すだけで、中身は持たない。
 
 ドラッグを離した瞬間の反応（**先行実行**）も同じ経路を通る。
@@ -349,7 +350,7 @@ last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
 **動かしたあとの `gameinfo` を予測して作り**、`apply()` に渡す
 （共有ボードなので、サーバの応答を待つと操作感が悪い）。
 **`decide_dst()` がキャンセルしたときは `undefined` を返し、
-そこで何も送らずに終わる**（分けたことで、ここが唯一のつなぎになった）。
+そこで何も送らずに終わる**（3 つに分けたので、途中で止まるのはここだけになった）。
 
 - 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]`
   だけを書き換える。**`sn` は進めない。** 動かせるかは
@@ -409,10 +410,9 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 ### クロック
 
 **表示を進めるのはクライアント側だけ**だが、残り時間の基準はサーバも持つ
-（TODO-016）。`on_json()` には `set_clock_limit` / `set_player_clock` に加えて
-`set_clock_switch` / `start_clock` / `stop_clock` / `resume_clock` の
-分岐があり、いずれも return せず、末尾の `add_history` と
-`emit_gameinfo()` へ落ちる。
+（TODO-016）。`set_clock_limit` / `set_player_clock` / `set_clock_switch` /
+`start_clock` / `stop_clock` / `resume_clock` のハンドラは、いずれも `0` を返し、
+`on_json()` の末尾で履歴の判定と `emit_gameinfo()` を通る。
 
 **クロックは `Clock`（`clock.py`）が持ち、`gameinfo` には入れない**
 （TODO-024）。入れると履歴に載り、`back` / `fwd` でクロックの発着まで
@@ -436,9 +436,9 @@ msg そのもの。**`data` と `history` は全ての `type` で必須**にな�
 クロックの状態はファイルの 1 行目に書かれる（下の「履歴」）。保存するのは
 `limit` / `sw` / 残り時間で、**`active` は保存しない**。サーバが落ちている
 間の時間は数えられないので、読み込んだときは必ず止まった状態で始める。
-`set_clock_switch` だけは、`history: false` で届いても保存する
-（`board.js` の `Board.apply_clock_sw()` がそう送るので、そこで保存しないと
-切ったまま再起動しても `sw` が戻ってしまう）。
+`set_clock_limit` と `set_clock_switch` は、`history: false` で届いても保存する
+（クライアントがそう送るので、そこで保存しないと、変えたまま再起動しても
+`limit` や `sw` が戻ってしまう）。
 
 ### 履歴（戻す・進める）
 
