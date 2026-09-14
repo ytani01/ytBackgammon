@@ -369,7 +369,10 @@ NAMED = {
 
 
 def test_table_history_values():
-    """表の history は docs/design.md の「履歴に積むかどうか」の値"""
+    """
+    表の history は archives/docs/design-3.md の
+    「履歴に積むかどうか」の値
+    """
     stacked = {t for t, e in MESSAGE_TYPES.items() if e.history}
 
     assert stacked == set(NAMED) | {

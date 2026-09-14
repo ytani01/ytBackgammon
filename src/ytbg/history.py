@@ -6,8 +6,8 @@ history.py
 
 履歴のスタック (TODO-025)。
 
-戻す側 (_history) と進む側 (_fwd_hist) の 2 つのスタックと、
-通し番号 (_cur_sn) を持つ。
+戻す側 (_history) と進む側 (_fwd_hist) の 2 つのスタックを持つ。
+通し番号は、戻す側の末尾の sn から求める。
 
 **保存は持たない。** 保存には Storage とクロックが要るので、
 保存するのは BackgammonServer。1 手ごとに全員へ送る backward_hist() /
@@ -26,7 +26,6 @@ class History:
     def __init__(self):
         self._history: list[GameInfo] = []
         self._fwd_hist: list[GameInfo] = []
-        self._cur_sn = 0
 
     @property
     def entries(self) -> list[GameInfo]:
@@ -45,7 +44,7 @@ class History:
         """戻す側と進む側を合わせた手数"""
         return len(self._history) + len(self._fwd_hist)
 
-    def add(self, gameinfo) -> bool:
+    def add(self, gameinfo: GameInfo) -> bool:
         """
         gameinfo を履歴に積む。
 
@@ -62,14 +61,11 @@ class History:
         Returns
         -------
         bool
-            履歴が変わったかどうか (保存が要るかどうか)。gameinfo が
-            None なら False。積んだとき、または積まなくても
-            _fwd_hist を捨てた (空でなかった) ときは True
+            履歴が変わったかどうか (保存が要るかどうか)。積んだとき、
+            または積まなくても _fwd_hist を捨てた (空でなかった)
+            ときは True
         """
         self.__log.debug('gameinfo={}', gameinfo)
-
-        if gameinfo is None:
-            return False
 
         fwd_hist_had_entries = len(self._fwd_hist) > 0
         self._fwd_hist = []
@@ -83,12 +79,7 @@ class History:
                 self.__log.debug('same as previous entry: not added')
                 return fwd_hist_had_entries
 
-        if len(self._history) == 0:
-            self._cur_sn = 1
-        else:
-            self._cur_sn = self._history[-1].sn + 1
-
-        gameinfo.sn = self._cur_sn
+        gameinfo.sn = self._history[-1].sn + 1 if self._history else 1
         self._history.append(gameinfo.copy())
         self.__log.debug('history=({})', len(self._history))
         return True
@@ -102,8 +93,7 @@ class History:
         self.__log.debug('')
 
         self._fwd_hist = []
-        self._cur_sn = 1
-        gameinfo.sn = self._cur_sn
+        gameinfo.sn = 1
         self._history = [gameinfo.copy()]
 
         self.__log.debug('_history=({}), _fwd_hist=({})',

@@ -143,7 +143,7 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   リビジョンが playwright 1.63.0 の要求と合わないため。
   `npx playwright install` で落とし直さない
 - 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
-  `BackgammonServer.DATAFILE_DIR` が見ており、無ければ `$HOME`。
+  `BackgammonServer` を作るときに読み（TODO-055）、無ければ `$HOME`。
   利用者の `~/ytbg-*` は読み書きされない
 - ポートは固定せず、空いているものを OS に選ばせる。サーバは
   `detached` で起動してプロセスグループごと kill する（`uv run` の下に
@@ -167,8 +167,9 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `on_json()` は待たずに返る。**完了を待つテストは
   `await bg_server._replayer._task`**（TODO-009、TODO-025）
 - `BackgammonServer` はコンストラクタの中で `load_data()` を呼び、
-  保存先を `DATAFILE_DIR`（`$HOME`）から組み立てる。`conftest.py` の
-  `bg_server` フィクスチャが `DATAFILE_DIR` を `tmp_path` に差し替えている
+  保存先を環境変数 `YTBG_DATA_DIR`（無ければ `$HOME`）から組み立てる。
+  `conftest.py` の `bg_server` フィクスチャが `YTBG_DATA_DIR` を `tmp_path` に
+  差し替えている
   ので、利用者の `~/ytbg-*` は読み書きされない。**このとき履歴が
   1 件積まれる**ので、件数を数えるテストはそれを前提に書く
 - 同じフィクスチャが `ClientHub.broadcast()` を丸ごと差し替え、送られた
@@ -215,7 +216,9 @@ basedpyright は落ちる**（mypy には int の引数へ float を渡せる特
 
 **TODO-020 で決めた構成は、TODO-023〜030 ですべて実装した。**
 当時の設計そのものは `archives/docs/design.md` に移してある（TODO-033）。
-**現行仕様ではないので、実装の根拠として引かないこと。**
+TODO-049 で決めた構成の見直し（第 3 弾）の設計は `archives/docs/design-3.md` にあり、
+TODO-050〜055 で実装した（TODO-055 で移した）。
+**どちらも現行仕様ではないので、実装の根拠として引かないこと。**
 
 人が読む説明は [`docs/Developer.md`](docs/Developer.md)（TODO-033）。
 以下はいまの実装で、Claude 向けの細かい注意も含む。

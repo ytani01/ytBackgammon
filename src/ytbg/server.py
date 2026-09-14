@@ -45,9 +45,6 @@ from .storage import Storage
 
 
 class BackgammonServer:
-    # 保存先。ブラウザでの動作確認は実プロセスを起動するので、
-    # 環境変数で一時ディレクトリへ逃がせるようにしてある (TODO-021)
-    DATAFILE_DIR = os.getenv('YTBG_DATA_DIR') or os.getenv('HOME')
     DATAFILE_NAME = 'ytbg'
     SEC_CHECKER_MOVE = 0.2
 
@@ -61,8 +58,12 @@ class BackgammonServer:
 
         # 保存は JSON Lines (TODO-024)。旧形式 (.json) は
         # もう読まない (TODO-031)
+        # 保存先。ブラウザでの動作確認は実プロセスを起動するので、
+        # 環境変数で一時ディレクトリへ逃がせるようにしてある (TODO-021)。
+        # import のときではなく作るときに読む (TODO-055)
+        datafile_dir = os.getenv('YTBG_DATA_DIR') or os.getenv('HOME')
         self._datafile_path = (
-            f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
+            f'{datafile_dir}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
         self.__log.debug('_datafile_path={}', self._datafile_path)
         self._storage = Storage(self._datafile_path)
 
@@ -81,8 +82,7 @@ class BackgammonServer:
         # 保存したものがあれば load_data() が差し替える
         self._clock = Clock()
 
-        [hist_len, _fwd_hist_len] = self.load_data()
-        if hist_len < 1:
+        if not self.load_data():
             self.__log.warning('load_data({}): error', self._datafile_path)
             self.add_history(self._gameinfo)
 
@@ -107,7 +107,7 @@ class BackgammonServer:
         # add_history() と二重になっても必ず保存する (TODO-032)
         self.save_data()
 
-    def add_history(self, gameinfo=None):
+    def add_history(self, gameinfo: GameInfo):
         # gameinfo のログは History.add() 側で出す (TODO-025)
         if self._hist.add(gameinfo):
             self.save_data()
@@ -217,7 +217,7 @@ class BackgammonServer:
         Parameters
         ----------
         n : int
-            < 0: all
+            <= 0: 最後まで
         sleep_sec : float
             sleep seconds
         """
@@ -231,7 +231,7 @@ class BackgammonServer:
         Parameters
         ----------
         n : int
-            < 0: all
+            <= 0: 最後まで
         sleep_sec : float
             sleep seconds
         """
@@ -253,29 +253,29 @@ class BackgammonServer:
         """
         保存したものを読む (TODO-024)。
 
-        読めなければ何も書き換えずに (0, 0) を返す。初回起動も
-        そこを通る。
+        読めないか、履歴が 1 件も無ければ False を返す。初回起動も
+        そこを通る。読めて履歴が 0 件のときは、クロックだけは読んだ
+        ものに差し替わる。
 
         Returns
         -------
-        history_length: int
-            履歴の件数
-        fwd_hist_length: int
-            進む側の履歴の件数
+        bool
+            読めて、履歴が 1 件以上あったか (TODO-055)。False なら
+            呼ぶ側が今の盤面を 1 件目として積む
         """
         self.__log.debug('path={}', self._datafile_path)
 
         history, fwd_hist, clock = self._storage.load()
         if clock is None:
             # 読めない・壊れている・ファイルが無い。空の履歴として始める
-            return 0, 0
+            return False
 
         self._hist.load(history, fwd_hist)
         # 保存に active は入れていないので、読み込んだ直後は止まっている
         self._clock = clock
         if len(self._hist) > 0:
             self._gameinfo = self._hist.entries[-1].copy()
-        return len(self._hist), len(self._hist.fwd_entries)
+        return len(self._hist) > 0
 
     async def on_connect(self, ws):
         name = self._hub.add(ws)

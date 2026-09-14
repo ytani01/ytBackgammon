@@ -4,76 +4,63 @@
 """
 test_datafile_dir.py
 
-保存先 (BackgammonServer.DATAFILE_DIR) の決まり方 (TODO-021)。
+保存先の決まり方 (TODO-021、TODO-055)。
 
 ブラウザでの動作確認 (tests/browser/) はサーバを実プロセスとして
-起動するので、conftest.py のように DATAFILE_DIR を monkeypatch では
-差し替えられない。環境変数 YTBG_DATA_DIR で逃がしているので、
-それが効くことをここで見る。
+起動するので、環境変数 YTBG_DATA_DIR で保存先を逃がしている。
+それが効くことをここで見る。保存先は BackgammonServer を作るときに
+読むので、環境変数を差し替えてから作ればよい。
 """
-import importlib
-
 import pytest
 
-import ytbg.server as server_module
+from ytbg.server import BackgammonServer
 
 
 @pytest.fixture
-def datafile_dir(monkeypatch):
-    """
-    環境変数を差し替えて server モジュールを読み直し、
-    そのときの DATAFILE_DIR を返す。
-
-    DATAFILE_DIR はクラス変数なので、import のときに 1 度だけ決まる。
-    値を見るには読み直すしかない。
-
-    読み直すと BackgammonServer クラスは別のオブジェクトになるが、
-    conftest.py の bg_server / bg_server_raw は import した時点の
-    クラスを掴んでいるので、そちらの monkeypatch とは食い違わない。
-    それでも後始末で環境変数を戻して読み直し、モジュールを元の状態に
-    しておく。
-    """
-    def reload_with(**env):
+def datafile_path(monkeypatch):
+    """環境変数を差し替えてサーバを作り、そのときの保存先を返す"""
+    def make(**env):
         for key, value in env.items():
             if value is None:
                 monkeypatch.delenv(key, raising=False)
             else:
                 monkeypatch.setenv(key, value)
-
-        module = importlib.reload(server_module)
-        return module.BackgammonServer.DATAFILE_DIR
-
-    yield reload_with
-
-    # 環境変数を戻してから読み直す (monkeypatch の後始末はこの後なので、
-    # ここで自分で戻す)
-    monkeypatch.undo()
-    importlib.reload(server_module)
+        return BackgammonServer(svr_ver='test', svr_id='test')._datafile_path
+    return make
 
 
-def test_ytbg_data_dir(datafile_dir, tmp_path):
-    """YTBG_DATA_DIR があれば、そちらを使う"""
-    assert datafile_dir(YTBG_DATA_DIR=str(tmp_path),
-                        HOME='/home/dummy') == str(tmp_path)
+def test_ytbg_data_dir(datafile_path, tmp_path):
+    """YTBG_DATA_DIR があれば、そちらを使う (JSON Lines)"""
+    assert datafile_path(YTBG_DATA_DIR=str(tmp_path), HOME='/home/dummy') \
+        == f'{tmp_path}/ytbg-test.jsonl'
 
 
-def test_no_ytbg_data_dir(datafile_dir):
+def test_no_ytbg_data_dir(datafile_path, tmp_path):
     """YTBG_DATA_DIR が無ければ HOME"""
-    assert datafile_dir(YTBG_DATA_DIR=None, HOME='/home/dummy') \
-        == '/home/dummy'
+    assert datafile_path(YTBG_DATA_DIR=None, HOME=str(tmp_path)) \
+        == f'{tmp_path}/ytbg-test.jsonl'
 
 
-def test_empty_ytbg_data_dir(datafile_dir):
+def test_empty_ytbg_data_dir(datafile_path, tmp_path):
     """YTBG_DATA_DIR が空文字なら HOME (or でつないでいるため)"""
-    assert datafile_dir(YTBG_DATA_DIR='', HOME='/home/dummy') \
-        == '/home/dummy'
+    assert datafile_path(YTBG_DATA_DIR='', HOME=str(tmp_path)) \
+        == f'{tmp_path}/ytbg-test.jsonl'
 
 
-def test_datafile_path(datafile_dir, tmp_path):
-    """保存先のパスが YTBG_DATA_DIR の下になる (JSON Lines)"""
-    datafile_dir(YTBG_DATA_DIR=str(tmp_path))
+def test_read_when_created(monkeypatch, tmp_path):
+    """
+    import したあとで環境変数を変えても効く (TODO-055)。
 
-    svr = server_module.BackgammonServer(
-        svr_ver='test', svr_id='test')
+    前はクラス変数で、import のときに 1 度だけ決まっていた。
+    """
+    first = tmp_path / 'first'
+    second = tmp_path / 'second'
+    first.mkdir()
+    second.mkdir()
 
-    assert svr._datafile_path == f'{tmp_path}/ytbg-test.jsonl'
+    monkeypatch.setenv('YTBG_DATA_DIR', str(first))
+    BackgammonServer(svr_ver='test', svr_id='test')
+    monkeypatch.setenv('YTBG_DATA_DIR', str(second))
+    svr = BackgammonServer(svr_ver='test', svr_id='test')
+
+    assert svr._datafile_path == f'{second}/ytbg-test.jsonl'

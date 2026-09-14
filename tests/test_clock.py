@@ -298,7 +298,7 @@ async def test_clock_types_skip_add_history_call(
     """
     called = []
 
-    def fake_add_history(gameinfo=None):
+    def fake_add_history(gameinfo):
         called.append(gameinfo)
 
     monkeypatch.setattr(bg_server, 'add_history', fake_add_history)

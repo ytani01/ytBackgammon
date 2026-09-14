@@ -20,7 +20,6 @@ import pytest
 from starlette.testclient import TestClient
 
 from ytbg.app import create_app
-from ytbg.server import BackgammonServer
 
 
 @pytest.fixture
@@ -28,12 +27,12 @@ def client(tmp_path, monkeypatch):
     """
     create_app() で作ったアプリの TestClient。
 
-    DATAFILE_DIR を tmp_path へ逃がすのは他のテストと同じ。
+    YTBG_DATA_DIR を tmp_path へ逃がすのは他のテストと同じ。
     BackgammonServer は create_app() の中で作られるので、差し替えは
     その前に済ませる。
     """
-    monkeypatch.setattr(
-        BackgammonServer, 'DATAFILE_DIR', str(tmp_path))
+    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('HOME', str(tmp_path))
 
     app = create_app('test', 'test', 'test', 'images1a')
     return TestClient(app)

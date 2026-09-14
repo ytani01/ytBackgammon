@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-055。** これまでに 54 件を決着させた。
+**残っている項目: なし。** これまでに 55 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-056` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -14,36 +14,8 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 **TODO-042 で決めた構成の見直し（第 2 弾）の実装（TODO-043〜048）も、
 2026-09-13 に全部終わった。**
 
-**TODO-049 で決めた構成の見直し（第 3 弾）は、TODO-050〜055 で実装する（TODO-050〜054 は済んだ）。**
-設計は `docs/design.md` にある。
-
----
-
-## TODO-055. サーバの細かい修正をまとめて行う
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | verifier + reviewer |
-
-- [ ] `DATAFILE_DIR` を、import したときではなく `BackgammonServer` を作るときに環境変数から読む
-- [ ] `add_history()` の `gameinfo=None` と `History.add()` の `None` 分岐を消し、`History._cur_sn` をローカル変数にする
-- [ ] `load_data()` が件数の組ではなく、読めたかどうかを返す
-- [ ] `backward_hist()` / `forward_hist()` の docstring を `n <= 0` に揃える
-- [ ] `docs/Developer.md` を今の構成に合わせて直す
-- [ ] `docs/design.md` を `archives/docs/design-3.md` へ移し、`CLAUDE.md` に現行仕様ではないことを書く
-
-設計は `docs/design.md` の「サーバの細かい修正」の節にある。
-
-- `tests/conftest.py` と `tests/browser/helper.mjs` の保存先の差し替えが
-  効き続けること（利用者の `~/ytbg-*` を読み書きしない）。
-  `conftest.py` と `test_ws.py` はクラス変数の `DATAFILE_DIR` を
-  monkeypatch しているので、環境変数 `YTBG_DATA_DIR` を差し替える形に直す。
-  `test_datafile_dir.py` がモジュールを読み直しているのも要らなくなる
-- `load_data()` の戻り値の組を見ているテスト（`test_history.py`、
-  `test_save_load.py`）も直す
-- **最後に行う**（TODO-050 と同じく `server.py` を変えるので、差分が混ざらないようにする）
-- `CLAUDE.md` は各項目で直す（途中のセッションが古い説明を読まないように）。
-  ここで直すのは、この項目で変えたところだけ
+**TODO-049 で決めた構成の見直し（第 3 弾）の実装（TODO-050〜055）も、
+2026-09-14 に全部終わった。** 設計は `archives/docs/design-3.md` に移した。
 
 ---
 
@@ -52,6 +24,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-055.** サーバの細かい修正をまとめて行う](archives/todo/TODO-055.%20サーバの細かい修正をまとめて行う.md)
 - [**TODO-054.** 表示部品（`ui/` のクラス）に id ではなく要素を渡す](archives/todo/TODO-054.%20表示部品（ui_%20のクラス）に%20id%20ではなく要素を渡す.md)
 - [**TODO-053.** `Board` からドラッグと設定を切り出す](archives/todo/TODO-053.%20Board%20からドラッグと設定を切り出す.md)
 - [**TODO-052.** 表示部品が持つ状態の写しをなくし、判定では `gameinfo` を読む](archives/todo/TODO-052.%20表示部品が持つ状態の写しをなくし、判定では%20gameinfo%20を読む.md)

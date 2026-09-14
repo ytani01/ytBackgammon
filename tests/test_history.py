@@ -91,10 +91,10 @@ async def test_clear_history_saves_data(bg_server, add_history):
     add_history(bg_server)
 
     await bg_server.clear_history()
-    [hist_len, fwd_len] = bg_server.load_data()
+    assert bg_server.load_data() is True
 
-    assert hist_len == 1
-    assert fwd_len == 0
+    assert len(bg_server._hist.entries) == 1
+    assert len(bg_server._hist.fwd_entries) == 0
 
 
 async def test_add_history_after_clear_restarts_sn(bg_server, add_history):

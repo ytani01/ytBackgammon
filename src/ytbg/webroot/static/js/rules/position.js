@@ -76,8 +76,8 @@ export const copy_gameinfo = (gameinfo) => JSON.parse(JSON.stringify(gameinfo));
  * pt[p] には、そのポイントに積まれたチェッカーの **プレーヤー番号を
  * 積んだ順に並べた配列**が入る (p = 0..27)。
  *
- * 設計 (docs/design.md) の下書きは `{player, n}` だったが、free move では
- * 1 つのポイントに両プレーヤーのチェッカーが乗る。`{player, n}` だと
+ * TODO-020 の設計 (archives/docs/design.md) の下書きは `{player, n}` だったが、
+ * free move では 1 つのポイントに両プレーヤーのチェッカーが乗る。`{player, n}` だと
  * その枚数を分けられず、PIP カウントがずれる。積んだ順の配列にすれば、
  * `checkers[0].player` を見ていた今までの判定 (`owner()`) も、
  * プレーヤーごとの枚数も、どちらも同じ答えになる (TODO-027)。

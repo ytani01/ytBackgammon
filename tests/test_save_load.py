@@ -332,12 +332,27 @@ async def test_jsonl_not_dict_is_broken_file(
     assert svr._gameinfo.score == [0, 0]
 
 
+def test_header_only_file_starts_with_one_entry(make_bg_server, tmp_path):
+    """
+    ヘッダだけで履歴が 0 件のファイルでも、今の盤面を 1 件目として積む。
+
+    load_data() は「読めて、履歴が 1 件以上あったか」を返す (TODO-055)。
+    読めただけで True を返すと、履歴が空のまま起動してしまう。
+    """
+    path = tmp_path / 'ytbg-header.jsonl'
+    path.write_text(json.dumps({'v': 2, 'clock': {}}) + '\n')
+
+    svr = make_bg_server('header')
+
+    assert len(svr._hist.entries) == 1
+
+
 def test_load_data_keeps_history_when_broken(bg_server):
     """読み込みに失敗したときは、サーバの履歴を書き換えない"""
     bg_server._storage.path.write_text('{')
     before = [h.to_dict() for h in bg_server._hist.entries]
 
-    assert bg_server.load_data() == (0, 0)
+    assert bg_server.load_data() is False
     assert [h.to_dict() for h in bg_server._hist.entries] == before
 
 
