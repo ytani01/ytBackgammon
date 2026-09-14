@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-057〜061。** これまでに 56 件を決着させた。
+**残っている項目: TODO-057〜060。** これまでに 57 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-062` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -17,28 +17,31 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 **TODO-049 で決めた構成の見直し（第 3 弾）の実装（TODO-050〜055）も、
 2026-09-14 に全部終わった。** 設計は `archives/docs/design-3.md` に移した。
 
-**TODO-056 で決めた構成の見直し（第 4 弾）は、TODO-057〜061 で実装する。**
+**TODO-056 で決めた構成の見直し（第 4 弾）は、TODO-057〜060 で実装する。**
 設計は `docs/design-4.md` にあり、この順に進める（どれも前の項目のあとに行う）。
 
 ---
 
-## TODO-057. 実装の説明を CLAUDE.md から `docs/Developer.md` へ移す
+## TODO-057. CLAUDE.md の実装の説明を整理し、落とし穴を `docs/Developer.md` へ移す
 
 |      | main | 担当 |
 |------|------|------|
 | 見込み | Opus 5 / effort high | verifier |
 
-- [ ] CLAUDE.md の「構成」以下にある実装の説明を `docs/Developer.md` へ移す
+- [ ] CLAUDE.md の「構成」以下にある説明のうち、コードを読めば分かる関数ごとの説明を消す
+- [ ] コードから見えない落とし穴（順番の縛り、テストでは守られない点、型チェックの食い違いなど）を `docs/Developer.md` へ移す
 - [ ] CLAUDE.md には Claude Code 向けの注意（テストの走らせ方と注意、書き方の慣習など）だけを残し、Developer.md を参照させる
 - [ ] AGENTS.md も Developer.md を参照させる
 
 設計は `docs/design-4.md` の「実装項目の分け方」の 1 にある。
 
-- **今の構成のまま移す**（構成は変えない）。文書だけの項目
+- **今の構成のまま行う**（構成は変えない）。文書だけの項目
+- **説明をそのまま移さない。** Developer.md は「細かい処理はコードを読めば
+  分かるので、ここには書かない」方針なので、移すのはコードから見えないことだけ
 - 移したあとも、Claude Code のセッションが要る説明に辿り着けること。
   利用者向けの Developer.md に TODO 番号を書かない決まりとの兼ね合いは、
   着手時に決める（番号を CLAUDE.md 側に残すか、番号なしで書くか）
-- verifier は、移す前の CLAUDE.md にあった説明が抜けていないかと、
+- verifier は、消した説明がコードを読めば分かるものか（落とし穴を消していないか）と、
   書いてあることが今のコードと合っているかを見る
 
 ---
@@ -83,58 +86,37 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 ---
 
-## TODO-060. BoardModel・BoardController・BoardView を入れる
+## TODO-060. BoardController と BoardView を入れる
 
 |      | main | 担当 |
 |------|------|------|
 | 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
 
-- [ ] `board_model.js` / `board_controller.js` / `board_view.js` を作り、状態・操作・時計の計算、入力・layout・演出を移す
+- [ ] `board_controller.js` / `board_view.js` を作り、状態・操作・時計の計算、入力・layout・演出を移す
 - [ ] `ui/` の部品から board・Settings・操作の関数への参照を無くす。`BoardPoint` を `layout.js` の座標計算にする
-- [ ] `config.js` を作り、`settings.js` と `log.js` の循環を無くす
+- [ ] `log.js` がクエリを直接読むようにして、`settings.js` と `log.js` の循環を無くす
 - [ ] `actions.js` と今の `Board`、要らなくなった委譲を消す
 - [ ] **Clock のチェックボックスは `set_clock_switch` を送るだけにし、計算も表示も返事の `clock_state` で変える**
-- [ ] **履歴の返事でも `clock_state` を全部反映する**（クライアントは `history_flag` を読まない）
+- [ ] **履歴の返事でも `clock_state` を全部反映する**
 - [ ] **キューブを掴んでいる間に受信しても、手元に残す**
-- [ ] `helper.mjs` の中を新しい構成に合わせる。`window.board` は `{model, controller, view}`
+- [ ] **サーバが返事に `history_flag` を載せるのをやめる**（`server.py`、`main.js`、`tests/test_on_json.py`、`tests/browser/clicks.test.mjs`）
+- [ ] `helper.mjs` の中を新しい構成に合わせる。`window.board` は `{controller, view}`
 - [ ] Developer.md を直す
+- [ ] `docs/design-4.md` を `archives/docs/design-4.md` へ移し、CLAUDE.md に現行仕様ではないことを書く
 
 設計は `docs/design-4.md` の「クライアントの構成」「変える挙動」「実装項目の分け方」の 4 にある。
 
-- **今の `Board` を Model と並べて状態の持ち主として残す途中の段階は作らない**
-- 変える挙動は上の 3 つだけ。それぞれテストを足し、変える前のコードで落ちることを確かめる
+- **今の `Board` を Controller と並べて状態の持ち主として残す途中の段階は作らない**
+- **作らないもの:** `BoardModel`、`config.js`、`dispose()` と入力の解除用の関数、
+  `present()` の中間の値、判定の無い `plan_*` の関数（設計案の「設計確認で決めたこと」の 6）
+- 変える挙動は上の 4 つだけ。それぞれテストを足し、変える前のコードで落ちることを確かめる
 - **画像の読み込みを待ってから組み立てる順番（TODO-029）は変えない。**
   テストでは守られないので、触れたら画像の応答を遅らせて配置を実測する
-- テスト本体は変えず、helper の中だけを直す。本体を変えたくなったら、
+- テスト本体は変えず、helper の中だけを直す（`history_flag` を見ている箇所は除く）。本体を変えたくなったら、
   その理由を報告に書く
-- reviewer は、rules・Model が DOM なしで動く、ui がゲームの状態や操作の関数を
+- サーバの構成は変えない（Session・protocol への分割と結果の型はやめた。TODO-061）
+- reviewer は、rules と Controller が DOM なしで動く、ui がゲームの状態や操作の関数を
   参照しない、import の循環が無い、状態とタイマーの持ち主が 1 つずつ、の 4 つを見る
-
----
-
-## TODO-061. サーバを Session と protocol に分け、操作の結果を型で表す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `session.py`（`BoardSession`）と `protocol.py` を作り、`server.py` から解析と実行を分ける
-- [ ] ハンドラの戻り値を `Applied(sec)` / `Ignored(reason)` / `Handled` にする
-- [ ] `last_op` を要求ごとの `publish` に添え、共有のフィールドに置かない
-- [ ] **`history_flag` を送るのをやめる**（TODO-060 でクライアントが読まなくなる）
-- [ ] Developer.md を直す
-- [ ] `docs/design-4.md` を `archives/docs/design-4.md` へ移し、現行仕様ではないことを書く
-
-設計は `docs/design-4.md` の「サーバの構成」「実装項目の分け方」の 5 にある。
-
-- 登録表は 1 つのまま。type を足すときに書き足す場所を増やさない
-- Replayer のロックと cancel の範囲、n 手の操作がその場で終わること、
-  cancel されても保存する経路、New Game が再生を止めないこと、配信が
-  全クライアントを待つことは変えない
-- `tests/conftest.py` の `bg_server` と `broadcast()` の差し替え、`tests/test_ws.py` が
-  効き続けること（利用者の `~/ytbg-*` を読み書きしない）
-- reviewer は、結果の型で分岐の意味が変わっていないかと、Session が
-  `server.py` / `protocol.py` を import しないことを見る
 
 ---
 
@@ -143,6 +125,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-061.** サーバを Session と protocol に分け、操作の結果を型で表す（対応しない）](archives/todo/TODO-061.%20サーバを%20Session%20と%20protocol%20に分け、操作の結果を型で表す.md)
 - [**TODO-056.** モジュール構成とクラス構成を見直す（第 4 弾）](archives/todo/TODO-056.%20モジュール構成とクラス構成を見直す（第%204%20弾）.md)
 - [**TODO-055.** サーバの細かい修正をまとめて行う](archives/todo/TODO-055.%20サーバの細かい修正をまとめて行う.md)
 - [**TODO-054.** 表示部品（`ui/` のクラス）に id ではなく要素を渡す](archives/todo/TODO-054.%20表示部品（ui_%20のクラス）に%20id%20ではなく要素を渡す.md)
