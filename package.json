@@ -5,7 +5,9 @@
   "type": "module",
   "description": "ytBackgammon: browser tests (JS). Python tests are run with pytest.",
   "scripts": {
-    "test": "node --test tests/browser/"
+    "test": "node --test tests/browser/",
+    "test:browser": "node --test tests/browser/",
+    "test:browser:headed": "YTBG_TEST_HEADED=1 node --test --test-concurrency=1 tests/browser/"
   },
   "devDependencies": {
     "playwright": "^1.63.0"

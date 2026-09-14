@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-059、060、062。** これまでに 59 件を決着させた。
+**残っている項目: TODO-059、060。** これまでに 60 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-063` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -76,32 +76,12 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 ---
 
-## TODO-062. ブラウザテストで画面を表示するモードに切り替えられるようにする
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort medium | verifier + reviewer |
-
-- [ ] 環境変数 `YTBG_TEST_HEADED` があれば、`launch_browser()` が画面を表示して chromium を起動する（既定はヘッドレスのまま）
-- [ ] 環境変数 `YTBG_TEST_SLOWMO`（ミリ秒）で、操作ごとに待ちを入れられるようにする
-- [ ] `package.json` の scripts に、ヘッドレスと画面表示のそれぞれで走らせるものを足す
-- [ ] CLAUDE.md と Developer.md に走らせ方を書く
-
-2026-09-14 に利用者と決めた。切り替えは、既にある `YTBG_TEST_CHROMIUM` と
-同じく環境変数で行い、`npm run` からも選べるようにする。
-
-- **TODO-058 のあとに行う**（TODO-058 で `helper.mjs` を書き換えているため）
-- 変更は `tests/browser/helper.mjs` の `launch_browser()` と `package.json` だけで小さいので、
-  実装は main が行う。確認（両方のモードで実際に走らせる）とレビュー（環境変数の
-  読み方の分岐）を別の担当に分ける
-
----
-
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-062.** ブラウザテストで画面を表示するモードに切り替えられるようにする](archives/todo/TODO-062.%20ブラウザテストで画面を表示するモードに切り替えられるようにする.md)
 - [**TODO-058.** ブラウザテストが `board` を触る箇所を `helper.mjs` に集める](archives/todo/TODO-058.%20ブラウザテストが%20%60board%60%20を触る箇所を%20%60helper.mjs%60%20に集める.md)
 - [**TODO-057.** CLAUDE.md の実装の説明を整理し、落とし穴を `docs/Developer.md` へ移す](archives/todo/TODO-057.%20CLAUDE.md%20の実装の説明を整理し、落とし穴を%20%60docs_Developer.md%60%20へ移す.md)
 - [**TODO-061.** サーバを Session と protocol に分け、操作の結果を型で表す（対応しない）](archives/todo/TODO-061.%20サーバを%20Session%20と%20protocol%20に分け、操作の結果を型で表す.md)

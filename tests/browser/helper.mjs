@@ -37,6 +37,14 @@ export const CHROMIUM_PATH = process.env.YTBG_TEST_CHROMIUM
       || '/usr/bin/chromium';
 
 /**
+ * YTBG_TEST_HEADED が空でも 0 でもなければ、画面を表示して chromium を起動する。
+ * YTBG_TEST_SLOWMO (ミリ秒) を渡すと、playwright の操作ごとに待ちを入れる
+ * (TODO-062)。
+ */
+const HEADED = !['', '0'].includes(process.env.YTBG_TEST_HEADED ?? '');
+const SLOWMO = Number(process.env.YTBG_TEST_SLOWMO) || 0;
+
+/**
  * 空いている TCP ポートを 1 つ取る。
  *
  * ytbg-boot.sh が使う 5001〜5004 や、他の作業とぶつからないように、
@@ -150,7 +158,11 @@ export async function start_server(opts = {}) {
  * @return {Promise<import('playwright').Browser>}
  */
 export function launch_browser() {
-    return chromium.launch({ executablePath: CHROMIUM_PATH });
+    return chromium.launch({
+        executablePath: CHROMIUM_PATH,
+        headless: !HEADED,
+        slowMo: SLOWMO,
+    });
 }
 
 /**

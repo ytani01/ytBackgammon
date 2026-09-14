@@ -46,6 +46,9 @@ node --test tests/js/      # JS のルール層のテスト（npm は要らな�
 
 npm install                # 最初の 1 回だけ（playwright を入れる）
 node --test tests/browser/ # ブラウザでの動作確認（JS のテスト）
+npm run test:browser         # node --test tests/browser/ と同じ
+npm run test:browser:headed  # 画面を表示して 1 ファイルずつ走らせる（TODO-062）
+YTBG_TEST_HEADED=1 YTBG_TEST_SLOWMO=300 node --test tests/browser/drag.test.mjs
 ```
 
 ## テスト
@@ -134,6 +137,12 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   いる**（`tests/browser/helper.mjs`）。`~/.cache/ms-playwright/` にある
   リビジョンが playwright 1.63.0 の要求と合わないため。
   `npx playwright install` で落とし直さない
+- 既定はヘッドレス。`YTBG_TEST_HEADED`（空でも `0` でもない値）で画面を表示し、
+  `YTBG_TEST_SLOWMO`（ミリ秒）で playwright の操作ごとに待ちを入れる（TODO-062）。
+  画面を表示するには X（`DISPLAY`）が要る。待ちが入るのはマウス・キーボード・
+  `goto` などで、`page.evaluate()` には入らない。マウスを離したあとの待ちの間に
+  サーバの返事が届くので、先行実行の表示を読むテストが返事の表示を読むことになる。
+  **待ちを入れた実行は、通るかどうかの確認には使わない**
 - 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
   `BackgammonServer` を作るときに読み（TODO-055）、無ければ `$HOME`。
   利用者の `~/ytbg-*` は読み書きされない

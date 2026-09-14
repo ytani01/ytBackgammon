@@ -429,6 +429,19 @@ graph TD
 - ポートは固定せず、空いているものを OS に選ばせる
 - **ブラウザはシステムの `/usr/bin/chromium` を使う。**
   `npx playwright install` で落とし直さないこと
+- 既定はヘッドレス。動きを目で見たいときは、画面を表示して走らせる
+
+  ```bash
+  npm run test:browser             # ヘッドレス（node --test tests/browser/ と同じ）
+  npm run test:browser:headed      # 画面を表示し、ファイルを 1 つずつ走らせる
+  YTBG_TEST_HEADED=1 YTBG_TEST_SLOWMO=300 node --test tests/browser/drag.test.mjs
+  ```
+
+  `YTBG_TEST_HEADED` は空でも `0` でもない値で画面を表示する（X の `DISPLAY` が要る）。
+  `YTBG_TEST_SLOWMO` はミリ秒で、マウス・キーボード・`goto` などの操作ごとに待ちを
+  入れる（`page.evaluate()` には入らない）。マウスを離したあとの待ちの間に
+  サーバの返事が届くので、先行実行の表示を見るテストは返事の表示を読むことになる。
+  **通るかどうかの確認は、待ちを入れずに行う**
 
 ### テストを書くときに気をつけること
 
