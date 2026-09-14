@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, launch_browser, open_board, start_server,
+    console_errors, gameinfo, launch_browser, open_board, press_part,
+    server_id, settings, start_server, wait_board, wait_for,
 } from './helper.mjs';
 
 describe('cookie のプレーヤー番号', () => {
@@ -39,28 +40,32 @@ describe('cookie のプレーヤー番号', () => {
 
     it('cookie が "0" の画面を開き直して投了すると、resign の player は数の 0',
        async () => {
-           await page.evaluate(() => {
-               document.cookie = `board${board.svr_id}_player=0;`;
-           });
+           const svr_id = await server_id(page);
+           await page.evaluate(id => {
+               document.cookie = `board${id}_player=0;`;
+           }, svr_id);
            await page.reload();
-           await page.waitForFunction(
-               () => typeof board !== 'undefined' && board !== undefined
-                   && board.checker !== undefined
-                   && board.checker[0][0].cur_point !== undefined);
+           await wait_board(page);
 
-           const sent = await page.evaluate(() => {
-               const sent = [];
-               const orig = WebSocket.prototype.send;
+           // 送ったものを貯める (投了ボタンを押す間だけ)
+           const cookie = await page.evaluate(() => {
+               window.__sent = [];
+               window.__orig_send = WebSocket.prototype.send;
                WebSocket.prototype.send = function (d) {
-                   sent.push(JSON.parse(d));
-                   return orig.call(this, d);
+                   window.__sent.push(JSON.parse(d));
+                   return window.__orig_send.call(this, d);
                };
-               const cookie = document.cookie;
-               const player = board.settings.player;
-               board.button_resign.on_mouse_down_xy(0, 0);
-               WebSocket.prototype.send = orig;
-               return { cookie, player, sent };
+               return document.cookie;
            });
+           const player = (await settings(page)).player;
+           await press_part(page, 'resign');
+           const sent = {
+               cookie, player,
+               sent: await page.evaluate(() => {
+                   WebSocket.prototype.send = window.__orig_send;
+                   return window.__sent;
+               }),
+           };
 
            assert.match(sent.cookie, /_player=0/, 'cookie が "0" でない');
            assert.equal(sent.player, 0);
@@ -70,7 +75,8 @@ describe('cookie のプレーヤー番号', () => {
                             [['resign', { player: 0, score: 3 }]]);
 
            // サーバが弾かずに受け付け、turn が -1 になる
-           await page.waitForFunction(() => board.gameinfo.turn === -1);
+           await wait_for(async () => (await gameinfo(page)).turn,
+                          t => t === -1, { msg: 'resign', timeout: 30000 });
        });
 
     it('コンソールエラーが出ていない', async () => {

@@ -11,17 +11,14 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { launch_browser, open_board, start_server } from './helper.mjs';
-
-/** board ができて最初の gameinfo が届くまで待つ (helper の open_board と同じ) */
-const wait_board = page => page.waitForFunction(
-    () => typeof board !== 'undefined' && board !== undefined
-        && board.checker !== undefined
-        && board.checker[0][0].cur_point !== undefined);
+import {
+    launch_browser, open_board, settings, shown_parts, start_server,
+    wait_board,
+} from './helper.mjs';
 
 /** PIP の表示 (opacity) を 2 人ぶん読む */
-const pip_opacity = page => page.evaluate(
-    () => [0, 1].map(p => board.pip[p].el.style.opacity));
+const pip_opacity = async page => (await shown_parts(page)).pip.map(
+    p => p.opacity);
 
 describe('Settings', () => {
     let server = undefined;
@@ -43,15 +40,15 @@ describe('Settings', () => {
 
     it('Sound を外すと cookie に保存し、開き直しても外れたまま', async () => {
         const page = await open_board(browser, server.url);
-        assert.equal(await page.evaluate(() => board.settings.sound), true);
+        assert.equal((await settings(page)).sound, true);
 
         await page.locator('#sound-switch').uncheck();
-        assert.equal(await page.evaluate(() => board.settings.sound), false);
+        assert.equal((await settings(page)).sound, false);
 
         // 同じコンテキストで開き直す (cookie は残る)
         await page.reload();
         await wait_board(page);
-        assert.equal(await page.evaluate(() => board.settings.sound), false,
+        assert.equal((await settings(page)).sound, false,
                      'cookie から読んだ音の設定が戻っていない');
         assert.equal(await page.locator('#sound-switch').isChecked(), false);
         await page.close();

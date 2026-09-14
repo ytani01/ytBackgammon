@@ -437,6 +437,11 @@ graph TD
 - `tests/js/helper.mjs` の初期配置は `src/ytbg/gameinfo.py` の写し。
   **初期配置を変えるときは両方を直すこと**
 - Python のテストは `asyncio_mode = "auto"` なので `async def` をそのまま書ける
+- **`tests/browser/` のテストは、ページの中の `board` を直接触らない。**
+  盤面を読む、届いた盤面を反映させる、予測を差し替えるといった操作は
+  `tests/browser/helper.mjs` の関数を通す。クライアントの構成を変えたときに、
+  テスト本体を変えずに helper の中だけを直せば済むようにするため。
+  返事が届く前に読む必要があるものは、helper の 1 つの関数の中で押して読む
 
 ## 型チェックと lint
 

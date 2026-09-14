@@ -19,7 +19,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, launch_browser, open_board, start_server,
+    apply_gameinfo, console_errors, effects_of_apply, gameinfo,
+    launch_browser, open_board, start_server,
 } from './helper.mjs';
 
 /**
@@ -30,39 +31,10 @@ import {
  * @param {Object} last_op
  * @return {Promise<{sound: string[], roll: number[]}>}
  */
-function apply_with(page, turn, last_op) {
-    return page.evaluate(([turn, last_op]) => {
-        const sound = [];
-        const roll = [];
-        const names = ['sound_roll', 'sound_put', 'sound_hit',
-                       'sound_turn_change'];
-        for (const name of names) {
-            board[name].play = () => { sound.push(name); };
-        }
-        for (let p = 0; p < 2; p++) {
-            const btn = board.roll_btn[p];
-            btn.set = function (dice, roll_flag = false) {
-                if (roll_flag) {
-                    roll.push(p);
-                }
-                return Object.getPrototypeOf(this).set.call(
-                    this, dice, roll_flag);
-            };
-        }
-        try {
-            const gi = JSON.parse(JSON.stringify(board.gameinfo));
-            gi.turn = turn;
-            board.apply(gi, { sec: 0, last_op: last_op });
-        } finally {
-            for (const name of names) {
-                delete board[name].play;
-            }
-            for (let p = 0; p < 2; p++) {
-                delete board.roll_btn[p].set;
-            }
-        }
-        return { sound, roll };
-    }, [turn, last_op]);
+async function apply_with(page, turn, last_op) {
+    const gi = await gameinfo(page);
+    gi.turn = turn;
+    return effects_of_apply(page, gi, last_op);
 }
 
 describe('last_op からの音とダイスの回転', () => {
@@ -136,13 +108,10 @@ describe('last_op からの音とダイスの回転', () => {
            // 駒の引き当て (ID は player * 100 + num) を見る。プレーヤー 1 の
            // 通し番号 10 以上を使うと、[0] 固定・% 10・プレーヤーの
            // 取り違えのどれでも、引いた駒の位置が変わって結果が変わる
-           const orig = await page.evaluate(() => {
-               const orig = JSON.parse(JSON.stringify(board.gameinfo));
-               const gi = JSON.parse(JSON.stringify(orig));
-               gi.board.checker[1][14] = [27, 0];
-               board.apply(gi, { sec: 0 });
-               return orig;
-           });
+           const orig = await gameinfo(page);
+           const gi = structuredClone(orig);
+           gi.board.checker[1][14] = [27, 0];
+           await apply_gameinfo(page, gi);
            try {
                const put = await apply_with(
                    page, 0, op('put_checker', { ch: 114, p: 27, idx: 0 }));
@@ -151,8 +120,7 @@ describe('last_op からの音とダイスの回転', () => {
                    page, 0, op('put_checker', { ch: 113, p: 27, idx: 1 }));
                assert.deepEqual(hit, { sound: ['sound_hit'], roll: [] });
            } finally {
-               await page.evaluate(
-                   (gi) => board.apply(gi, { sec: 0 }), orig);
+               await apply_gameinfo(page, orig);
            }
        });
 

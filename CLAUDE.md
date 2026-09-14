@@ -74,13 +74,13 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 - `board.test.mjs` — 盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
   コンソールエラー
 - `rules.test.mjs` — **`Board` がルール層につながっているか**（TODO-027）。
-  `board.position()` / `pip_count()` / `winner_is()` / `closeout()` /
-  `get_dst_points()` をページの中で呼ぶ。`board.test.mjs` と
+  helper の `judge()` / `pip_count()` / `dst_points()` で、ページの中の
+  `Board` の判定を呼ぶ。`board.test.mjs` と
   `drag.test.mjs` はチェッカーのドラッグを free move で行うので、ルール判定を
   通らない（ルール判定を通るドラッグは `predict.test.mjs`）
 - `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
   ボタン・バナー・キューブ・クロックを実際に押し、**送られたメッセージの
-  `type` / `data`** と、変わった `board` の属性を見る（TODO-028）。
+  `type` / `data`** と、変わった盤面や設定を見る（TODO-028）。
   盤面を変える操作では、**送ったのがその 1 通だけか**と、`history` が
   付いていないことも見る（TODO-051）。得点の ▲ と free move のダイスは、
   返事の前に 2 回押して 2 回ぶん効くかを見る（TODO-052）。キューブのダブル・リダブル・テイク、
@@ -122,7 +122,9 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 0 と 1 の間は `end_turn`）。目は `dice`、駒は `put_checker`。
 **0 / 1 / -1 から 2 へは戻せず、-1 からはどこへも戻せない**（`opening` は
 `turn` が 2 以上のときしか受け付けない）ので、そのときは `new` で盤面ごと戻す。
-状態は `board.gameinfo` から読む。**画面に出ているダイスの目**は
+状態は helper の `gameinfo()` で読む。**テスト本体はページの中の `board` を
+直接触らず、helper の関数を通す**（TODO-058。構成を変えるときに helper の中だけを
+直せば済むようにするため）。**画面に出ているダイスの目**は
 `shown_dice()` が要素（z・画像のファイル名・opacity）から読む
 （ダイスは目を持たないため。TODO-052）
 

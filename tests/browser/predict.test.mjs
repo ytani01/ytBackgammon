@@ -48,8 +48,10 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    center_of, console_errors, launch_browser, open_board, send_msg,
-    set_turn, shown_dice, start_server, wait_for,
+    apply_gameinfo, center_of, checkers, console_errors, corrupt_prediction,
+    dragging, fail_prediction, gameinfo, judge, launch_browser, open_board,
+    record_apply, restore_prediction, send_msg, send_put_checker, set_turn,
+    shown_dice, shown_parts, stack, start_server, take_applied, wait_for,
 } from './helper.mjs';
 
 /**
@@ -91,44 +93,6 @@ function take_sent(page) {
 }
 
 /**
- * board.apply() を包んで、呼ばれるたびに「そのときの盤面」を貯める。
- *
- * 先行実行とサーバの返事のどちらで表示が変わったのかを、
- * あとから順番に見られるようにする。
- *
- * @param {import('playwright').Page} page
- */
-function record_apply(page) {
-    return page.evaluate(() => {
-        window.__applied = [];
-        // 包みを重ねない (重ねると 1 回の apply() で何度も貯まる)
-        if (window.__orig_apply === undefined) {
-            window.__orig_apply = board.apply;
-        }
-        const orig = window.__orig_apply;
-        board.apply = function (gameinfo, opts = {}) {
-            const ret = orig.call(this, gameinfo, opts);
-            window.__applied.push({
-                // 予測には last_op も clock_state も付かない
-                has_last_op: Boolean(opts.last_op),
-                has_clock_state: Boolean(opts.clock_state),
-                sn: gameinfo.sn,
-                point: board.checker.map(p => p.map(ch => ch.cur_point)),
-            });
-            return ret;
-        };
-    });
-}
-
-/**
- * @param {import('playwright').Page} page
- * @return {Promise<Object[]>}
- */
-function take_applied(page) {
-    return page.evaluate(() => window.__applied.splice(0));
-}
-
-/**
  * ターン (プレーヤー 0) とダイスをサーバに設定して、届くまで待つ。
  *
  * @param {import('playwright').Page} page
@@ -139,10 +103,10 @@ async function set_turn_dice(page, dice) {
     await send_msg(page, 'dice', { player: 0, dice: dice });
 
     await wait_for(
-        () => page.evaluate(() => ({
-            turn: board.gameinfo.turn,
-            dice: board.gameinfo.board.dice[0],
-        })),
+        async () => {
+            const gi = await gameinfo(page);
+            return { turn: gi.turn, dice: gi.board.dice[0] };
+        },
         s => s.turn === 0 && JSON.stringify(s.dice) === JSON.stringify(dice),
         { msg: 'set_turn_dice' });
 }
@@ -154,12 +118,9 @@ async function set_turn_dice(page, dice) {
  * @param {number} p
  */
 async function put_p100(page, p) {
-    await page.evaluate(async p => {
-        const { put_checker } = await import('/static/js/actions.js');
-        put_checker(board, board.checker[1][0], p);
-    }, p);
+    await send_put_checker(page, 1, 0, p);
     await wait_for(
-        () => page.evaluate(() => board.checker[1][0].cur_point),
+        async () => (await checkers(page))[1][0].point,
         cur => cur === p, { msg: `put_p100(${p})` });
 }
 
@@ -175,27 +136,25 @@ async function put_p100(page, p) {
  * @param {{src: number, blocks: number[], dice: number[]}} opts
  * @return {Promise<Object>} - 差し替える前の gameinfo
  */
-function apply_local(page, opts) {
-    return page.evaluate(({ src, blocks, dice }) => {
-        const save = JSON.parse(JSON.stringify(board.gameinfo));
-        const gi = JSON.parse(JSON.stringify(board.gameinfo));
-        gi.turn = 0;
-        gi.resign = -1;
-        gi.board.cube = { side: -1, value: 1, accepted: true };
-        gi.board.dice = [dice, [0, 0, 0, 0]];
-        gi.board.checker[0] = Array.from(
-            { length: 15 }, (_, i) => (i === 0 ? [src, 0] : [0, i - 1]));
-        let c1 = [];
-        for (const b of blocks) {
-            c1.push([b, 0], [b, 1]);
-        }
-        while (c1.length < 15) {
-            c1.push([25, c1.length - blocks.length * 2]);
-        }
-        gi.board.checker[1] = c1;
-        board.apply(gi, { sec: 0 });
-        return save;
-    }, opts);
+async function apply_local(page, { src, blocks, dice }) {
+    const save = await gameinfo(page);
+    const gi = structuredClone(save);
+    gi.turn = 0;
+    gi.resign = -1;
+    gi.board.cube = { side: -1, value: 1, accepted: true };
+    gi.board.dice = [dice, [0, 0, 0, 0]];
+    gi.board.checker[0] = Array.from(
+        { length: 15 }, (_, i) => (i === 0 ? [src, 0] : [0, i - 1]));
+    let c1 = [];
+    for (const b of blocks) {
+        c1.push([b, 0], [b, 1]);
+    }
+    while (c1.length < 15) {
+        c1.push([25, c1.length - blocks.length * 2]);
+    }
+    gi.board.checker[1] = c1;
+    await apply_gameinfo(page, gi);
+    return save;
 }
 
 /**
@@ -204,11 +163,9 @@ function apply_local(page, opts) {
  * @param {import('playwright').Page} page
  * @return {Promise<number>}
  */
-function tip_of_point6(page) {
-    return page.evaluate(() => {
-        const ch = board.top_checker(6);
-        return parseInt(ch.id.slice(1)) % 100;
-    });
+async function tip_of_point6(page) {
+    const { tip } = await stack(page, 6);
+    return parseInt(tip.slice(1)) % 100;
 }
 
 /**
@@ -249,7 +206,7 @@ describe('ドラッグの先行実行 (予測)', () => {
     it('サーバの応答が無くても、離した瞬間に表示が変わる', async () => {
         await set_turn_dice(page, [3, 0, 0, 0]);
         const tip = await tip_of_point6(page);
-        const sn0 = await page.evaluate(() => board.gameinfo.sn);
+        const sn0 = (await gameinfo(page)).sn;
 
         // ここから先、送ったメッセージはサーバへ届かない
         await record_sent(page, true);
@@ -257,18 +214,22 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         await one_touch_move(page);
 
-        const state = await page.evaluate(i => ({
-            point: board.checker[0][i].cur_point,
-            n3: board.checker.flat().filter(c => c.cur_point === 3).length,
-            n6: board.checker.flat().filter(c => c.cur_point === 6).length,
-            entry: board.gameinfo.board.checker[0][i],
-            sn: board.gameinfo.sn,
-            pip: board.pip[0].pip_count,
+        // 送信を止めているので、読む間に返事は届かない
+        const shown = await shown_parts(page);
+        const all = (await checkers(page)).flat();
+        const gi = await gameinfo(page);
+        const state = {
+            point: all[tip].point,
+            n3: all.filter(c => c.point === 3).length,
+            n6: all.filter(c => c.point === 6).length,
+            entry: gi.board.checker[0][tip],
+            sn: gi.sn,
+            pip: shown.pip[0].count,
             // 使ったダイスは使用済み (3 -> 13) になっている。
             // 予測した gameinfo に入っている (TODO-051)
-            gi_dice: board.gameinfo.board.dice[0],
-            active_dice: board.get_active_dice(0),
-        }), tip);
+            gi_dice: gi.board.dice[0],
+            active_dice: (await judge(page)).active_dice[0],
+        };
         state.dice = await shown_dice(page, 0);
 
         // 表示 (サーバの応答は届いていない)
@@ -335,11 +296,10 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         // サーバの返事でも同じ盤面になる
         await wait_for(
-            () => page.evaluate(i => ({
-                mine: board.checker[0][i].cur_point,
-                hit: board.checker[1][0].cur_point,
-                sn: board.gameinfo.sn,
-            }), tip),
+            async () => {
+                const ch = await checkers(page);
+                return { mine: ch[0][tip].point, hit: ch[1][0].point };
+            },
             s => s.mine === 3 && s.hit === 27,
             { msg: 'hit' });
 
@@ -356,17 +316,7 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         // わざと外れる予測を作る。動かしたチェッカーを、
         // サーバへ送る移動先 (3) ではなく 20 へ置いたことにする
-        await page.evaluate(() => {
-            const orig = board.predict_gameinfo;
-            board.predict_gameinfo = function (...args) {
-                const gameinfo = orig.apply(this, args);
-                const moves = args[0];
-                const ch = moves[moves.length - 1].ch;
-                const ch_i = parseInt(ch.id.slice(1)) % 100;
-                gameinfo.board.checker[ch.player][ch_i] = [20, 0];
-                return gameinfo;
-            };
-        });
+        await corrupt_prediction(page, 20);
 
         await one_touch_move(page);
 
@@ -387,19 +337,19 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         // サーバから届く gameinfo で、正しいところへ戻る
         const state = await wait_for(
-            () => page.evaluate(i => ({
-                point: board.checker[0][i].cur_point,
-                n20: board.checker.flat().filter(
-                    c => c.cur_point === 20).length,
-                n3: board.checker.flat().filter(
-                    c => c.cur_point === 3).length,
-            }), tip),
+            async () => {
+                const ch = await checkers(page);
+                const all = ch.flat();
+                return { point: ch[0][tip].point,
+                         n20: all.filter(c => c.point === 20).length,
+                         n3: all.filter(c => c.point === 3).length };
+            },
             s => s.point === 3,
             { msg: 'correction' });
         assert.equal(state.n20, 0, 'point 20 にチェッカーが残っている');
         assert.equal(state.n3, 2);
 
-        await page.evaluate(() => { delete board.predict_gameinfo; });
+        await restore_prediction(page);
     });
 
     it('行けない場所で離すと、元に戻って何も送らない', async () => {
@@ -416,17 +366,17 @@ describe('ドラッグの先行実行 (予測)', () => {
         // point 6 の先端を、player1 の駒がいる point 19 へ運ぶ
         // (player0 は番号が減る方向なので、6 から 19 へは行けない)
         const src = await center_of(page, `#p0${String(tip).padStart(2, '0')}`);
-        const dst_id = await page.evaluate(() => board.top_checker(19).id);
+        const dst_id = (await stack(page, 19)).tip;
         const dst = await center_of(page, `#${dst_id}`);
         await page.mouse.move(src.x, src.y);
         await page.mouse.down();
         await page.mouse.move(dst.x, dst.y, { steps: 5 });
         await page.mouse.up();
 
-        const state = await page.evaluate(i => ({
-            point: board.checker[0][i].cur_point,
-            moving: board.drag.checker !== undefined,
-        }), tip);
+        const state = {
+            point: (await checkers(page))[0][tip].point,
+            moving: await dragging(page) !== undefined,
+        };
         state.dice = await shown_dice(page, 0);
 
         assert.equal(state.point, 6, '元のポイントに戻っていない');
@@ -447,19 +397,15 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         await record_sent(page);
         await record_apply(page);
-        await page.evaluate(() => {
-            board.predict_gameinfo = function () {
-                throw new Error('predict failed (test)');
-            };
-        });
+        await fail_prediction(page);
 
         try {
             await one_touch_move(page);
 
-            const state = await page.evaluate(i => ({
-                point: board.checker[0][i].cur_point,
-                moving: board.drag.checker !== undefined,
-            }), tip);
+            const state = {
+                point: (await checkers(page))[0][tip].point,
+                moving: await dragging(page) !== undefined,
+            };
             state.dice = await shown_dice(page, 0);
             assert.equal(state.point, 6, '元のポイントに戻っていない');
             assert.equal(state.moving, false, '掴んだままになっている');
@@ -468,7 +414,7 @@ describe('ドラッグの先行実行 (予測)', () => {
                              '予測に失敗したのに送っている');
             assert.deepEqual(await take_applied(page), []);
         } finally {
-            await page.evaluate(() => { delete board.predict_gameinfo; });
+            await restore_prediction(page);
         }
     });
 
@@ -484,10 +430,10 @@ describe('ドラッグの先行実行 (予測)', () => {
             await record_apply(page);
             await one_touch_move(page);
 
-            const state = await page.evaluate(() => ({
-                point: board.checker[0][0].cur_point,
-                gi_dice: board.gameinfo.board.dice[0],
-            }));
+            const state = {
+                point: (await checkers(page))[0][0].point,
+                gi_dice: (await gameinfo(page)).board.dice[0],
+            };
             state.dice = await shown_dice(page, 0);
             assert.equal(state.point, 4, '先行実行で動いていない');
             assert.deepEqual(state.gi_dice, [15, 11, 0, 0],
@@ -500,7 +446,7 @@ describe('ドラッグの先行実行 (予測)', () => {
                            dice: [15, 11, 0, 0], score: 0 }],
             ]);
         } finally {
-            await page.evaluate(g => board.apply(g, { sec: 0 }), save);
+            await apply_gameinfo(page, save);
             await record_sent(page);
         }
     });
@@ -521,7 +467,7 @@ describe('ドラッグの先行実行 (予測)', () => {
                            dice: [11, 0, 0, 0], score: 1 }],
             ]);
         } finally {
-            await page.evaluate(g => board.apply(g, { sec: 0 }), save);
+            await apply_gameinfo(page, save);
             await record_sent(page);
         }
     });

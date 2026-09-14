@@ -26,7 +26,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, launch_browser, open_board, send_msg, set_turn,
+    console_errors, gameinfo, launch_browser, open_board, press_part,
+    send_msg, set_free_move as apply_free_move, set_turn, settings,
     start_server, wait_for,
 } from './helper.mjs';
 
@@ -41,9 +42,9 @@ const AUTO_CLICK_WAIT = 8000;
  * @param {number[]} dice1 - プレーヤー 1 のダイス
  */
 async function set_opening(page, dice0, dice1) {
-    if ( await page.evaluate(() => board.gameinfo.turn) < 2 ) {
+    if ( (await gameinfo(page)).turn < 2 ) {
         await send_msg(page, 'new', {});
-        await wait_for(() => page.evaluate(() => board.gameinfo.turn),
+        await wait_for(async () => (await gameinfo(page)).turn,
                        t => t === 2, { msg: 'new' });
     }
     await set_turn(page, 2);
@@ -51,11 +52,7 @@ async function set_opening(page, dice0, dice1) {
     await send_msg(page, 'dice', { player: 1, dice: dice1 });
 
     await wait_for(
-        () => page.evaluate(() => ({
-            turn: board.gameinfo.turn,
-            d0: board.gameinfo.board.dice[0],
-            d1: board.gameinfo.board.dice[1],
-        })),
+        () => turn_dice(page),
         s => s.turn === 2
             && JSON.stringify(s.d0) === JSON.stringify(dice0)
             && JSON.stringify(s.d1) === JSON.stringify(dice1),
@@ -69,11 +66,19 @@ async function set_opening(page, dice0, dice1) {
  * @param {boolean} on
  */
 async function set_free_move(page, on) {
-    await page.evaluate(v => {
-        document.getElementById('free-move').checked = v;
-        board.settings.apply_free_move();
-    }, on);
-    assert.equal(await page.evaluate(() => board.settings.free_move), on);
+    await apply_free_move(page, on);
+    assert.equal((await settings(page)).free_move, on);
+}
+
+/**
+ * turn と両者のダイス
+ *
+ * @param {import('playwright').Page} page
+ * @return {Promise<{turn: number, d0: number[], d1: number[]}>}
+ */
+async function turn_dice(page) {
+    const gi = await gameinfo(page);
+    return { turn: gi.turn, d0: gi.board.dice[0], d1: gi.board.dice[1] };
 }
 
 describe('先手決め (opening roll)', () => {
@@ -105,23 +110,16 @@ describe('先手決め (opening roll)', () => {
 
            // 自分が Roll を押す。乱数で振ったあと、2 秒後の自動クリック
            // までにサーバ経由で目を 5 に置き換える
-           await page.evaluate(async () => {
-               const { emit_msg } = await import('/static/js/ws.js');
-               board.roll_btn[0].on_mouse_down_xy(0, 0);
-               emit_msg('dice', { player: 0, dice: [5, 0, 0, 0] });
-           });
+           await press_part(page, 'roll', 0);
+           await send_msg(page, 'dice', { player: 0, dice: [5, 0, 0, 0] });
            await wait_for(
-               () => page.evaluate(() => board.gameinfo.board.dice[0]),
+               async () => (await gameinfo(page)).board.dice[0],
                d => JSON.stringify(d) === JSON.stringify([5, 0, 0, 0]),
                { msg: 'force dice' });
 
            // 5 > 2 なので、自分が先手
            const state = await wait_for(
-               () => page.evaluate(() => ({
-                   turn: board.gameinfo.turn,
-                   d0: board.gameinfo.board.dice[0],
-                   d1: board.gameinfo.board.dice[1],
-               })),
+               () => turn_dice(page),
                s => s.turn !== 2,
                { msg: 'opening roll', timeout: AUTO_CLICK_WAIT });
 
@@ -140,25 +138,22 @@ describe('先手決め (opening roll)', () => {
 
         await set_opening(page, [0, 0, 0, 0], [0, 0, 2, 0]);
 
-        await page.evaluate(async () => {
-            const { emit_msg } = await import('/static/js/ws.js');
-            board.roll_btn[0].on_mouse_down_xy(0, 0);
-            emit_msg('dice', { player: 0, dice: [5, 0, 0, 0] });
-        });
+        await press_part(page, 'roll', 0);
+        await send_msg(page, 'dice', { player: 0, dice: [5, 0, 0, 0] });
         await wait_for(
-            () => page.evaluate(() => board.gameinfo.board.dice[0]),
+            async () => (await gameinfo(page)).board.dice[0],
             d => JSON.stringify(d) === JSON.stringify([5, 0, 0, 0]),
             { msg: 'force dice' });
 
         // free move では、クリックされたダイスの目が 1 つ進む
         const d0 = await wait_for(
-            () => page.evaluate(() => board.gameinfo.board.dice[0]),
+            async () => (await gameinfo(page)).board.dice[0],
             d => JSON.stringify(d) !== JSON.stringify([5, 0, 0, 0]),
             { msg: 'free move click', timeout: AUTO_CLICK_WAIT });
 
         assert.deepEqual(d0, [6, 0, 0, 0],
                          'dice[0] 以外が書き換わっている');
-        assert.equal(await page.evaluate(() => board.gameinfo.turn), 2,
+        assert.equal((await gameinfo(page)).turn, 2,
                      'free move で先手が決まってしまっている');
 
         await set_free_move(page, false);

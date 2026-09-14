@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { launch_browser, start_server } from './helper.mjs';
+import { launch_browser, start_server, wait_board } from './helper.mjs';
 
 /**
  * ページを開いて、盤面ができるまでに出た console.log の件数を返す
@@ -33,10 +33,7 @@ async function count_logs(browser, url) {
         }
     });
     await page.goto(url);
-    await page.waitForFunction(
-        () => typeof board !== 'undefined' && board !== undefined
-            && board.checker !== undefined
-            && board.checker[0][0].cur_point !== undefined);
+    await wait_board(page);
     await page.close();
     return n;
 }

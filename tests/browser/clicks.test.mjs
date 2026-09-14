@@ -21,8 +21,10 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    center_of, console_errors, launch_browser, open_board, send_msg,
-    dice_from_els, set_turn, sleep, start_server, wait_for,
+    center_of, console_errors, gameinfo, hide_banner, judge, launch_browser,
+    open_board, press_n, press_pass_banner, record_received_src, send_msg,
+    set_turn, settings, show_banner, shown_parts, sleep, start_server,
+    wait_board, wait_for,
 } from './helper.mjs';
 
 /**
@@ -38,7 +40,6 @@ async function record_sent(page) {
     page.on('dialog', d => d.accept());
     await page.evaluate(() => {
         window.__sent = [];
-        window.__seen_src = [];
         const orig = WebSocket.prototype.send;
         window.__orig_send = orig;
         WebSocket.prototype.send = function (d) {
@@ -46,16 +47,8 @@ async function record_sent(page) {
             window.__sent.push(JSON.parse(d));
             return orig.call(this, d);
         };
-        // load_gameinfo(gameinfo, sec, history_flag, clock_state, last_op)
-        const orig_load = board.load_gameinfo;
-        board.load_gameinfo = function (...args) {
-            const last_op = args[4];
-            if ( last_op ) {
-                window.__seen_src.push(last_op.src);
-            }
-            return orig_load.apply(this, args);
-        };
     });
+    await record_received_src(page);
 }
 
 let settle_n = 0;
@@ -80,13 +73,13 @@ let settle_n = 0;
  */
 async function settle(page) {
     const src = `settle-${++settle_n}`;
-    await page.evaluate(src => {
-        const name = board.gameinfo.board.playername[1];
+    const name = (await gameinfo(page)).board.playername[1];
+    await page.evaluate(([src, name]) => {
         window.__orig_send.call(window.__ws, JSON.stringify({
             src: src, type: 'set_playername',
             data: { player: 1, name: name },
         }));
-    }, src);
+    }, [src, name]);
     await wait_for(
         () => page.evaluate(s => window.__seen_src.includes(s), src),
         seen => seen, { msg: 'settle' });
@@ -157,44 +150,6 @@ async function assert_only_sent(page, type, data) {
     assert.equal('history' in sent[0], false, `${type}: history を送っている`);
 }
 
-/**
- * パスのバナーを出して押し、押した直後の状態を返す。
- *
- * 押したのと同じタスクの中で読む。サーバの返事の load_gameinfo() →
- * set_turn() もバナーを全部 off() にするので、返事が届いてから見ると
- * on_pass の off() を確かめたことにならない。
- *
- * @param {import('playwright').Page} page
- * @param {'click'|'space'} how - バナーを押すか、スペースキーか
- * @return {Promise<{shown: boolean, active: boolean}>}
- */
-function press_pass(page, how) {
-    return page.evaluate(how => {
-        const btn = board.pass_btn[0];
-
-        if (how === 'space') {
-            // Roll ボタンが出ているとスペースキーはそちらへ行く
-            board.roll_btn[0].off();
-        }
-        btn.on();
-        const shown = btn.active;
-
-        if (how === 'click') {
-            const r = btn.el.getBoundingClientRect();
-            btn.el.dispatchEvent(new MouseEvent('mousedown', {
-                bubbles: true,
-                clientX: r.x + r.width / 2, clientY: r.y + r.height / 2,
-            }));
-        } else {
-            document.body.dispatchEvent(
-                new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-        }
-
-        const active = btn.active;
-        return { shown, active };
-    }, how);
-}
-
 describe('クリックでの操作', () => {
     let server = undefined;
     let browser = undefined;
@@ -216,10 +171,9 @@ describe('クリックでの操作', () => {
         }
     });
 
-    // 画面ごとの設定は board.settings にある (TODO-053)
-    const settings_attr = name => page.evaluate(
-        n => board.settings[n], name);
-    const turn = () => page.evaluate(() => board.gameinfo.turn);
+    // 画面ごとの設定 (TODO-053)
+    const settings_attr = async name => (await settings(page))[name];
+    const turn = async () => (await gameinfo(page)).turn;
 
     /**
      * メニューを開いて項目を押す。押す前に貯めたメッセージは捨てる
@@ -233,7 +187,7 @@ describe('クリックでの操作', () => {
     };
 
     /**
-     * board.settings.player が want になるまで待つ (回転は 0.5 秒かけて動く)
+     * settings.player が want になるまで待つ (回転は 0.5 秒かけて動く)
      *
      * @param {number} want
      */
@@ -242,7 +196,7 @@ describe('クリックでの操作', () => {
 
     // --- メニュー ---
 
-    it('メニュー「ボード回転」→ board.settings.player が反転し、メニューが閉じる',
+    it('メニュー「ボード回転」→ settings.player が反転し、メニューが閉じる',
        async () => {
            const p0 = await settings_attr('player');
            await menu('ボード回転');
@@ -296,7 +250,7 @@ describe('クリックでの操作', () => {
 
     // --- ヘッダ ---
 
-    it('ヘッダ Sound → board.settings.sound が反転する', async () => {
+    it('ヘッダ Sound → settings.sound が反転する', async () => {
         const s0 = await settings_attr('sound');
         await page.locator('#sound-switch').click();
         assert.equal(await settings_attr('sound'), !s0);
@@ -304,14 +258,14 @@ describe('クリックでの操作', () => {
         assert.equal(await settings_attr('sound'), s0);
     });
 
-    it('ヘッダ Free → board.settings.free_move が true になる', async () => {
+    it('ヘッダ Free → settings.free_move が true になる', async () => {
         await page.locator('#free-move').click();
         assert.equal(await settings_attr('free_move'), true);
         await page.locator('#free-move').click();
         assert.equal(await settings_attr('free_move'), false);
     });
 
-    it('ヘッダ Pip → board.settings.disp_pip が true になる', async () => {
+    it('ヘッダ Pip → settings.disp_pip が true になる', async () => {
         await page.locator('#disp-pip').click();
         assert.equal(await settings_attr('disp_pip'), true);
         await page.locator('#disp-pip').click();
@@ -346,7 +300,7 @@ describe('クリックでの操作', () => {
            await assert_only_sent(page, 'set_clock_limit',
                                   { index: 0, clock_limit: 180 });
            await wait_for(
-               () => page.evaluate(() => board.clock_limit.limit[0]),
+               async () => (await shown_parts(page)).clock_limit[0],
                v => v === 180, { msg: 'clock_limit[0]' });
        });
 
@@ -359,7 +313,7 @@ describe('クリックでの操作', () => {
            await assert_only_sent(page, 'set_clock_limit',
                                   { index: 1, clock_limit: 15 });
            await wait_for(
-               () => page.evaluate(() => board.clock_limit.limit[1]),
+               async () => (await shown_parts(page)).clock_limit[1],
                v => v === 15, { msg: 'clock_limit[1]' });
        });
 
@@ -434,7 +388,7 @@ describe('クリックでの操作', () => {
         await assert_sent(page, 'fwd', { n: 1 });
     });
 
-    it('盤面の回転ボタン → board.settings.player が反転する', async () => {
+    it('盤面の回転ボタン → settings.player が反転する', async () => {
         const p0 = await settings_attr('player');
         await page.locator('#button-inverse').click({ force: true });
         await wait_player(1 - p0);
@@ -444,7 +398,7 @@ describe('クリックでの操作', () => {
 
     it('スコアの ▲ → set_score {player: 0, score: +1} を送る', async () => {
         await settle(page);
-        const s0 = await page.evaluate(() => board.gameinfo.score[0]);
+        const s0 = (await gameinfo(page)).score[0];
         await take_sent(page);
         await page.locator('#score_up0').click({ force: true });
         await assert_only_sent(page, 'set_score',
@@ -457,42 +411,17 @@ describe('クリックでの操作', () => {
         await assert_only_sent(page, 'set_score', { player: 0, score: 0 });
     });
 
-    /**
-     * 要素を、返事を待たずに続けて n 回押し、押し終えた直後の状態を返す。
-     *
-     * 1 回の evaluate の中で押すので、その間にサーバの返事は届かない。
-     * 手元の写しを持たずに gameinfo を読むので、先に表示 (apply()) して
-     * いないと 2 回目も同じ値を送ってしまう (TODO-052)
-     *
-     * @param {string} id
-     * @param {number} n
-     * @return {Promise<{score: number[], shown: string, dice: number[],
-     *                   shown_dice: number[]}>}
-     */
-    const press_n = (id, n) => page.evaluate(([id, n]) => {
-        const el = document.getElementById(id);
-        for (let i = 0; i < n; i++) {
-            const r = el.getBoundingClientRect();
-            el.dispatchEvent(new MouseEvent('mousedown', {
-                bubbles: true,
-                clientX: r.x + r.width / 2, clientY: r.y + r.height / 2,
-            }));
-        }
-        return { score: board.gameinfo.score.slice(),
-                 shown: board.score[0].el.innerHTML,
-                 dice: board.gameinfo.board.dice[0].slice(),
-                 dice_els: board.roll_btn[0].dice.map(
-                     d => ({ z: d.z, src: d.image_el.src,
-                             opacity: d.image_el.style.opacity })) };
-    }, [id, n]).then(r => ({ ...r, shown_dice: dice_from_els(r.dice_els) }));
+    // 返事を待たずに続けて押すのは press_n()。手元の写しを持たずに
+    // gameinfo を読むので、先に表示 (apply()) していないと 2 回目も
+    // 同じ値を送ってしまう (TODO-052)
 
     it('スコアの ▲ を返事の前に 2 回押す → 2 回ぶん足される', async () => {
         // 上の ▼ で 0 になっている
         await settle(page);
-        const s0 = await page.evaluate(() => board.gameinfo.score[0]);
+        const s0 = (await gameinfo(page)).score[0];
         await take_sent(page);
 
-        const r = await press_n('score_up0', 2);
+        const r = await press_n(page, 'score_up0', 2);
         // 返事の前に、表示と gameinfo が 2 つ進んでいる (先行実行)
         assert.equal(r.score[0], s0 + 2, 'gameinfo が 2 つ進んでいない');
         assert.equal(r.shown, String(s0 + 2), '表示が 2 つ進んでいない');
@@ -503,7 +432,7 @@ describe('クリックでの操作', () => {
             ['set_score', { player: 0, score: s0 + 1 }],
             ['set_score', { player: 0, score: s0 + 2 }],
         ]);
-        assert.equal(await page.evaluate(() => board.gameinfo.score[0]),
+        assert.equal((await gameinfo(page)).score[0],
                      s0 + 2, 'サーバの盤面が 2 つ進んでいない');
 
         // 元に戻す
@@ -514,7 +443,7 @@ describe('クリックでの操作', () => {
     it('free move でダイスを返事の前に 2 回押す → 目が 2 つ進む', async () => {
         await send_msg(page, 'dice', { player: 0, dice: [5, 0, 0, 0] });
         await wait_for(
-            () => page.evaluate(() => board.gameinfo.board.dice[0]),
+            async () => (await gameinfo(page)).board.dice[0],
             d => d[0] === 5, { msg: 'dice' });
         await page.locator('#free-move').click();
         try {
@@ -522,7 +451,7 @@ describe('クリックでの操作', () => {
             await take_sent(page);
 
             // 5 -> 6 -> 1
-            const r = await press_n('dice00', 2);
+            const r = await press_n(page, 'dice00', 2);
             assert.deepEqual(r.dice, [1, 0, 0, 0],
                              'gameinfo が 2 つ進んでいない');
             assert.deepEqual(r.shown_dice, [1, 0, 0, 0],
@@ -535,14 +464,14 @@ describe('クリックでの操作', () => {
                 ['dice', { player: 0, dice: [1, 0, 0, 0] }],
             ]);
             assert.deepEqual(
-                await page.evaluate(() => board.gameinfo.board.dice[0]),
+                (await gameinfo(page)).board.dice[0],
                 [1, 0, 0, 0], 'サーバの盤面が 2 つ進んでいない');
         } finally {
             await page.locator('#free-move').click();
             // 次の項目 (キューブ) はダイスが空の前提
             await send_msg(page, 'dice', { player: 0, dice: [0, 0, 0, 0] });
             await wait_for(
-                () => page.evaluate(() => board.gameinfo.board.dice[0]),
+                async () => (await gameinfo(page)).board.dice[0],
                 d => d.every(v => v === 0), { msg: 'dice clear' });
         }
     });
@@ -597,14 +526,14 @@ describe('クリックでの操作', () => {
 
         await assert_only_sent(page, 'double', { player: 0 });
         await wait_for(
-            () => page.evaluate(() => board.gameinfo.board.cube),
+            async () => (await gameinfo(page)).board.cube,
             c => c.side === 1 && c.value === 2 && c.accepted === false,
             { msg: 'double' });
 
         // 後始末: プレーヤー 1 がテイクしたことにする (次の Roll のため)
         await send_msg(page, 'take', { player: 1 });
         await wait_for(
-            () => page.evaluate(() => board.gameinfo.board.cube.accepted),
+            async () => (await gameinfo(page)).board.cube.accepted,
             a => a === true, { msg: 'take' });
     });
 
@@ -630,7 +559,7 @@ describe('クリックでの操作', () => {
      * @param {{side: number, value: number, accepted: boolean}} want
      */
     const wait_cube = want => wait_for(
-        () => page.evaluate(() => board.gameinfo.board.cube),
+        async () => (await gameinfo(page)).board.cube,
         c => c.side === want.side && c.value === want.value
             && c.accepted === want.accepted,
         { msg: `cube ${JSON.stringify(want)}` });
@@ -646,8 +575,8 @@ describe('クリックでの操作', () => {
         await take_sent(page);
 
         // 自分の側 (下) から中央より上へ動かす
-        const dy = await page.evaluate(
-            () => board.cube.y1[1] - board.cube.y1[0]);
+        const { cube_y1 } = await shown_parts(page);
+        const dy = cube_y1[1] - cube_y1[0];
         await drag_cube(dy);
 
         await assert_only_sent(page, 'double', { player: 0 });
@@ -690,7 +619,7 @@ describe('クリックでの操作', () => {
         // テイクの項目のまま自分の側でテイク済みなので、ダイスが無ければ
         // double を送る盤面 (TODO-052)
         await settle(page);
-        assert.ok(await page.evaluate(() => board.has_dice(0)), 'ダイスが無い');
+        assert.ok((await judge(page)).has_dice[0], 'ダイスが無い');
         await take_sent(page);
 
         await drag_cube(5);
@@ -704,14 +633,14 @@ describe('クリックでの操作', () => {
         // キューブの操作でクロックが切り替わっているので、動いているか
         // どうかはここで読む
         await settle(page);
-        const active0 = await page.evaluate(() => board.player_clock[0].active);
+        const active0 = (await shown_parts(page)).clock_active[0];
         for (const active of [active0, !active0]) {
             await take_sent(page);
             await page.locator('#p0clock').click({ force: true });
             await assert_only_sent(
                 page, active ? 'stop_clock' : 'resume_clock', { player: 0 });
             await wait_for(
-                () => page.evaluate(() => board.player_clock[0].active),
+                async () => (await shown_parts(page)).clock_active[0],
                 a => a === !active, { msg: 'clock' });
         }
     });
@@ -721,7 +650,7 @@ describe('クリックでの操作', () => {
         // Roll のあとなので turn は 0。目を使えないもの (11〜16) にする
         await send_msg(page, 'dice', { player: 0, dice: [13, 15, 0, 0] });
         await wait_for(
-            () => page.evaluate(() => board.gameinfo.board.dice[0]),
+            async () => (await gameinfo(page)).board.dice[0],
             d => d[0] === 13 && d[1] === 15, { msg: 'dice' });
         await settle(page);
         await take_sent(page);
@@ -740,7 +669,7 @@ describe('クリックでの操作', () => {
            await set_turn(page, 0);
            await settle(page);
            await take_sent(page);
-           const r = await press_pass(page, 'click');
+           const r = await press_pass_banner(page, 'click');
            assert.equal(r.shown, true, 'パスのバナーが出ていない');
            assert.equal(r.active, false, 'パスのバナーが消えていない');
            await assert_only_sent(page, 'end_turn', { player: 0 });
@@ -756,28 +685,17 @@ describe('クリックでの操作', () => {
            await set_turn(page, 0);
            await settle(page);
            await take_sent(page);
-           const r = await press_pass(page, 'space');
+           const r = await press_pass_banner(page, 'space');
            assert.equal(r.shown, true, 'パスのバナーが出ていない');
            assert.equal(r.active, false, 'パスのバナーが消えていない');
            await assert_only_sent(page, 'end_turn', { player: 0 });
        });
 
-    for (const [name, list] of [['投了', 'resign_banner_btn'],
-                                ['勝ち', 'win_btn']]) {
+    for (const [name, banner] of [['投了', 'resign'], ['勝ち', 'win']]) {
         it(`${name}のバナー → on_click が呼ばれ、何も送らない`, async () => {
             await settle(page);
             // on_click を包んで、呼ばれたことを記録する
-            const id = await page.evaluate(l => {
-                const b = board[l][0];
-                const orig = b.on_click;
-                window.__clicked = undefined;
-                b.on_click = btn => {
-                    window.__clicked = btn.id;
-                    orig(btn);
-                };
-                b.on();
-                return b.id;
-            }, list);
+            const id = await show_banner(page, banner);
             await take_sent(page);
             await page.locator(`#${id}`).click({ force: true });
 
@@ -788,7 +706,7 @@ describe('クリックでの操作', () => {
             await sleep(200);
             assert.deepEqual(await take_sent(page), []);
 
-            await page.evaluate(l => board[l][0].off(), list);
+            await hide_banner(page, banner);
         });
     }
 
@@ -810,7 +728,7 @@ describe('クリックでの操作', () => {
     it('投了ボタン → resign {player: 0, score} だけを送る', async () => {
         // TODO-051 より前は stop_clock 2 通・set_turn・set_score を送っていた
         await settle(page);
-        const cube = await page.evaluate(() => board.gameinfo.board.cube);
+        const cube = (await gameinfo(page)).board.cube;
         const score = cube.accepted ? cube.value * 3 : cube.value / 2;
         await take_sent(page);
         await page.locator('#button-resign').click({ force: true });
@@ -838,9 +756,7 @@ describe('クリックでの操作', () => {
         });
         try {
             await p.goto(server.url);
-            await p.waitForFunction(
-                () => typeof board !== 'undefined' && board !== undefined
-                    && board.cube !== undefined);
+            await wait_board(p, { received: false });
 
             await p.evaluate(() => {
                 const fire = (el, type) => {
@@ -864,7 +780,7 @@ describe('クリックでの操作', () => {
                            { msg: 'back' });
             await sleep(200);
 
-            assert.equal(await p.evaluate(() => board.gameinfo), undefined);
+            assert.equal(await gameinfo(p), undefined);
             assert.deepEqual(received.map(m => JSON.parse(m).type), ['back']);
             assert.deepEqual(errors, []);
         } finally {
