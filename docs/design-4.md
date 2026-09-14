@@ -1,259 +1,348 @@
 # モジュール構成とクラス構成の見直し（第 4 弾）
 
-TODO-056 の設計案。2026-09-14 作成。現行仕様ではなく、利用者の確認待ち。
+TODO-056 の設計案。2026-09-14 作成。現行仕様ではない。
 この項目ではソースコードを変更しない。
+
+2026-09-14 に、Codex（main）が設計し、reviewer が現行コードと照らして確認した。
+同日に Claude Code（main）が改めて確認し、利用者と相談して方針を決めた
+（末尾の「設計確認で決めたこと」）。本文はその決定を反映してある。
 
 ## 目的と範囲
 
-状態の所有者を明確にし、操作の判断を表示部品から独立させる。
+状態の持ち主を明確にし、操作の判断を表示部品から独立させる。
 クラスは状態やライフサイクルを持つものに使い、計算は関数にする。
 ファイルを分けるだけで相互参照が残る構成は避ける。
+ファイルは、使う側が 2 つ以上になるまで分けない。
 
 共有ボード、free move、クライアントでのルール判定、WebSocket の
 メッセージ形式、JSON Lines v2、ES Modules による配布を維持する。
-先行実行の競合解決や配信キューの導入は別の挙動変更になるため含めない。
-現在の操作条件や例外時の扱いを移行の過程で変更しない。
+先行実行の競合解決や配信キューの導入は、別の挙動変更になるため含めない。
+操作条件や例外時の扱いは、下の「変える挙動」の 4 つを除いて変えない。
 
 ## 現行コードで確認した問題
 
-| 場所 | 結び付き | 変更後 |
-|------|----------|--------|
-| `board.js` の `Board extends BgImage` | アプリの状態と表示部品の継承が一体 | Model・Controller と View を分離し、背景画像は View が所有 |
-| `checker_order()` / `predict_gameinfo()` | 駒の並びや予測が `Checker` を返す、または読む | IDと盤面データだけで計算 |
-| `actions.js` の `decide_dst()` / `move()` | 表示部品から行き先・ヒット・送信内容を決める | 純粋関数から操作と予測盤面を返す |
-| `Board.apply()` | 盤面置換、描画、クロック反映、演出を一括処理 | Controller が適用順を管理し、View は描画を担当 |
-| `RollButton` | ダイス4個の生成、他のバナー操作、2秒後の自動クリック | View が部品を組み、Controller がタイマーを扱う |
-| `PlayerClock` / `ClockLimit` | 残り時間・設定の所有とDOM表示が一体 | Model が時刻の基準を持ち、View が表示 |
-| `BgBase.get_xy()` | 基底クラスが `board.settings` や派生クラスの `settings` を参照 | 入力用の座標変換を明示的に渡す |
-| `BoardPoint` | DOMがないのに表示基底を継承し、駒を直接動かす | `layout.js` の座標計算 |
-| `server.py` | 解析と実行が同居し、`None` が無視と送信済みを兼ねる | 登録・解析と実行を分離、結果を明示 |
-| `settings.js` / `log.js` | 相互 import と評価順への注意 | 起動時設定を独立させ、循環を除く |
+| 場所 | いまの問題 | 変更後 |
+|------|------------|--------|
+| `board.js` の `Board extends BgImage` | アプリの状態と表示部品の継承が一体 | Model・Controller と View を分け、背景画像は View が持つ |
+| `checker_order()` / `predict_gameinfo()` | 駒の並びや予測が `Checker` を返す、または読む | ID と盤面データだけで計算 |
+| `actions.js` の `decide_dst()` / `move()` | 表示部品から行き先・ヒット・送信内容を決める | 純粋関数が操作と予測の盤面を返す |
+| `Board.apply()` | 盤面の置き換え、描画、クロックの反映、演出を一度に行う | Controller が順番を決め、View は描画を受け持つ |
+| `RollButton` | ダイス 4 個の生成、他のバナーの操作、2 秒後の自動クリック | View が部品を組み、Controller がタイマーを持つ |
+| `PlayerClock` / `ClockLimit` | 残り時間・設定の保持と DOM の表示が一体 | Model が時刻の基準を持ち、View が表示 |
+| `BgBase.get_xy()` | 基底クラスが `board.settings` や派生クラスの `settings` を読む | 入力用の座標変換を引数で渡す |
+| `BoardPoint` | DOM が無いのに表示の基底を継承し、駒を直接動かす | `layout.js` の座標計算 |
+| `server.py` | 解析と実行が同じ場所にあり、`None` が「捨てた」と「送信済み」を兼ねる | 登録・解析と実行を分け、結果を型で表す |
+| `settings.js` / `log.js` | 互いに import していて、評価の順番に注意が要る | 起動時の設定を独立させ、循環を無くす |
 
 根拠は現在の `src/ytbg/` と `tests/`。過去の `design-3.md` は経緯として確認した。
-TODO-053 で見送った、同時ドラッグのテストが部品の入力経路を通らない点は、
-今回その経路を変更するため検証対象にする。0 のダイスが 10 になる既存挙動は
-今回修正しない。純粋関数への移動時に、現在の結果を確認して維持する。
+TODO-053 で見送った「同時ドラッグのテストが部品の入力経路を通らない」点は、
+今回その経路を変えるので検証の対象にする。
+
+## 変える挙動
+
+構成を移すときに、次の 4 つだけ挙動を変える。**そのコードを移す段階で入れ、
+変える点ごとにテストを足して、変える前のコードで落ちることを確かめる。**
+
+| 挙動 | いま | 変えたあと | 段階 |
+|------|------|------------|------|
+| 目が 0 のダイス | 使えない目を 11〜16 にするとき、0 が 10 になって送られ、履歴にも残る | 0 のまま | 3 |
+| Clock のチェックボックス | 計算は送信前に変わり、表示の ON/OFF は返事を待つ | 送るだけにして、両方とも返事の `clock_state` で変える | 4 |
+| 履歴の返事でのクロック | `clock_state` のうち `limit` だけを反映する | 全部反映する（クロックは履歴の対象外なので巻き戻らない） | 4 |
+| ドラッグ中の受信 | 駒は手元に残るが、キューブは決まった位置へ飛ぶ | キューブも手元に残す | 4 |
+
+保存済みの `.jsonl` にある 10 は、表示も判定も 0 と同じに扱われるので、
+そのまま読める。
+
+次の 2 つは今のまま残す（返事が届けば直り、直すには先行実行の仕組みを
+変える必要があるため）。
+
+- Roll の直後に得点の ▲ や free move のダイスを押すと、予測の描画で
+  Roll ボタンがもう一度出る
+- 予測を描画すると、他のクライアントが変えた `score` や名前が 1 往復ぶん戻る
 
 ## クライアントの構成
 
 ```text
 main.js ── 組み立て・起動
   ├─ BoardController ── BoardModel ── rules/
-  │       ├─ 送信関数（ws.js から注入）
-  │       └─ BoardView ── ui/・layout.js・Drag・入力処理
-  └─ Settings・起動時設定・音
+  │       ├─ 送信関数（ws.js から渡す）
+  │       └─ BoardView ── ui/・layout.js・Drag・入力の処理
+  └─ Settings・起動時の設定・音
 ```
 
 View と ui は Controller や Model を import しない。入力はコールバックで
-ID・値・盤面座標を渡す。Model と rules は DOM・WebSocket・音に依存しない。
-`rules/` が import できるのは従来どおり `rules/` 内だけとする。
+ID・値・盤面の座標を渡す。Model と rules は DOM・WebSocket・音に依存しない。
+`rules/` が import できるのは、これまでどおり `rules/` の中だけ。
 
-| モジュール | 公開するもの | 所有する状態 |
-|------------|--------------|--------------|
-| `board_model.js` | `BoardModel.receive(data, now)`、`predict(gameinfo)`、`snapshot(now)` | 現在の gameinfo、履歴表示の番号、クロックの基準値と基準時刻 |
-| `board_controller.js` | `BoardController.receive(data)`、操作ごとのメソッド、`dispose()` | オープニングと時計更新のタイマー、注入された Model・View・send・Settings |
-| `board_view.js` | `BoardView.render(snapshot, options)`、`render_clock(clock)`、`play_effects(effects)`、`dispose()` | DOM部品、画像寸法、向き、ドラッグ |
-| `rules/actions.js` | `can_pick_checker(gi, id, free_move)`、`decide_dst(gi, id, point)`、`plan_move(gi, id, point)` | なし |
-| `rules/state.js` | `checker_order(gi)`、`checkers_at(gi, point)`、`active_dice(gi, player)`、盤面の複製 | なし |
-| `presentation.js` | `present(snapshot, settings)`、`effects_for(previous, next, last_op)` | なし。バナー・PIP・演出の判定結果を返す |
-| `layout.js` | 既存の配置に加え `checker_geometry(point, index, size)` と当たり判定 | なし |
-| `input.js` | `bind_input(el, to_board_xy, handlers)`。解除関数を返す | リスナーだけ |
-| `config.js` | URLクエリ・bodyのdata属性の読み口 | なし |
+| モジュール | 公開するもの | 持つ状態 |
+|------------|--------------|----------|
+| `board_model.js` | `BoardModel.receive(data, now)`、`predict(gameinfo)`、`snapshot(now)` | 今の gameinfo、履歴の番号、クロックの基準値と基準時刻 |
+| `board_controller.js` | `BoardController.receive(data)`、操作ごとのメソッド、`dispose()` | オープニングと時計の更新のタイマー、渡された Model・View・送信関数・Settings |
+| `board_view.js` | `BoardView.render(snapshot, options)`、`render_clock(clock)`、`play_effects(effects)`、`dispose()` | DOM の部品、画像の寸法、向き、ドラッグ |
+| `rules/actions.js` | 操作ごとの判定と送信内容（下の表） | なし |
+| `rules/position.js` | 既存のものに加えて `checker_order(gi)`、`checkers_at(gi, point)`、`active_dice(gi, player)` | なし |
+| `layout.js` | 既存の配置に加えて `checker_geometry(point, index, size)` と当たり判定 | なし |
+| `config.js` | URL のクエリと `<body>` の `data-*` を読む関数 | なし |
 
-メソッド名はこの設計の推奨名。各シグネチャの引数は以下の意味とし、
-実装時には JSDoc で具体的な型を付ける。
+設計案の最初の版では `presentation.js`、`input.js`、`rules/state.js` も
+分けていた。使う側が 1 つなので分けない（「設計確認で決めたこと」の 3）。
 
-- `receive(data)` の data は現在のサーバ応答の data 全体。
-- `snapshot(now)` は盤面、履歴番号、表示時点のクロック値をまとめた読取用の値。
-  View は保存・書き換えをせず、その場で描画する。
-- `checker_order()` は `{id, player, point, idx}` の列。idx の安定ソートと
-  同値時の player・駒番号の順を維持する。UIの駒への変換は View だけで行う。
-- `plan_move()` は不成立なら `null`、成立なら `{message: {type, data}, predicted}`。
-  ヒットの2手、idx、使用済みダイス、勝ちの得点を同じ予測から求める。
-  駒の移動元は gameinfo から読む。入力盤面を変更せず、sn を進めない。
-- `present()` はバナーの表示、PIP、名前の強調などの値を返す。表示部品から
-  ルールを呼んだり、別の表示部品を操作したりしない。
+- `present(snapshot, settings)`（バナーの表示、PIP、名前の強調などの値を返す）と
+  `bind_input(el, to_board_xy, handlers)`（リスナーをつなぎ、解除する関数を返す）は、
+  `board_view.js` の中の関数にする
+- `effects_for(previous, next, last_op)`（鳴らす音と回すダイスを返す）は、
+  変更前の盤面を持つ Controller が求めて `view.play_effects()` に渡すので、
+  `board_controller.js` の中の関数にする
+- 盤面を読む関数は `rules/position.js` に足す。`copy_gameinfo()` は既にある
 
-`BoardModel` は既存の純粋関数をすべてラップするクラスにはしない。
-予測計算は rules が行い、Model は結果の置換と状態の所有を担当する。
-現在の `actions.js` は純粋な判断を rules に、送信・予測適用・タイマーを
-Controller に移し、移行完了時に削除する。
+メソッド名はこの設計で勧める名前。引数の意味は次のとおりで、
+実装するときに JSDoc で具体的な型を付ける。
 
-操作判断の公開範囲は次の一覧で固定する。plan関数は不成立ならnull、
-成立ならmessageと必要な場合だけpredictedを返す。表示の指示は返さない。
+- `receive(data)` の `data` は、サーバの返事の `data` 全体
+- `snapshot(now)` は、盤面、履歴の番号、その時点のクロックの値をまとめた、
+  読むだけの値。View は保存も書き換えもせず、その場で描画する
+- `checker_order()` は `{id, player, point, idx}` の列。`idx` の安定ソートと、
+  同じ値のときの player・駒番号の順を保つ。ui の駒に直すのは View だけ
+- `plan_move()` は、成り立たなければ `null`、成り立てば
+  `{message: {type, data}, predicted}`。ヒットの 2 手、`idx`、使ったダイス、
+  勝ちの点数を同じ予測から求める。駒の移動元は gameinfo から読む。
+  渡された盤面を書き換えず、`sn` を進めない
+- `present()` は、表示部品からルールを呼んだり、別の表示部品を
+  操作したりしない
 
-| 純粋関数（`rules/actions.js`） | 入力と判断 |
+`BoardModel` は、既存の純粋関数をすべて包むクラスにはしない。
+予測の計算は rules が行い、Model は結果の置き換えと状態の保持を受け持つ。
+今の `actions.js` は、純粋な判定を `rules/actions.js` に、送信・予測の反映・
+タイマーを Controller に移し、移し終えたら消す。
+
+操作の判定として公開するものは次の表で決める。plan の関数は、成り立たなければ
+`null`、成り立てば `message` と、要るときだけ `predicted` を返す。
+表示の指示は返さない。
+
+| 純粋関数（`rules/actions.js`） | 入力と判定 |
 |--------------------------------|------------|
-| `can_hold_cube(gi, player)` | turn、cubeのside・accepted、両者のダイス |
-| `plan_roll(gi, player, random_values)` | cube・turnと抽選済みの位置・目からダイスを作る。乱数生成はController |
-| `plan_dice_click(gi, player, index, free_move)` | free move、先手決め、ダイス消費後のend_turn |
-| `plan_end_turn(player)` | 現在と同じplayerの送信内容。新しい手番条件は加えない |
-| `plan_double(gi, player, redouble)` / `plan_take(player)` / `plan_cancel_double(player)` | 現在の上限条件と送信内容 |
-| `plan_resign(gi, player)` | 未テイク時の扱いと投了点数 |
-| `plan_score(gi, player, operation)` | 加点・クリア、上限、予測盤面 |
-| `plan_put_checker(gi, id, point)` | free moveのidxと送信内容。予測なし |
+| `can_pick_checker(gi, id, free_move)` | 駒を掴めるか |
+| `decide_dst(gi, id, point)` | 行き先とヒット |
+| `plan_move(gi, id, point)` | 上のとおり |
+| `can_hold_cube(gi, player)` | `turn`、キューブの `side`・`accepted`、両者のダイス |
+| `plan_cube_drop(gi, player, geometry)` | 下の「入力、ドラッグ、クロック」を見ること |
+| `plan_roll(gi, player, random_values)` | キューブ・`turn` と、抽選済みの位置・目からダイスを作る。乱数を作るのは Controller |
+| `plan_dice_click(gi, player, index, free_move)` | free move、先手決め、ダイスを使い切ったあとの `end_turn` |
+| `plan_end_turn(player)` | 今と同じ player の送信内容。新しい手番の条件は足さない |
+| `plan_double(gi, player, redouble)` / `plan_take(player)` / `plan_cancel_double(player)` | 今の上限の条件と送信内容 |
+| `plan_resign(gi, player)` | 未テイクのときの扱いと投了の点数 |
+| `plan_score(gi, player, operation)` | 加点・クリア、上限、予測の盤面 |
+| `plan_put_checker(gi, id, point)` | free move の `idx` と送信内容。予測はしない |
 
-駒の通常操作は前述のplan_move、キューブを離す操作は後述のplan_cube_dropを使う。
-数値への変換、名前・履歴・時計設定の送信はControllerが行う。
-時計のstop/resumeはModelのactiveから選ぶ。ルールに時計や通信を持ち込まない。
-roll成功時のボタン非表示と自動操作の予約はControllerが行う。
+数への変換、名前・履歴・時計の設定の送信は Controller が行う。
+時計の `stop` / `resume` は Model の `active` から選ぶ。ルールに時計や通信を
+持ち込まない。Roll が成り立ったときのボタンの非表示と、自動操作の予約は
+Controller が行う。
 
 ### 状態の反映と演出
 
-サーバ受信時は Controller が変更前の盤面を取り、Model に応答を適用し、
-View を描画してから演出を実行する。`put_checker` の音は変更前の盤面の位置で
-判定し、`move` のヒット音は従来どおり last_op.moves のバーへの移動で判定する。
-roll は turn が -1 のとき演出しない。opening / end_turn の音は
-手番の差分ではなく操作名と新しい turn で判定する。
+サーバから受け取ったら、Controller が変更前の盤面を取り、Model に返事を
+反映し、View を描画してから演出を行う。`put_checker` の音は変更前の盤面の
+位置で判定し、`move` のヒット音はこれまでどおり `last_op.moves` のバーへの
+移動で判定する。`roll` は `turn` が -1 のとき演出しない。`opening` /
+`end_turn` の音は、手番の差ではなく操作名と新しい `turn` で判定する。
 
 予測も同じ描画を使うが、クロックの基準と演出には触れない。
-通常の move は送信後に予測反映、free move のダイス・得点は予測反映後に
-送信する現行の順序を保つ。free move の駒は予測しない。
-通信中の予測を再適用するキューは作らず、サーバ応答で現在値を置換する。
+通常の `move` は送信してから予測を反映し、free move のダイス・得点は
+予測を反映してから送る。今の順番を保つ。free move の駒は予測しない。
+送信中の予測を返事に重ね直す仕組みは作らず、返事で今の値を置き換える。
 
 `Dice.set(value)` は画像・不透明度・定位置を反映し、`animate_roll()` は
-回転だけを担当する。Rollボタンとダイスは View の兄弟部品にし、
-Rollボタンがダイスを所有する構成を解消する。
+回転だけを受け持つ。Roll ボタンとダイスは View の中で並べて持ち、
+Roll ボタンがダイスを持つ形をやめる。
 
 ### 入力、ドラッグ、クロック
 
 `BgBase` は DOM の移動・回転・表示だけを持つ。`BgImage` / `BgText` の
-薄い継承は残せるが、board・Settings・操作関数への参照は持たせない。
-全イベントを基底のコンストラクタで登録せず、必要な部品だけ input.js でつなぐ。
-マウスとタッチの既存の座標変換を移し、Pointer Events への変更は同時に行わない。
+薄い継承は残してよいが、board・Settings・操作の関数への参照は持たせない。
+すべてのイベントを基底のコンストラクタで登録せず、要る部品だけを
+`bind_input()` でつなぐ。マウスとタッチの今の座標変換を移し、
+Pointer Events への切り替えは同時に行わない。
 
-Drag は View に属し、駒とキューブの掴んだ位置を別々に保持する。
-押した駒の操作可否を確認してから、そのポイントの先端の駒へ持ち替える
-現在の順番を維持する。Controller との受け渡しは駒IDとポイント番号とする。
-離した状態を解除してから Controller を呼び、予測描画でドラッグ座標が
-復元されないようにする。不成立なら掴んだときの座標へ戻す。
-受信中も掴んだ駒の見た目の座標と z を保持する。キューブの受信時の
-位置更新も現行と比較し、駒と同じ保持処理へ勝手に統一しない。
+Drag は View に置き、駒とキューブの掴んだ位置を別々に持つ。
+押した駒を掴めるか確かめてから、そのポイントの先端の駒へ持ち替える
+今の順番を保つ。Controller との受け渡しは、駒の ID とポイント番号で行う。
+掴んでいる状態を外してから Controller を呼び、予測の描画でドラッグの座標が
+戻されないようにする。成り立たなければ、掴んだときの座標へ戻す。
+**受信しても、掴んでいる駒とキューブの見た目の座標と z を保つ**
+（キューブは今は決まった位置へ飛ぶ。「変える挙動」を見ること）。
 
-クロックの基準値・active・sw・limit は Model が所有し、時計表示は
-`snapshot(now)` で計算する。予測では基準時刻を更新しない。
-Controllerが現在と同じ200msのintervalを持ち、毎回時刻を渡して
-`view.render_clock(model.snapshot(now).clock)` を呼ぶ。盤面全体の再描画や
-演出は行わない。Controller.disposeがintervalと自動操作のtimeoutを解除する。
-履歴応答では limit のみ反映し、active・残り時間・sw は現在の表示の
-基準を保持する（現行の history_flag の扱い）。クロックのクリックは
-Model の active を見て stop / resume を決める。
-初回受信前のクロック設定と表示は、現在のHTML初期値から初期化する。
-Clockチェックボックスは現在、送信前にローカルのswを変えているため、
-ControllerからModelのswを先に更新して送る。単に応答待ちには変えない。
-その場では盤面全体を再描画せず、時計計算のみ新しいswを使う。
-時計要素の表示・非表示は通常のサーバ応答で反映し、render_clockは変更しない。
-チェックボックスの表示は入力時の値を保つ。swが無効な間の各tickでは
-現在のPlayerClockと同様に基準値と基準時刻を更新し、無効期間を後で差し引かない。
-持ち時間の入力は秒へ換算して送り、基準値は応答で反映する。
+クロックの基準値・`active`・`sw`・`limit` は Model が持ち、サーバから届いた
+`clock_state` だけから作る。時計の表示は `snapshot(now)` で計算する。
+予測では基準時刻を変えない。**履歴の返事でも `clock_state` をすべて反映する**
+ので、クライアントは `history_flag` を読まない。
+Controller が今と同じ 200 ms の interval を持ち、毎回時刻を渡して
+`view.render_clock(model.snapshot(now).clock)` を呼ぶ。盤面全体の描画や
+演出は行わない。`Controller.dispose()` が interval と自動操作の timeout を解除する。
+クロックのクリックは、Model の `active` を見て `stop` / `resume` を決める。
+最初の返事が届く前のクロックの設定と表示は、今の HTML の初期値から作る。
 
-キューブを離す操作は、Viewが `src_y`・最後の描画位置・中央と両側の
+**Clock のチェックボックスは `set_clock_switch` を送るだけにする。**
+`sw` による計算も、時計の要素の表示・非表示も、返事の `clock_state` で変える。
+チェックボックスの表示も返事の `sw` に合わせる。`sw` が無効な間の各 tick では、
+今の `PlayerClock` と同じく基準値と基準時刻を更新し、無効だった時間を
+あとから差し引かない。持ち時間の入力は秒に直して送り、基準値は返事で反映する。
+
+キューブを離す操作では、View が `src_y`・最後に描画した位置・中央と両側の
 基準座標を値で渡す。純粋関数 `plan_cube_drop(gi, player, geometry)` が
-take / double / cancel_doubleを選ぶ。境界の等号、最後の描画位置を使う点、
-リダブル時のプレーヤー番号も既存条件を保ち、DOM要素は渡さない。
+`take` / `double` / `cancel_double` を選ぶ。境界の等号、最後に描画した位置を
+使う点、リダブルのときのプレーヤー番号も今の条件を保ち、DOM の要素は渡さない。
 
-オープニングの2秒後の処理は Controller がダイスのクリックと同じ操作を
-呼ぶ。タイマー開始時の「相手のダイスが出ている」条件と、実行時に最新の
-状態で判断する挙動を維持する。受信ごとに再予約しない。dispose 時に解除する。
-Roll直後にボタンを隠す処理は一時的な表示操作として View に委譲し、
-次の描画で状態から表示が決まる現在の挙動を維持する。
+オープニングの 2 秒後の処理は、Controller がダイスのクリックと同じ操作を
+呼ぶ。タイマーを始めるときの「相手のダイスが出ている」条件と、実行するときに
+最新の状態で判断する挙動を保つ。受信のたびに予約し直さない。
+`dispose()` で解除する。
+Roll の直後にボタンを隠す処理は、一時的な表示の操作として View に任せ、
+次の描画で状態から表示が決まる今の挙動を保つ。
 
-`main.js` は DOM生成、画像待機、依存の組み立て、イベント接続を担当する。
-ヘッダの要素もまとめて View へ渡す。画像を作る時期と待機を保ち、
-画像寸法が0のまま組み立てない。キーボードも部品のマウスメソッドではなく
-Controller の操作を呼ぶが、Roll / Pass が有効なときだけという条件を保つ。
+`main.js` は、DOM の生成、画像の待機、依存するものの組み立て、イベントの
+接続を受け持つ。ヘッダの要素もまとめて View へ渡す。画像を作る時期と待機を
+保ち、画像の寸法が 0 のまま組み立てない。キーボードも部品のマウスのメソッド
+ではなく Controller の操作を呼ぶが、Roll / Pass が有効なときだけという条件は保つ。
 
-`config.js` にクエリと data属性の読み口を移し、log.js はそこだけを参照する。
-Settings は画面ごとの設定とcookieを担当する。音スイッチ変更時の
-クエリ再読込と、`?sound=` の現行の扱いも維持する。
+クエリと `data-*` を読む関数を `config.js` に移し、`log.js` はそこだけを
+import する。Settings は画面ごとの設定と cookie を受け持つ。音のスイッチを
+変えたときにクエリを読み直す処理と、`?sound=` の今の扱いも保つ。
 
 ## サーバの構成
 
-| モジュール | 責務 |
-|------------|------|
-| `app.py` | Starlette、JSON受信、接続を継続するかの例外処理、依存の組み立て |
-| `server.py` / `BackgammonServer` | 接続管理への委譲、解析、Sessionへの実行依頼、応答のWebSocket配信 |
-| `session.py` / `BoardSession` | GameInfo・Clock・History・Storage・Replayerの所有、操作実行、保存、履歴再生 |
-| `protocol.py` | 単一の登録表、parse、型検査、応答のJSON組み立て |
-| `message.py` | 既存の入力dataclassと例外 |
-| `gameinfo.py` ほか | 現在の盤面更新、時計、履歴、保存形式、Task管理 |
+| モジュール | 受け持つこと |
+|------------|--------------|
+| `app.py` | Starlette、JSON の受信、接続を続けるかの例外処理、依存するものの組み立て |
+| `server.py` / `BackgammonServer` | 接続の管理を `ClientHub` に任せる、解析、Session への実行の依頼、返事の WebSocket での配信 |
+| `session.py` / `BoardSession` | GameInfo・Clock・History・Storage・Replayer を持ち、操作の実行、保存、履歴の再生 |
+| `protocol.py` | 1 つの登録表、`parse()`、型の確認、返事の JSON の組み立て |
+| `message.py` | 既存の入力の dataclass と例外 |
+| `gameinfo.py` ほか | 今の盤面の更新、時計、履歴、保存の形式、Task の管理 |
 
-Session は WebSocket と raw JSON を知らず、`publish(update)` という
-非同期コールバックを受ける。Server がその値を protocol の関数でJSONにして
-ClientHubへ送る。Session は server.py / protocol.py を import しない。
-保存先パスの環境変数解決は app.py の組み立て時に行い、Storage を渡す。
+Session は WebSocket と生の JSON を知らず、`publish(update)` という
+非同期のコールバックを受け取る。Server がその値を protocol の関数で JSON にして
+`ClientHub` へ送る。Session は `server.py` / `protocol.py` を import しない。
+保存先のパスを環境変数から決めるのは `app.py` の組み立てのときに行い、
+Storage を渡す。
 
-`protocol.py` の登録行は `MessageType(make_data, handler, history)` を維持し、
-handler は BoardSession のメソッドを参照する。型を追加する登録箇所は増やさない。
-parse は解決した登録行と型付きデータを返し、Server が handler と history を
-Session の実行メソッドへ渡す。既存の data の型・必須キーの検査を維持する。
-GameInfo が入力dataclassを受ける現在の形は残し、同型の内部クラスを増やさない。
+`protocol.py` の登録の行は `MessageType(make_data, handler, history)` のままにし、
+handler は `BoardSession` のメソッドを指す。type を足すときに書き足す場所は
+増やさない。`parse()` は見つけた登録の行と型付きのデータを返し、Server が
+handler と history を Session の実行のメソッドへ渡す。今の `data` の型と
+必須キーの確認は保つ。GameInfo が入力の dataclass を受け取る今の形は残し、
+同じ形の内部クラスを増やさない。
 
-操作結果は `Applied(sec)`、`Ignored(reason)`、`Handled` の3種類とする。
-Applied では Session が勝負終了時の時計停止、履歴登録・保存、publish の順に
-処理する。Ignored はログを出し、履歴登録も配信もしない。Handled は履歴再生や
-new のように専用経路で処理したことを表し、共通後処理を行わない。
-Clock設定の保存とNew Gameの必須保存も現行どおり実行する。
+操作の結果は `Applied(sec)`、`Ignored(reason)`、`Handled` の 3 種類にする。
+`Applied` では、Session が勝負がついたときの時計の停止、履歴への追加・保存、
+`publish` の順に行う。`Ignored` はログを出し、履歴にも積まず配信もしない。
+`Handled` は履歴の再生や `new` のように専用の経路で処理したことを表し、
+共通の後処理を行わない。クロックの設定の保存と、New Game で必ず行う保存も
+今のとおり行う。
 
-publish に渡す Update は盤面のスナップショット、時計状態、履歴番号、秒数、
-history_flag とする。通常応答の raw last_op は Server のその要求のローカル値で
-添える。Session の処理に渡す publish を要求単位で束縛し、共有フィールドへ
-「最後の操作」を置かない。再生・接続・new・clear_hist は現在どおり last_op なし。
+`publish` に渡す Update は、盤面のスナップショット、時計の状態、履歴の番号、
+秒数とする。**`history_flag` は、クライアントが第 4 段階で読まなくなるので、
+第 5 段階で送るのをやめる。** 通常の返事の `last_op` は、Server がその要求の
+ローカルな値として添える。Session の処理に渡す `publish` は要求ごとに作り、
+共有のフィールドに「最後の操作」を置かない。再生・接続・`new`・`clear_hist` は、
+今のとおり `last_op` なし。
 
-Replayer のロックとcancelの範囲、n手の操作がその場で終わること、再生中の
-別操作との割込みを維持する。操作全体に新しいロックは導入しない。
-再生がcancelされてもfinallyで保存する経路を残す。New Gameを新たに
-再生停止対象にはしない。配信は現在と同じく全クライアントの完了を待つ。
+Replayer のロックと cancel の範囲、n 手の操作がその場で終わること、再生中の
+別の操作との割り込みを保つ。操作全体に新しいロックは入れない。
+再生が cancel されても `finally` で保存する経路を残す。New Game を新しく
+再生を止める対象にはしない。配信は今と同じく、全クライアントへ送り終わるのを待つ。
 
-## 移行順と実装項目の分割案
+## 実装項目の分け方
 
-段階的な移行を推奨する。一括置換なら仮の委譲メソッドは不要だが、
-入力・時計・通信の変更が同時に入り、違いの原因を絞りにくい。
-段階移行では各段階でテストを通し、最後に一時的な委譲を削除する。
-以下は後続TODOの候補であり、まだ登録・着手していない。
+段階的に移す。一括で置き換えると仮の委譲メソッドは要らないが、入力・時計・
+通信の変更が一度に入り、違いが出たときに原因を絞りにくい。
+各段階でテストを全件通し、一時的な委譲はその段階の中で消す。
+以下は後続の TODO の候補で、まだ立てていない。
 
-1. 盤面参照と操作予測を純粋関数へ移す。旧Boardから委譲して動作を維持する。
-2. BoardModel・Controller・BoardViewを同じ項目で導入する。
-   状態・操作・時計計算、入力・layout・演出を移し、部品のboard参照を除く。
-   actions.js と旧Board、不要な委譲を削除。configの循環解消もここで行う。
-   旧BoardをModelと並べて状態の所有者として残す中間段階は作らない。
-3. サーバをSession・protocolへ分け、結果型を導入する。
-4. Developer.md とテストの補助関数を最終構成へ揃え、全体確認する。
+1. **CLAUDE.md の実装の説明を `docs/Developer.md` へ移す。**
+   今の構成のまま移す。CLAUDE.md と AGENTS.md には、それぞれのツール向けの
+   注意だけを残し、Developer.md を参照させる。CLAUDE.md を編集するので
+   Claude Code で行う。文書だけの項目
+2. **ブラウザテストが `board` を直接触る箇所を `tests/browser/helper.mjs` の関数に
+   集める。** 盤面を読む、受信を差し替える、予測を観測する関数にする。
+   テストだけを変え、今の `Board` のまま全件が通ることを確かめる
+3. **盤面の参照と操作の予測を純粋関数へ移す。** 今の `Board` と `actions.js` から
+   委譲して、挙動を保つ。**目が 0 のダイスを 0 のままにする**のもここ
+4. **BoardModel・BoardController・BoardView を同じ項目で入れる。**
+   状態・操作・時計の計算、入力・layout・演出を移し、部品の board への参照を
+   無くす。`actions.js` と今の `Board`、要らなくなった委譲を消す。
+   `config.js` による循環の解消もここで行う。今の `Board` を Model と並べて
+   状態の持ち主として残す途中の段階は作らない。
+   **Clock のチェックボックス、履歴の返事でのクロック、ドラッグ中のキューブを
+   変えるのもここ**
+5. **サーバを Session と protocol に分け、結果の型を入れる。**
+   `history_flag` を送るのをやめるのもここ
 
-第3段階はクライアント変更と独立して先行できるが、既定は上記の順。
-第2段階は変更量が大きいが、状態の所有者と参照側を同時に替える必要がある。
-第1段階ではwindow.boardは既存Board、第2段階からはmainが
+第 5 段階はクライアントの変更と関係しないので先にもできるが、既定は上の順。
+第 4 段階は変更が大きいが、状態の持ち主と、それを読む側を同時に替える必要がある。
+
+第 3 段階までは `window.board` は今の `Board`。第 4 段階からは `main.js` が
 `window.board = {model, controller, view}` をデバッグ用に公開する。
-受信や予測を差し替えるテストも第2段階でcontrollerの入口に移し、
-その段階でブラウザテストを通す。旧APIを保つだけのFacadeは残さない。
+受信や予測を差し替えるテストは第 2 段階で helper に集めてあるので、
+第 4 段階では helper の中だけを Controller の入口に合わせ、テスト本体は変えない。
+古い API を保つためだけの Facade は残さない。
+
+`docs/Developer.md` は、第 1 段階のあと、コードを変える各段階で直す。
+構成を最後に見直すだけの段階は設けない。
 
 ## 検証と完了条件
 
-この設計項目の確認は、別担当による現行コードとの照合とMarkdownの差分確認。
-実装後の動作確認に合格したという意味ではない。
+この設計の項目での確認は、別の担当による現行コードとの照合と Markdown の差分の確認。
+実装したあとの動作確認に通ったという意味ではない。
 
-| 対象 | 既存の確認 | 追加・強化する確認 |
-|------|------------|----------------------|
-| 純粋な操作判断 | `tests/js/`、`predict.test.mjs` | IDでのヒット・積み順・ダイス消費・勝ちの点数・入力不変・sn不変 |
-| 先行実行 | `predict.test.mjs`、`clicks.test.mjs` | 応答を止めて連続操作、応答での復元、free moveの予測有無 |
-| 入力とドラッグ | `board.test.mjs`、`drag.test.mjs` | 部品の実入力から同時ドラッグ、反転、離す直前の受信、解除前描画で失敗すること |
-| 演出 | `last_op.test.mjs`、`sound.test.mjs` | 同じ盤面の再描画だけでは音が増えない、予測と応答で二重にならない |
-| オープニング | `opening.test.mjs` | 自動操作の2秒待機中に応答、同目、タイマーが受信で増えない |
-| 時計 | Python時計テスト、ブラウザのクリックテスト | 時刻注入による猶予消費・負の持ち時間、予測と履歴受信で基準が戻らない |
-| 初期化 | `settings.test.mjs`、`player_cookie.test.mjs` | 画像応答を遅らせた寸法・配置、初回受信前の各操作 |
-| サーバ | `test_ws.py`、`test_named_ops.py`、`test_message.py` | 3種の結果と配信回数、未知type・不正dataで接続継続 |
-| 保存と再生 | `test_save_load.py`、`test_history.py`、`test_replay.py` | 分離後もcancel時保存、同時のbackが2手、履歴と時計の独立 |
-| 同期 | ブラウザ複数タブ、`test_broadcast.py` | 接続・再接続と操作応答のlast_opが混ざらない |
+| 対象 | 既存の確認 | 足す・強める確認 |
+|------|------------|------------------|
+| 純粋な操作の判定 | `tests/js/`、`predict.test.mjs` | ID でのヒット・積み順・ダイスの消費・勝ちの点数・渡した盤面が変わらない・`sn` が変わらない。**目が 0 のダイスが 0 のまま** |
+| 先行実行 | `predict.test.mjs`、`clicks.test.mjs` | 返事を止めて続けて操作、返事での復元、free move で予測するかどうか |
+| 入力とドラッグ | `board.test.mjs`、`drag.test.mjs` | 部品の実際の入力から同時ドラッグ、盤面の反転、離す直前の受信、掴んでいる状態を外す前に描画すると落ちること。**掴んでいるキューブが受信で飛ばない** |
+| 演出 | `last_op.test.mjs`、`sound.test.mjs` | 同じ盤面を描画し直すだけでは音が増えない、予測と返事で二重にならない |
+| オープニング | `opening.test.mjs` | 自動操作の 2 秒の待ちの間に返事、同じ目、受信でタイマーが増えない |
+| 時計 | Python の時計のテスト、`clicks.test.mjs` | 時刻を渡しての猶予の消費・マイナスの持ち時間、予測で基準が戻らない。**履歴の返事で `clock_state` が反映される。Clock のチェックボックスは、返事を止めると計算も表示も変わらない** |
+| 初期化 | `settings.test.mjs`、`player_cookie.test.mjs` | 画像の応答を遅らせたときの寸法・配置、最初の返事の前の各操作 |
+| サーバ | `test_ws.py`、`test_named_ops.py`、`test_message.py` | 3 種類の結果と配信の回数、未知の type・不正な data で接続を保つ |
+| 保存と再生 | `test_save_load.py`、`test_history.py`、`test_replay.py` | 分けたあとも cancel のときに保存する、同時の `back` で 2 手戻る、履歴と時計が独立 |
+| 同期 | ブラウザの複数タブ、`test_broadcast.py` | 接続・再接続と操作の返事の `last_op` が混ざらない |
 
-操作判断にはキューブの上限・accepted・side・turn・ダイス表示中の条件を含める。
-Clockスイッチは応答を止めて、計算だけが先に変わり表示のON/OFFは待つことを確認する。
+操作の判定には、キューブの上限・`accepted`・`side`・`turn`・ダイスが出ているかの
+条件を含める。
 
-各実装項目で関係するテストを実行し、完了時に `uv run pytest`、
+各実装項目で関係するテストを走らせ、終わるときに `uv run pytest`、
 `node --test tests/js/`、`node --test tests/browser/`、`uv run ruff check .`、
-`uv run mypy src`、`uv run basedpyright` を確認する。
-ブラウザは既存helperのシステムChromiumと一時データディレクトリを使う。
-重要な追加テストは対象処理を意図的に壊して失敗を確認し、その変更を戻して確認する。
+`uv run mypy src`、`uv run basedpyright` を確かめる。
+ブラウザは既存の helper のシステムの Chromium と一時データディレクトリを使う。
+大事な追加テストは、対象の処理をわざと壊して落ちることを確かめ、戻して確かめる。
 
-最終的に rules・Model がDOMなしで動き、uiがゲーム状態や操作関数を参照せず、
-importの循環がなく、状態とタイマーの所有者が一つずつ決まっていることを
-コードレビューで確認する。CLAUDE.mdは編集せず、必要なCodex向け補足はAGENTS.mdへ書く。
+rules・Model が DOM なしで動く、ui がゲームの状態や操作の関数を参照しない、
+import の循環が無い、状態とタイマーの持ち主が 1 つずつに決まっている、の 4 つは
+第 4 段階のコードレビューで確かめる。サーバの結果の型と Session の依存の向きは
+第 5 段階のレビューで確かめる。
+
+## 設計確認で決めたこと
+
+2026-09-14 に、Claude Code（main）が設計案を現行コードと照らして確認した。
+問題の表のうち `BgBase.get_xy()`、`BoardPoint`、`RollButton` のタイマー、
+`settings.js` と `log.js` の循環、`checker_order()` の 5 点は、コードと合っていた。
+次の点を利用者と相談して決め、本文に反映した。
+
+1. **実装の説明は `docs/Developer.md` に移す。** 最初の版は「CLAUDE.md は
+   編集しない」としていたが、CLAUDE.md は `Board.apply()` や `actions.js` の
+   注意を細かく持っていて、第 4 段階で大部分が外れる。Developer.md に集めれば、
+   Claude Code と Codex のどちらが実装しても直すのは 1 か所になる。
+   移すのは実装の前に、別の項目で行う
+2. **ブラウザテストを先に helper 経由へ移す。** `tests/browser/` は
+   `board.apply` / `board.gameinfo` / `board.load_gameinfo` を 64 か所で直接
+   触っている。最初の版のままでは第 4 段階で実装とテストが同時に変わり、
+   テストが通っても挙動が保たれた根拠にならない。純粋関数へ移す項目とは
+   別の項目にして先に行う
+3. **ファイルは、使う側が 2 つ以上になるまで分けない。** `presentation.js`、
+   `input.js`、`rules/state.js` をやめた
+4. **残す挙動と変える挙動を分けた。** 「変える挙動」の節を見ること。
+   変えるものは、そのコードを移す段階で入れる
+5. **段階的に移し、最初の版の第 4 段階（文書とテストの補助関数を揃えて全体を
+   確かめる）は無くした。** 文書は各段階で直し、テストの補助関数は第 2 段階で
+   揃うので、残る中身が無い
