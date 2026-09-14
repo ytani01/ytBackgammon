@@ -1,8 +1,8 @@
 /**
  * 盤面を単純なデータで表す Position と、ポイント番号の計算 (TODO-027)。
  *
- * **ここは DOM も Board も見ない。** 受け取るのは Position と player と
- * 出目のような単純な値だけ。import してよいのは rules/ の中だけ。
+ * **ここは DOM も Board も見ない。** 受け取るのは gameinfo・Position・
+ * player・出目のような単純な値だけ。import してよいのは rules/ の中だけ。
  */
 
 /**
@@ -61,13 +61,23 @@ export const get_pip = (player, point) => {
 }; // get_pip()
 
 /**
+ * gameinfo の複製 (TODO-053)
+ *
+ * 予測した盤面を作るときに、届いた gameinfo を汚さないために使う。
+ *
+ * @param {Object} gameinfo
+ * @return {Object}
+ */
+export const copy_gameinfo = (gameinfo) => JSON.parse(JSON.stringify(gameinfo));
+
+/**
  * 盤面 (チェッカーの配置) だけを持つ型。
  *
  * pt[p] には、そのポイントに積まれたチェッカーの **プレーヤー番号を
  * 積んだ順に並べた配列**が入る (p = 0..27)。
  *
- * 設計 (docs/design.md) の下書きは `{player, n}` だったが、free move では
- * 1 つのポイントに両プレーヤーのチェッカーが乗る。`{player, n}` だと
+ * TODO-020 の設計 (archives/docs/design.md) の下書きは `{player, n}` だったが、
+ * free move では 1 つのポイントに両プレーヤーのチェッカーが乗る。`{player, n}` だと
  * その枚数を分けられず、PIP カウントがずれる。積んだ順の配列にすれば、
  * `checkers[0].player` を見ていた今までの判定 (`owner()`) も、
  * プレーヤーごとの枚数も、どちらも同じ答えになる (TODO-027)。
@@ -195,8 +205,8 @@ export class Position {
      * 「UI と同じ」と見なさないこと** (TODO-027 のレビューでの指摘)。
      *
      * **ヒットの処理はしない。** 相手のチェッカーをバーへ送るのは、
-     * 呼んだ側が別の `with_move()` として行う (`ui/checker.js` の
-     * `apply_move()` が `moves` に 2 手ぶん積む。TODO-030、TODO-045)。
+     * 呼んだ側が別の `with_move()` として行う (`actions.js` の
+     * `move()` が `moves` に 2 手ぶん積む。TODO-030、TODO-051)。
      *
      * **from_p に player の駒が無ければ例外を投げる。** 呼ぶ側は
      * 「掴んでいる駒」を渡す前提で、駒が無いことは起きない。黙って

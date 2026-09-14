@@ -26,21 +26,17 @@ from .hub import ClientHub
 from .message import (
     ClockLimitData,
     ClockSwitchData,
-    CubeData,
     DiceData,
-    GameInfoData,
     HistStepData,
     Message,
     MoveData,
     NoData,
     OpeningData,
-    PlayerClockData,
     PlayerData,
     PlayerNameData,
     PutCheckerData,
     ResignData,
     ScoreData,
-    TurnData,
     UnknownMessageType,
 )
 from .mylog import getLogger
@@ -49,9 +45,6 @@ from .storage import Storage
 
 
 class BackgammonServer:
-    # 保存先。ブラウザでの動作確認は実プロセスを起動するので、
-    # 環境変数で一時ディレクトリへ逃がせるようにしてある (TODO-021)
-    DATAFILE_DIR = os.getenv('YTBG_DATA_DIR') or os.getenv('HOME')
     DATAFILE_NAME = 'ytbg'
     SEC_CHECKER_MOVE = 0.2
 
@@ -65,8 +58,12 @@ class BackgammonServer:
 
         # 保存は JSON Lines (TODO-024)。旧形式 (.json) は
         # もう読まない (TODO-031)
+        # 保存先。ブラウザでの動作確認は実プロセスを起動するので、
+        # 環境変数で一時ディレクトリへ逃がせるようにしてある (TODO-021)。
+        # import のときではなく作るときに読む (TODO-055)
+        datafile_dir = os.getenv('YTBG_DATA_DIR') or os.getenv('HOME')
         self._datafile_path = (
-            f'{self.DATAFILE_DIR}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
+            f'{datafile_dir}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
         self.__log.debug('_datafile_path={}', self._datafile_path)
         self._storage = Storage(self._datafile_path)
 
@@ -85,8 +82,7 @@ class BackgammonServer:
         # 保存したものがあれば load_data() が差し替える
         self._clock = Clock()
 
-        [hist_len, _fwd_hist_len] = self.load_data()
-        if hist_len < 1:
+        if not self.load_data():
             self.__log.warning('load_data({}): error', self._datafile_path)
             self.add_history(self._gameinfo)
 
@@ -111,7 +107,7 @@ class BackgammonServer:
         # add_history() と二重になっても必ず保存する (TODO-032)
         self.save_data()
 
-    def add_history(self, gameinfo=None):
+    def add_history(self, gameinfo: GameInfo):
         # gameinfo のログは History.add() 側で出す (TODO-025)
         if self._hist.add(gameinfo):
             self.save_data()
@@ -221,7 +217,7 @@ class BackgammonServer:
         Parameters
         ----------
         n : int
-            < 0: all
+            <= 0: 最後まで
         sleep_sec : float
             sleep seconds
         """
@@ -235,7 +231,7 @@ class BackgammonServer:
         Parameters
         ----------
         n : int
-            < 0: all
+            <= 0: 最後まで
         sleep_sec : float
             sleep seconds
         """
@@ -257,29 +253,29 @@ class BackgammonServer:
         """
         保存したものを読む (TODO-024)。
 
-        読めなければ何も書き換えずに (0, 0) を返す。初回起動も
-        そこを通る。
+        読めないか、履歴が 1 件も無ければ False を返す。初回起動も
+        そこを通る。読めて履歴が 0 件のときは、クロックだけは読んだ
+        ものに差し替わる。
 
         Returns
         -------
-        history_length: int
-            履歴の件数
-        fwd_hist_length: int
-            進む側の履歴の件数
+        bool
+            読めて、履歴が 1 件以上あったか (TODO-055)。False なら
+            呼ぶ側が今の盤面を 1 件目として積む
         """
         self.__log.debug('path={}', self._datafile_path)
 
         history, fwd_hist, clock = self._storage.load()
         if clock is None:
             # 読めない・壊れている・ファイルが無い。空の履歴として始める
-            return 0, 0
+            return False
 
         self._hist.load(history, fwd_hist)
         # 保存に active は入れていないので、読み込んだ直後は止まっている
         self._clock = clock
         if len(self._hist) > 0:
             self._gameinfo = self._hist.entries[-1].copy()
-        return len(self._hist), len(self._hist.fwd_entries)
+        return len(self._hist) > 0
 
     async def on_connect(self, ws):
         name = self._hub.add(ws)
@@ -365,16 +361,6 @@ class BackgammonServer:
         await self.emit_gameinfo(3, False)
         return None
 
-    async def _on_set_gameinfo(self, m: Message) -> float | None:
-        """gameinfo を丸ごと入れ替える"""
-        data: GameInfoData = m.data
-        self._gameinfo = GameInfo.from_dict(data.gameinfo)
-        # 盤面ごと入れ替わるので、クロックは止まった状態にする (TODO-016)
-        self._clock.stop_all()
-        self.add_history(self._gameinfo)
-        await self.emit_gameinfo(0)
-        return None
-
     async def _on_put_checker(self, m: Message) -> float | None:
         """
         checker を動かす。
@@ -388,22 +374,10 @@ class BackgammonServer:
             self.__log.debug('hit')
         return self.SEC_CHECKER_MOVE
 
-    async def _on_cube(self, m: Message) -> float | None:
-        """cube"""
-        data: CubeData = m.data
-        self._gameinfo.cube(data)
-        return 0
-
     async def _on_dice(self, m: Message) -> float | None:
         """dice"""
         data: DiceData = m.data
         self._gameinfo.dice(data)
-        return 0
-
-    async def _on_set_turn(self, m: Message) -> float | None:
-        """turn と resign"""
-        data: TurnData = m.data
-        self._gameinfo.set_turn(data)
         return 0
 
     async def _on_set_playername(self, m: Message) -> float | None:
@@ -525,7 +499,7 @@ class BackgammonServer:
         ytbg.js の受信側がこうしていた。今はクライアントが
         clock_state に従うので、ここが唯一の決め手になる。
 
-        set_clock_limit は history: false で送られる (TODO-032) ので、
+        set_clock_limit は履歴に積まない (TODO-032) ので、
         ここで保存しないと limit が残らない。_on_set_clock_switch() と
         同じ理由
         """
@@ -536,13 +510,7 @@ class BackgammonServer:
         self.save_data()
         return 0
 
-    async def _on_set_player_clock(self, m: Message) -> float | None:
-        """残り時間を入れ替える"""
-        data: PlayerClockData = m.data
-        self._clock.set_clock(data.player, data.clock)
-        return 0
-
-    # ここから 4 つはクロックの動作そのもの (TODO-016)。TODO-012 で
+    # ここから 3 つはクロックの動作そのもの (TODO-016)。TODO-012 で
     # いったん消した分岐だが、再接続したクライアントへ動作中かどうかを
     # 返せるように戻した。TODO-015 で転送をやめたので、すでに開いて
     # いる画面も、ここで作った状態を clock_state で受け取って合わせる
@@ -551,9 +519,8 @@ class BackgammonServer:
         """
         クロック機能そのものの ON/OFF。
 
-        board.js の Board.apply_clock_sw() は history: false で送るので、
-        ここで保存しないと sw が残らない (TODO-024)。
-        start/stop/resume_clock はターンのたびに走るので
+        履歴に積まないので、ここで保存しないと sw が残らない (TODO-024)。
+        stop/resume_clock と、手番の受け渡しでのクロックの切り替えは
         保存しない (I/O が増えすぎる)。
         """
         data: ClockSwitchData = m.data
@@ -563,14 +530,6 @@ class BackgammonServer:
         self._clock.stop(1)
         self._clock.set_switch(data.switch)
         self.save_data()
-        return 0
-
-    async def _on_start_clock(self, m: Message) -> float | None:
-        """
-        ui/clock.js の PlayerClock.start() に合わせ、猶予を戻してから動かす
-        """
-        data: PlayerData = m.data
-        self._clock.start(data.player)
         return 0
 
     async def _on_resume_clock(self, m: Message) -> float | None:
@@ -587,7 +546,7 @@ class BackgammonServer:
 
     async def on_json(self, ws, msg):
         """
-        msg := {'type': str, 'data': object, 'history': bool}
+        msg := {'type': str, 'data': object}
 
         parse() で型を付けてから、登録表 (MESSAGE_TYPES) のハンドラへ
         渡す (TODO-026、TODO-050)。data のキーが足りなければ parse() で
@@ -614,15 +573,15 @@ class BackgammonServer:
 
         # 勝負がついたら、両方のクロックを止める (TODO-050)。
         # 処理の前から -1 のときは止めない (勝負がついたあとでも、
-        # クロックを押せば再開できるように)。Clock.stop_all() は
-        # 経過分を残り時間に反映しないので使わない
+        # クロックを押せば再開できるように)。stop() は経過分を
+        # 残り時間に反映してから止める
         if turn0 != -1 and self._gameinfo.turn == -1:
             self._clock.stop(0)
             self._clock.stop(1)
 
-        # 履歴に積むかは表で決める (TODO-050)。古い type は、
-        # メッセージの history も真のときだけ積む (TODO-051 で消す)
-        if msg_type.history and (m.history or m.type in NAMED_TYPES):
+        # 履歴に積むかは表で決める (TODO-050、TODO-051)。
+        # メッセージに history は無い
+        if msg_type.history:
             self.add_history(self._gameinfo)
 
         # 受け取った msg をそのまま転送するのではなく、gameinfo に
@@ -653,7 +612,6 @@ _S = BackgammonServer
 
 # type ごとの「data の型・ハンドラ・履歴に積むか」(TODO-050)。
 # type を足すときに直すのはここだけ。
-# history には、TODO-051 で history を見なくなったあとの値を書く
 MESSAGE_TYPES: dict[str, MessageType] = {
     # 履歴の操作 (自分で送信するもの)
     'back': MessageType(HistStepData.from_dict, _S._on_back, False),
@@ -664,8 +622,6 @@ MESSAGE_TYPES: dict[str, MessageType] = {
     'fwd_all': MessageType(NoData.from_dict, _S._on_fwd_all, False),
     'clear_hist': MessageType(NoData.from_dict, _S._on_clear_hist, False),
     'new': MessageType(NoData.from_dict, _S._on_new, False),
-    'set_gameinfo': MessageType(
-        GameInfoData.from_dict, _S._on_set_gameinfo, False),
     # 名前付きの操作
     'roll': MessageType(DiceData.from_dict, _S._on_roll, True),
     'opening': MessageType(OpeningData.from_dict, _S._on_opening, True),
@@ -679,9 +635,7 @@ MESSAGE_TYPES: dict[str, MessageType] = {
     # 盤面
     'put_checker': MessageType(
         PutCheckerData.from_dict, _S._on_put_checker, True),
-    'cube': MessageType(CubeData.from_dict, _S._on_cube, True),
     'dice': MessageType(DiceData.from_dict, _S._on_dice, True),
-    'set_turn': MessageType(TurnData.from_dict, _S._on_set_turn, True),
     'set_playername': MessageType(
         PlayerNameData.from_dict, _S._on_set_playername, True),
     'set_score': MessageType(ScoreData.from_dict, _S._on_set_score, True),
@@ -689,24 +643,13 @@ MESSAGE_TYPES: dict[str, MessageType] = {
     # 積むと sn 以外すべて 1 つ前と同じエントリになる
     'set_clock_limit': MessageType(
         ClockLimitData.from_dict, _S._on_set_clock_limit, False),
-    'set_player_clock': MessageType(
-        PlayerClockData.from_dict, _S._on_set_player_clock, False),
     'set_clock_switch': MessageType(
         ClockSwitchData.from_dict, _S._on_set_clock_switch, False),
-    'start_clock': MessageType(
-        PlayerData.from_dict, _S._on_start_clock, False),
     'resume_clock': MessageType(
         PlayerData.from_dict, _S._on_resume_clock, False),
     'stop_clock': MessageType(
         PlayerData.from_dict, _S._on_stop_clock, False),
 }
-
-# 名前付きの操作。メッセージの history を見ず、表だけで積むかを決める。
-# TODO-051 で古い type とメッセージの history を消したら、これも消す
-NAMED_TYPES: frozenset[str] = frozenset({
-    'roll', 'opening', 'move', 'end_turn',
-    'double', 'take', 'cancel_double', 'resign',
-})
 
 
 def parse(msg: dict[str, Any]) -> Message:
@@ -724,7 +667,7 @@ def parse(msg: dict[str, Any]) -> Message:
         (list / dict は dict のキーにできず、そのままでは
         TypeError になるため)
     KeyError
-        'type' / 'data' / 'history' か、data の中のキーが足りない
+        'type' / 'data' か、data の中のキーが足りない
     TypeError
         data の値の型が dataclass の注釈と合わない (TODO-050)。
         盤面を書き換える前に弾く
@@ -741,7 +684,6 @@ def parse(msg: dict[str, Any]) -> Message:
     return Message(
         type=msg_type,
         data=data,
-        history=bool(msg['history']),
         raw=msg,
     )
 

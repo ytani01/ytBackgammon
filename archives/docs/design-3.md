@@ -1,7 +1,9 @@
 # 構成の見直し（設計）
 
-**これから実装する構成で、今の実装とは違う。** 今の構成は
-[Developer.md](Developer.md) にある。
+**TODO-049 で決め、TODO-050〜055 で実装した構成。現行仕様ではない。**
+今の構成は [Developer.md](../../docs/Developer.md) と `CLAUDE.md` にある。
+実装の途中で決め直したこと（盤面と合わない操作を捨てる、入口で型を確かめる、など）は
+書き足してあるが、実装に合わせて細部まで直してはいない。
 
 ## 変えないこと
 
@@ -207,5 +209,5 @@ type ごとに「`data` の型」「処理する関数」「履歴に積むか�
 `board.emit_turn()` や `board.turn`、`board.moving_checker` を直接触っている
 テストが多く、`clicks.test.mjs` は送られた type と `data` を確かめているため。
 
-すべて終わったら、[Developer.md](Developer.md) を今の構成に合わせて直し、
+すべて終わったら、[Developer.md](../../docs/Developer.md) を今の構成に合わせて直し、
 この文書は `archives/docs/design-3.md` へ移す。

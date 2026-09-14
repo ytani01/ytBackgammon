@@ -6,7 +6,7 @@ import { BgBase } from "./base.js";
  */
 export class BoardPoint extends BgBase {
     /**
-     * @param {string} id
+     * @param {undefined} el - 要素は持たない
      * @param {Board} board
      * @param {number} x
      * @param {number} y
@@ -16,8 +16,8 @@ export class BoardPoint extends BgBase {
      * @param {number} direction - -1: 上から下, 1: 下から上
      * @param {number} max_n
      */
-    constructor(id, board, x, y, w, h, idx, direction, max_n) {
-        super(id, x, y, 0, {w: w, h: h, board: board});
+    constructor(el, board, x, y, w, h, idx, direction, max_n) {
+        super(el, x, y, 0, {w: w, h: h, board: board});
         this.idx = idx;
         this.direction = direction; // up: +1, down: -1
         this.max_n = max_n;

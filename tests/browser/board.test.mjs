@@ -13,8 +13,8 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    console_errors, center_of, launch_browser, open_board, start_server,
-    wait_for,
+    console_errors, center_of, launch_browser, open_board, shown_dice,
+    start_server, wait_for,
 } from './helper.mjs';
 
 describe('ブラウザでの基本の動作確認', () => {
@@ -79,20 +79,69 @@ describe('ブラウザでの基本の動作確認', () => {
         assert.ok(png.length > 10000, `screenshot が小さい: ${png.length}`);
     });
 
+    it('表示部品が dom.js の作った要素を取り違えずに持っている', async () => {
+        // 部品は id でなく要素を受け取る (TODO-054)。渡す要素を取り違えても
+        // id 属性は dom.js が正しく付けたままなので、#id で探すテストでは
+        // 気づけない。部品が持つ el の id を、期待する id と照らす
+        const r = await page1.evaluate(() => {
+            const pairs = [
+                [board, 'board'], [board.cube, 'cube'],
+                [board.button_resign, 'button-resign'],
+                [board.button_inverse, 'button-inverse'],
+                [board.button_fwd, 'button-fwd'],
+                [board.button_back, 'button-back'],
+            ];
+            // 部品ではなく要素そのものを持っているもの
+            const pair_el = (el, id) => pairs.push([{ el }, id]);
+            const wrong = [];
+            for (let p = 0; p < 2; p++) {
+                for (let i = 0; i < 15; i++) {
+                    const ch = board.checker[p][i];
+                    pairs.push([ch, 'p' + p + ('0' + i).slice(-2)]);
+                    if (ch.player !== p || ch.num !== i) {
+                        wrong.push(`checker[${p}][${i}]: `
+                                   + `player=${ch.player} num=${ch.num}`);
+                    }
+                }
+                board.roll_btn[p].dice.forEach(
+                    (d, i) => pairs.push([d, `dice${p}${i}`]));
+                pairs.push([board.roll_btn[p], `rollbutton${p}`]);
+                pairs.push([board.pass_btn[p], `passbutton${p}`]);
+                pairs.push([board.win_btn[p], `winbutton${p}`]);
+                pairs.push([board.resign_banner_btn[p], `resignbutton${p}`]);
+                pairs.push([board.score[p], `p${p}score`]);
+                pairs.push([board.score_btn[p].up, `score_up${p}`]);
+                pairs.push([board.score_btn[p].down, `score_down${p}`]);
+                pairs.push([board.player_name[p], `p${p}name`]);
+                pair_el(board.player_name[p].el_input, `p${p}name-input`);
+                pairs.push([board.player_clock[p], `p${p}clock`]);
+                pair_el(board.player_clock[p].el_bg, `p${p}clock-bg`);
+                pairs.push([board.pip[p], `p${p}pip`]);
+            }
+            for (const [obj, id] of pairs) {
+                if (obj.el?.id !== id) {
+                    wrong.push(`${id}: ${obj.el?.id}`);
+                }
+            }
+            return { n: pairs.length, wrong };
+        });
+        assert.deepEqual(r.wrong, []);
+        assert.equal(r.n, 68);
+    });
+
     it('Roll ボタンでダイスが出る', async () => {
         // 新しい盤面は turn == 2 (両方可) なので、両方の Roll が出ている
         const active = await page1.evaluate(() => board.roll_btn[0].active);
         assert.equal(active, true, 'Roll ボタンが出ていない');
 
-        const before_dice = await page1.evaluate(
-            () => board.roll_btn[0].get());
+        const before_dice = await shown_dice(page1, 0);
         assert.deepEqual(before_dice, [0, 0, 0, 0]);
 
         await page1.locator('#rollbutton0').click();
 
         // サーバが返す gameinfo で dice が入る
         const dice = await wait_for(
-            () => page1.evaluate(() => board.roll_btn[0].get()),
+            () => shown_dice(page1, 0),
             d => d.some(v => v >= 1 && v <= 6),
             { msg: 'dice' });
 
@@ -120,15 +169,15 @@ describe('ブラウザでの基本の動作確認', () => {
             gi.board.checker[0][0][1] = 4;
             gi.board.checker[0][4][1] = 0;
 
-            // predict: true なのでサーバへは何も送らない
-            board.apply(gi, { sec: 0, predict: true });
+            // apply() はサーバへ何も送らない (TODO-051)
+            board.apply(gi, { sec: 0 });
             const at6 = board.checkers_at(6);
             const out = { before,
                           ids: at6.map((c) => c.id),
                           z: at6.map((c) => c.z),
                           tip: board.top_checker(6).id };
 
-            board.apply(save, { sec: 0, predict: true });  // 後始末
+            board.apply(save, { sec: 0 });  // 後始末
             return out;
         });
 
@@ -144,7 +193,7 @@ describe('ブラウザでの基本の動作確認', () => {
     it('チェッカーをドラッグできる', async () => {
         // ルールに縛られずに動かせるように free move にする
         await page1.locator('#free-move').check();
-        assert.equal(await page1.evaluate(() => board.free_move), true);
+        assert.equal(await page1.evaluate(() => board.settings.free_move), true);
 
         // 移動先は、別の point に乗っているチェッカーの位置にする
         const dst = await page1.evaluate(() => {
@@ -153,7 +202,7 @@ describe('ブラウザでの基本の動作確認', () => {
         });
 
         // #p000 を掴むと、掴めるのは「その point の先端のチェッカー」で、
-        // p000 そのものではない。Checker.on_mouse_down_xy() の意図どおりで、
+        // p000 そのものではない。Drag.pick_checker() の意図どおりで、
         // 正しい挙動。新しい盤面では p000 は point 6 に 5 枚積まれた
         // いちばん下なので、先端は p004 になる
         const tip = await page1.evaluate(() => {
@@ -167,8 +216,8 @@ describe('ブラウザでの基本の動作確認', () => {
         await page1.mouse.down();
 
         const moving = await page1.evaluate(() => ({
-            id: board.moving_checker.id,
-            point: board.moving_checker.cur_point,
+            id: board.drag.checker.id,
+            point: board.drag.checker.cur_point,
         }));
         assert.equal(moving.id, tip);
         assert.notEqual(moving.point, dst.point,
@@ -180,8 +229,9 @@ describe('ブラウザでの基本の動作確認', () => {
         // 掴んだままカーソルに付いてきている。
         // point 6 と point 19 は同じ列なので x だけでは判定できない
         const dragging = await page1.evaluate(() => {
-            const ch = board.moving_checker;
-            return { pos: [ch.x, ch.y], src: [ch.src_x, ch.src_y] };
+            const ch = board.drag.checker;
+            return { pos: [ch.x, ch.y],
+                     src: board.drag.checker_src };
         });
         assert.notDeepEqual(dragging.pos, dragging.src,
                             'ドラッグ中に動いていない');
@@ -197,8 +247,8 @@ describe('ブラウザでの基本の動作確認', () => {
             { msg: 'drag' });
 
         assert.equal(
-            await page1.evaluate(() => board.moving_checker === undefined),
-            true, 'moving_checker が残っている');
+            await page1.evaluate(() => board.drag.checker === undefined),
+            true, 'drag.checker が残っている');
 
         moved = { checker_index: tip_i, point: dst.point };
     });

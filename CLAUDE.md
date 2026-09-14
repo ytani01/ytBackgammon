@@ -85,11 +85,16 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   コンソールエラー
 - `rules.test.mjs` — **`Board` がルール層につながっているか**（TODO-027）。
   `board.position()` / `pip_count()` / `winner_is()` / `closeout()` /
-  `get_dst_points()` をページの中で呼ぶ。ほかの 2 つはドラッグを
-  free move で行うので、ルール判定を通らない
+  `get_dst_points()` をページの中で呼ぶ。`board.test.mjs` と
+  `drag.test.mjs` はチェッカーのドラッグを free move で行うので、ルール判定を
+  通らない（ルール判定を通るドラッグは `predict.test.mjs`）
 - `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
-  ボタン・バナーを実際に押し、**送られたメッセージの `type` / `data` /
-  `history`** と、変わった `board` の属性を見る（TODO-028）。
+  ボタン・バナー・キューブ・クロックを実際に押し、**送られたメッセージの
+  `type` / `data`** と、変わった `board` の属性を見る（TODO-028）。
+  盤面を変える操作では、**送ったのがその 1 通だけか**と、`history` が
+  付いていないことも見る（TODO-051）。得点の ▲ と free move のダイスは、
+  返事の前に 2 回押して 2 回ぶん効くかを見る（TODO-052）。キューブのダブル・リダブル・テイク、
+  使えるダイスが無いときにダイスを押す `end_turn` もここで見る。
   `WebSocket.prototype.send` を包んで送ったものを貯め、`confirm()` は
   自動で OK する。サーバの返事を待つ目印に、プレーヤー 1 の名前を
   変えずに送り直しているので、**このファイルの中でプレーヤー 1 の名前を
@@ -104,10 +109,32 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `open_board()` が貯めるのは console の `error` だけなので、
   このファイルは `log` を数える形で自分でページを開く
 - `predict.test.mjs` — ドラッグを離した瞬間の先行実行（TODO-030）。
-  予測で表示が変わり、外れてもサーバから届く `gameinfo` で戻るか
+  予測で表示が変わり、外れてもサーバから届く `gameinfo` で戻るか。
+  `move` 1 通の中身（使ったダイスと使えなくなったダイスの 11〜16、
+  勝ちの点数）と、予測に失敗したら何も送らないこと（TODO-051）
+- `last_op.test.mjs` — 音とダイスの回転を `last_op` から決めているか
+  （TODO-051）。`apply()` に `last_op` を渡し、鳴らした音と回したダイスを数える
 - `opening.test.mjs` — オープニングロールで先手が決まるか（TODO-041）
 - `player_cookie.test.mjs` — cookie から読んだプレーヤー番号が数になって
   いるか（TODO-050）。文字列のままだと、サーバが型の合わない値として弾く
+- `drag.test.mjs` — 駒を掴んでいる間に `gameinfo` が届いても、掴んでいる駒が
+  手元の座標に残るか（TODO-053）。別のタブから `set_playername` を送って届かせる。
+  キューブとチェッカーを同時に掴んでも、キューブを離せば take を送るか
+- `settings.test.mjs` — 音の ON/OFF を cookie に保存して開き直しても残るか、
+  PIP の最初の表示が Pip のチェックボックスに合うか（TODO-053）。
+  チェックが入った状態は `addInitScript()` の `DOMContentLoaded` で作る
+  （`page.route()` で `index.html` を書き換えると `/ws` への接続が弾かれる）
+
+**テスト専用の type は無い**（TODO-051）。盤面の用意は残っている type で
+行う。`helper.mjs` の `send_msg()` がページの中で `ws.js` の `emit_msg()` を
+呼び、`set_turn()` が turn を変える（0 / 1 は `opening`、2 は
+`opening`（`winner: -1`）、-1 は `moves` が空で `score` が 1 の `move`、
+0 と 1 の間は `end_turn`）。目は `dice`、駒は `put_checker`。
+**0 / 1 / -1 から 2 へは戻せず、-1 からはどこへも戻せない**（`opening` は
+`turn` が 2 以上のときしか受け付けない）ので、そのときは `new` で盤面ごと戻す。
+状態は `board.gameinfo` から読む。**画面に出ているダイスの目**は
+`shown_dice()` が要素（z・画像のファイル名・opacity）から読む
+（ダイスは目を持たないため。TODO-052）
 
 注意する点:
 
@@ -116,7 +143,7 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   リビジョンが playwright 1.63.0 の要求と合わないため。
   `npx playwright install` で落とし直さない
 - 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
-  `BackgammonServer.DATAFILE_DIR` が見ており、無ければ `$HOME`。
+  `BackgammonServer` を作るときに読み（TODO-055）、無ければ `$HOME`。
   利用者の `~/ytbg-*` は読み書きされない
 - ポートは固定せず、空いているものを OS に選ばせる。サーバは
   `detached` で起動してプロセスグループごと kill する（`uv run` の下に
@@ -140,8 +167,9 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `on_json()` は待たずに返る。**完了を待つテストは
   `await bg_server._replayer._task`**（TODO-009、TODO-025）
 - `BackgammonServer` はコンストラクタの中で `load_data()` を呼び、
-  保存先を `DATAFILE_DIR`（`$HOME`）から組み立てる。`conftest.py` の
-  `bg_server` フィクスチャが `DATAFILE_DIR` を `tmp_path` に差し替えている
+  保存先を環境変数 `YTBG_DATA_DIR`（無ければ `$HOME`）から組み立てる。
+  `conftest.py` の `bg_server` フィクスチャが `YTBG_DATA_DIR` を `tmp_path` に
+  差し替えている
   ので、利用者の `~/ytbg-*` は読み書きされない。**このとき履歴が
   1 件積まれる**ので、件数を数えるテストはそれを前提に書く
 - 同じフィクスチャが `ClientHub.broadcast()` を丸ごと差し替え、送られた
@@ -188,7 +216,9 @@ basedpyright は落ちる**（mypy には int の引数へ float を渡せる特
 
 **TODO-020 で決めた構成は、TODO-023〜030 ですべて実装した。**
 当時の設計そのものは `archives/docs/design.md` に移してある（TODO-033）。
-**現行仕様ではないので、実装の根拠として引かないこと。**
+TODO-049 で決めた構成の見直し（第 3 弾）の設計は `archives/docs/design-3.md` にあり、
+TODO-050〜055 で実装した（TODO-055 で移した）。
+**どちらも現行仕様ではないので、実装の根拠として引かないこと。**
 
 人が読む説明は [`docs/Developer.md`](docs/Developer.md)（TODO-033）。
 以下はいまの実装で、Claude 向けの細かい注意も含む。
@@ -220,8 +250,8 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   クライアントから届いたメッセージの分岐（`on_json()`）と、盤面・履歴・
   クロック・保存・配信のとりまとめ。HTTP の応答は持たない
 - `src/ytbg/gameinfo.py` — `GameInfo` / `BoardState` / `CubeState`（TODO-024）。
-  盤面の状態そのものを表す dataclass。`put_checker()` / `cube()` /
-  `dice()` / `set_turn()` / `set_playername()` / `set_score()` /
+  盤面の状態そのものを表す dataclass。`put_checker()` /
+  `dice()` / `set_playername()` / `set_score()` /
   `resign_game()` / `new_game()` という更新のメソッドもここが持つ
   （TODO-025 で `ytBackgammon` を吸収した。`resign` は dataclass の
   フィールド名なので、メソッドは `resign_game()`）。
@@ -231,13 +261,17 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   相手の得点も足す。**盤面と合わないときは何も変えずに `False` を返す**
   （`move()` だけは戻り値が無い）。
   **更新のメソッドは `message.py` の dataclass をそのまま受け取る**
-  （`cube(CubeData)` の形。TODO-038。`server.py` で `asdict()` に
+  （`dice(DiceData)` の形。TODO-038。`server.py` で `asdict()` に
   戻していたのをやめた）。そのため `gameinfo.py` は `message.py` に
   依存する（`message.py` の側は何も import しないので循環しない）。
   `to_dict()` は
-  `dataclasses.asdict()`、`from_dict()` は手で書いている。**ファイルから読むときだけは
-  必須キーの欠落を例外にする**（黙って初期配置になると、壊れたファイルが
-  「初期配置の N 手」として読まれてしまう）
+  `dataclasses.asdict()`、`from_dict()` は手で書いている。**必須キーの
+  欠落は常に `KeyError` にする**（黙って初期配置になると、壊れたファイルが
+  「初期配置の N 手」として読まれてしまう）。渡されたものが dict でない
+  とき（`"board": null` など）も入口で `KeyError` にする。`storage.py` の
+  `LOAD_ERRORS` は `TypeError` を拾わないので、そのままだとサーバが
+  起動しない（TODO-051）。部分的な dict を受けていた
+  `set_gameinfo` は TODO-051 で消した
 - `src/ytbg/clock.py` — `Clock`（TODO-024）。クロックは `gameinfo` の外に置く
 - `src/ytbg/history.py` — `History`（TODO-025）。戻す側（`_history`）と
   進む側（`_fwd_hist`）の 2 つのスタックと通し番号。**保存は持たない**
@@ -252,7 +286,7 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   `~/ytbg-{server_id}.jsonl` への保存・読み込み
 - `src/ytbg/webroot/static/js/` — クライアント。ES Modules で、バンドラは
   使わない（TODO-028）。クラス階層図は `ui/base.js` の先頭にある
-  - `main.js` — エントリ。`build_dom()` で要素を作り、`Board` を作り、
+  - `main.js` — エントリ。`build_dom()` で要素を作り、それを渡して `Board` を作り、
     WebSocket をつなぐ。ヘッダとメニューの操作は、末尾でまとめて
     `addEventListener` でつなぐ（TODO-029。`window` への橋渡しはもう無い）。
     `window.board` はデバッグ用に残してある。
@@ -262,6 +296,15 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     `window.board` が無くても ReferenceError にならず、黙って DIV を掴む
   - `dom.js` — 盤面の要素を作る（TODO-029）。チェッカー 30 個・ダイス 8 個
     などの `<div>` と、名前の `<input>` 2 つ、`#buttons`。
+    **作った要素を返し**、`main.js` がそれを `Board` に渡す（TODO-054）。
+    キーは `Board` のフィールド名に近い名前にしてある（`checker`、`cube`、
+    `roll_btn` などは同じ名前。`name` は `player_name`、`clock` は
+    `player_clock` に渡す。`name_input` と `clock_bg` はそれぞれ
+    `PlayerName` と `PlayerClock` に、`dice` は `RollButton` に渡すもので、
+    `Board` に同じ名前のフィールドは無い。一覧は `build_dom()` の JSDoc）。
+    `board` には `#board` 自身が入る。
+    **id 属性は `tests/browser/` が要素を探すためだけに残してある**
+    （部品は id で要素を拾わない）。
     **`BgImage` は `<img>` の幅・高さを読んで大きさを決めるので、
     読み込み前に `Board` を組むと幅が 0 になって配置が崩れる。**
     これを防いでいるのは次の 2 つで、**効いているのは前者**。
@@ -276,28 +319,64 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     **どちらもテストでは守られない。** `wait_images()` を外しても
     `tests/browser/` は全件通る（no-op なので当然）。
     この順序を変えるときは、画像の応答を遅らせて配置を実測すること
-  - `ws.js`（接続・再接続・送信）、`log.js`（**`?debug` を付けて開いたとき
+  - `actions.js` — サーバへ送る操作（TODO-051）。**`emit_msg` を import
+    するのはここだけ。** ゲームを進める処理（`roll()` / `click_dice()` /
+    `end_turn()` / `drop_checker()` / `move()` / `drop_cube()` / `double()` /
+    `take()` / `cancel_double()` / `resign()`）と「押してよいか」の判定
+    （`can_pick_checker()` / `can_hold_cube()`）、名前・得点・クロック・
+    設定・履歴の操作の送信を並べる。どれも `board` を受け取り、
+    送る値は数に直す。`drag.js` と `ui/` の表示部品、`main.js` / `board.js` は
+    ここを呼ぶ。キューブを離したときに `double` / `take` / `cancel_double` の
+    どれを送るかも、ここの `drop_cube()` が決める
+  - `drag.js` — `Drag`（TODO-053）。チェッカーとキューブを「掴む・動かす・
+    離す」だけを受け持ち、掴んでいるもの（`checker` / `cube`）と掴んだ
+    位置はここだけが持つ。**掴んだ位置はチェッカー用（`checker_src`）と
+    キューブ用（`cube_src_y`）で別に持つ**（free move ならマルチタッチで
+    両方を同時に掴める。1 組にするとキューブを離したときに take /
+    redouble が送られない）。動かすのも、`Checker` は `move_checker()`、
+    `Cube` は `move_cube()`、`Board` は両方の `move()`。`Board` が `board.drag` として
+    持ち、`Checker` / `Cube` のマウスの処理はこれを呼ぶだけ。行き先の判定と
+    送信は `actions.js` に任せる。**チェッカーを離すときは、`actions.js` を
+    呼ぶ前に `checker` を外す**（`apply()` は掴んでいる駒を手元の座標へ
+    戻すので、先行実行の表示で駒が動かなくなる）。**この順番はテストでは
+    守られない**（後にしても `tests/browser/` は通る）
+  - `ws.js`（接続・再接続・送信。`emit_msg(type, data)`）、`log.js`（**`?debug` を付けて開いたとき
     だけ `console.log` へ出す**。TODO-048）、`layout.js`（盤面の座標）、
-    `settings.js`（`CookieBase`、クエリ文字列から `sound` を読む
+    `settings.js`（`Settings`、`CookieBase`、クエリ文字列から `sound` を読む
     `get_sound_query()` と `debug` の有無を見る `get_debug_query()`、
     `<body>` の `data-*` から読む
-    `get_image_dir()` / `get_server_id()`）、`sound.js`
+    `get_image_dir()` / `get_server_id()`）、`sound.js`。
+    `Settings`（TODO-053）は音の ON/OFF・free move・PIP を表示するか・
+    cookie に保存するプレーヤー番号を持ち、`Board` が `board.settings` として
+    持つ。**プレーヤー番号は `board.settings.player` で、`Board` 自身は
+    持たない。** クロックの ON/OFF と持ち時間は `Board` に残す。
+    **`log.js` と `settings.js` は互いに import している**ので、
+    `settings.js` のトップレベルで `log()` を呼ばないこと（評価の順に
+    よっては ReferenceError になる）。`?sound` を読み直して
+    `set_global_sound_switch()` を呼ぶのは `main.js` の `sound-switch` の
+    ハンドラで、`settings.js` は `sound.js` を import しない
   - `board.js` — `Board`
   - `rules/` — ルール層（TODO-027）。`position.js` に `Position` と
-    `goal_point()` / `bar_point()` / `get_pip()`、`move.js` に
+    `goal_point()` / `bar_point()` / `get_pip()` / `copy_gameinfo()`、`move.js` に
     `calc_dst_point()` / `all_inner()` / `dst_point()` / `dst_points()` /
-    `usable_dice()` / `dice_for_move()`（TODO-043）、`judge.js` に
+    `usable_dice()` / `dice_for_move()`（TODO-043）/ `disable_unusable()`
+    （使えなくなった目を 11〜16 にした新しい配列を返す。TODO-053）、`judge.js` に
     `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()`。
     **DOM も `Board` も見ず、値を返すだけ**で、
     import してよいのは `rules/` の中だけ。表示の更新
-    （`pip[player].set()`、`dice[i].disable()`）と状態の書き換え
-    （`resign = -1`）は `Board` と `RollButton` の側で行う。
+    （`pip[player].set()`）は `Board` の側で行う。
     `Board.position()` が `Position.from_gameinfo(this.gameinfo)` を
     返す（TODO-044。`this.gameinfo` がまだ無いときは空の盤面）
   - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
     ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
-    `label.js` / `button.js`。`board` と `player` は基底のコンストラクタの
-    options で渡す
+    `label.js` / `button.js`。コンストラクタの第 1 引数は `build_dom()` が
+    作った要素で、id ではない（TODO-054。`PlayerClock` の背景と
+    `PlayerName` の `<input>`、`RollButton` のダイス 4 個も要素で渡す。
+    `BoardPoint` は要素を持たず `undefined`）。`id` は要素の id 属性を返す
+    getter で、ログとテストのためだけにある。`board` と `player` は基底の
+    コンストラクタの options で渡す。`Checker` は通し番号を `num`
+    （0〜14）で持つ。**マウスの処理と表示だけを受け持ち、サーバへは
+    送らない**（判定と送信は `actions.js`。TODO-051）
 - `src/ytbg/webroot/templates/index.html` — ボード 1 面。
   `<script type="module" src="/static/js/main.js">` の 1 行で読み込む。
   **中身は `<header>` と空の `<div id="board">` だけ**で、盤面の要素は
@@ -323,8 +402,10 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **クロックはここに入っていない**（TODO-024。下の「クロック」を見ること）。
 
 チェッカーは `checker[player][i] = [point, idx]` の配列で、**ID は
-`player * 100 + i`**（例: 012, 101）。**チェッカーの位置はこれでしか
-持たず**、表示の部品は持たない（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
+`player * 100 + i`**（例: 012, 101）。クライアントでは
+`Checker` の `player * 100 + num` で求める（id の文字列からは取らない。
+TODO-054）。**チェッカーの位置はこれでしか持たず**、表示の部品は持たない
+（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
 積み順を決めているのは `Board.checker_order()` だけで、`apply()` の
 配り直しと `Board.checkers_at()` / `top_checker()` がそれを使う。
 
@@ -335,54 +416,102 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 減る方向、プレーヤー 1 は増える方向に進む（`calc_dst_point()`）。
 
 メッセージは全て WebSocket（`/ws`）で送る JSON 1 本で、
-`{src, type, data, history}` の形（クライアント側は `emit_msg()`）。
-履歴に 1 手として積むかは、`server.py` の登録表 `MESSAGE_TYPES` の
-`history` で type ごとに決める（TODO-050）。積むのは名前付きの 8 つの操作
-（`roll` / `opening` / `move` / `end_turn` / `double` / `take` /
-`cancel_double` / `resign`）と `put_checker` / `dice` / `set_playername` /
-`set_score`、それに TODO-051 で消す `cube` / `set_turn`。クロック系の 6 つ
-（`set_clock_limit` / `set_player_clock` / `set_clock_switch` /
-`start_clock` / `resume_clock` / `stop_clock`）は `gameinfo` を書き換えない
-ので積まない（TODO-032）。**名前付きの 8 つは表だけを見る。古い type は、
-表で積み、かつメッセージの `history` が真のときだけ積む**（TODO-051 で
-`history` を見る条件を消す。`server.py` の `NAMED_TYPES` もそのとき消す）。
-1 つ前のエントリと `sn` 以外が同じ場合も積まない（TODO-032）。
+`{src, type, data}` の形（TODO-051）。**クライアントで送るのは
+`actions.js` だけ**で、`ws.js` の `emit_msg(type, data)` を呼ぶ。
+**1 つの操作を 1 通で送る**（手番を渡すのは `end_turn` 1 通。以前は
+`dice` / `stop_clock` / `set_player_clock` / `start_clock` / `set_turn` の
+5 通だった）。**プレーヤー番号などは数に直して送る**（サーバが型を確かめて
+弾く。cookie から読んだ値は文字列のことがある）。
+
+メッセージに `history` は無い。履歴に 1 手として積むかは、`server.py` の
+登録表 `MESSAGE_TYPES` の `history` で type ごとに決める（TODO-050、TODO-051）。
+積むのは名前付きの 8 つの操作（`roll` / `opening` / `move` / `end_turn` /
+`double` / `take` / `cancel_double` / `resign`）と `put_checker`（free move
+での移動）/ `dice`（free move での目の変更）/ `set_playername` /
+`set_score`。クロック系の 4 つ（`set_clock_limit` / `set_clock_switch` /
+`resume_clock` / `stop_clock`）は `gameinfo` を書き換えないので積まない
+（TODO-032）。1 つ前のエントリと `sn` 以外が同じ場合も積まない（TODO-032）。
+`cube` / `set_turn` / `set_player_clock` / `start_clock` / `set_gameinfo` は
+TODO-051 で消した（届いても登録表に無い type として無視する）。
 
 **`type` を書くのはクライアント → サーバの向きだけ**で、分岐はサーバの
 `on_json()` にしかない（TODO-015）。サーバが返すのは `gameinfo` 1 本で、
 `data` に直前の操作が `last_op`（受け取った msg そのまま。操作に紐づかない
 送信では `None`）として入る。クライアントは `gameinfo` で盤面を作り直し、
-**音と dice の回転だけを `last_op` から出す**（`Board.apply()`）。
+**音と dice の回転だけを `last_op` から出す**（`Board.apply()`。TODO-051）。
+
+- `roll`: 振ったプレーヤーのダイスを回し、振る音を鳴らす（`turn` が -1 なら
+  出さない）。free move の `dice` は回さない
+- `move`: **`turn` を見ずに**駒を置く音を鳴らす（勝ちになる `move` では、
+  届く `gameinfo` の `turn` がもう -1）。**ヒットの音は `moves` にバー
+  （26 以上）へ動かすものがあるか**で決める（動かす前の位置を見ると、
+  先行実行した画面では駒がもうバーにあって見分けられない）
+- `put_checker`: 今までどおり、`turn` が -1 では鳴らさない。ヒットは
+  「行き先が 26 以上で、動かす前が 26 未満」
+- `opening` / `end_turn`: 手番が変わる音。**`turn` が変わったかは見ない**
+  （鳴らすのは `turn` が 0 / 1 になるときだけ。同じ目の `opening` で
+  `turn` が 2 に戻るときは鳴らない）
 
 **表示を変えるのは `Board.apply(gameinfo, {sec, history_flag, clock_state,
-last_op, predict})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
+last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
 `load_gameinfo()` が名前付きの引数に直して渡すだけで、中身は持たない。
+**`apply()` と `Board.set_turn()` はサーバへ何も送らない**（TODO-051。
+以前は勝負がついた盤面で `stop_clock` を送っていた）。`Board.winner_is()` も
+判定するだけで `resign` を書き換えない。
+
+**盤面の状態は `board.gameinfo` にしか持たず、判定もそこを読む**（TODO-052）。
+表示部品は `turn` / `resign` / キューブ / 得点 / ダイスの目の写しを持たない
+（キューブの向きやダイスの画像は、`apply()` が `gameinfo` から毎回作る）。
+ダイスは `Board.get_active_dice(player)`（1〜6 の目）と
+`Board.has_dice(player)`（11〜16 も含めて出ているか）で読む。
+**`gameinfo` がまだ届いていないときは、盤面を読む操作（ロール、ダイス、
+チェッカー、キューブ、投了、得点）は何もしない**（`actions.js` の判定が
+`false` を返すか、何も送らない）。名前・クロック・履歴の操作は送る。
+`Checker.cur_point` だけは残してあり、`apply()` が `gameinfo` と一緒に書き直す。
 
 ドラッグを離した瞬間の反応（**先行実行**）も同じ経路を通る。
-`Checker.on_mouse_up_xy()` は `decide_dst()`（行き先とヒットの判定）→
-`apply_move()`（予測・送信・ダイスの消費）→ `after_move()`（勝敗と得点）の
-順に呼ぶだけで（TODO-045）、`apply_move()` が `Board.predict_gameinfo()` で
-**動かしたあとの `gameinfo` を予測して作り**、`apply()` に渡す
+`Checker.on_mouse_up_xy()` は `Drag.drop_checker()` を呼ぶだけで、それが
+`actions.js` の `drop_checker()` を呼ぶ。
+`drop_checker()` が `decide_dst()`（行き先とヒットの判定）→ `move()`
+（予測・送信・表示）の順に呼ぶ（TODO-045、TODO-051）。`move()` が
+`Board.predict_gameinfo()` で**動かしたあとの `gameinfo` を予測して作り**、
+そこから `idx`・ダイス・勝ちの点数を求めて `move` を 1 通送り、`apply()` に渡す
 （共有ボードなので、サーバの応答を待つと操作感が悪い）。
-**`decide_dst()` がキャンセルしたときは `undefined` を返し、
-そこで何も送らずに終わる**（3 つに分けたので、途中で止まるのはここだけになった）。
+**`drop_checker()` が `false` を返したら（`decide_dst()` がキャンセルしたか、
+予測に失敗した）、何も送らずに `Drag` が元の位置へ戻す。**
 
-- 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]`
-  だけを書き換える。**`sn` は進めない。** 動かせるかは
+- 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]` と、
+  動かしたプレーヤーのダイスを書き換える。**`sn` は進めない。** 動かせるかは
   `Position.with_move()` が確かめる（駒が無ければ例外）
+- **ダイスは、使った目と、動かしたあとの盤面で使えなくなった目を 11〜16 に
+  する**（TODO-051）。送る `dice` もこれ。表示もこの `gameinfo` から作るので、
+  `apply()` のあとで `disable()` する順番の縛りは無くなった
 - **ヒットのときは 2 手ぶん**（相手をバーへ、自分を移動先へ）。
-  サーバへ送る `put_checker` の `idx` も、この予測から取る
+  `move` の `moves` に 2 つ載せ、`idx` もこの予測から取る
+- **勝ちの点数も予測した盤面から求める**（`rules/judge.js` の `winner_is()`）。
+  `score` が 1 以上ならサーバが `turn` を -1 にして得点を足す
+- **予測に失敗したら何も送らない**。行き先は `decide_dst()` が確かめた
+  あとなので、失敗するのは `gameinfo` がまだ届いていないときだけ
 - **予測のときは `clock_state` と `last_op` を渡さない。**
   クロックは古い残り時間から数え直しになり、音は二重に鳴る
 - **予測が外れても、サーバから届く `gameinfo` で表示は戻る**
   （`apply()` は毎回チェッカーを配り直す）。
   確認は `tests/browser/predict.test.mjs`
-- `apply()` は dice を `gameinfo` の値に戻すので、**使ったダイスの
-  `disable()` は `apply()` のあとで行う**。先にやると使用済みが消える。
-  予測が古い値へ戻さないよう、**dice だけは `roll_btn` から写す**
-- **free move のときは先行実行しない**（`emit` して return する）。
-  ルール判定を通らないので、行き先を確かめられない
-- **予測は、動かした駒と dice 以外を「最後に届いた `gameinfo`」へ戻す。**
+- **free move でチェッカーを動かすときは先行実行しない**（`put_checker` を
+  送るだけ）。ルール判定を通らないので、行き先を確かめられない
+- **free move のダイスと得点の ▲▼ は先行実行する**（TODO-052）。
+  `gameinfo` を複製して目や得点だけを変え、`apply()` で表示してから
+  `dice` / `set_score` を送る。写しを持たないので、表示を先に変えないと、
+  返事が届く前に続けて押した分が消える。確認は `tests/browser/clicks.test.mjs`。
+  **返事が 1 通も届かない間に続けて押した分は消えない。途中で返事が届くと
+  消えることがある**（届いた `gameinfo` を土台に同じ値を送り直す。変更前と同じ）。
+  また、Roll を押した直後に ▲ や free move のダイスを押すと、予測の
+  `apply()` で Roll ボタンがもう一度出ることがある（ダイスはまだ 0 のため）
+- **予測は `this.gameinfo` を土台にし、変えたもの（動かした駒と dice、
+  得点の ▲▼ ならその得点）以外はそのまま使う。** `apply()` は
+  `this.gameinfo` を渡された `gameinfo` に置き換えるので、予測を
+  `apply()` したあとの `this.gameinfo` は予測そのもので、次の予測は
+  それを土台にする（続けて押した分が効くのはこのため）。
   `score` / `playername` / `cube` / `turn` は `apply()` が毎回
   `gameinfo` から書き直すので、**画面の方が新しい値は 1 往復ぶん
   巻き戻る**（他のクライアントの変更が飛んでいる間だけ起きる。
@@ -393,8 +522,9 @@ last_op, predict})` だけ**（TODO-030）。サーバから届いた `gameinfo`
 `type` ごとの frozen dataclass に組み立てるので、**`data` のキーが
 足りなければ入口で `KeyError` になる**（奥の `msg['data']['n']` まで
 持ち越さない）。`parse()` が返す `Message` は
-`{type, data, history, raw}` で、`raw` が `last_op` に要る受け取った
-msg そのもの。**`data` と `history` は全ての `type` で必須**になった。
+`{type, data, raw}` で、`raw` が `last_op` に要る受け取った
+msg そのもの。**`data` は全ての `type` で必須**になった（`history` は
+TODO-051 で無くなり、付いていても読まない）。
 `back` や `clear_hist` のように中身を使わない `type` でも、キーが
 無ければ `parse()` で `KeyError` になる（旧 `on_json()` は読まずに
 `return` していた）。
@@ -417,16 +547,15 @@ float のフィールドには int も通す。**`list` のフィールドは `f
 
 ハンドラは全て `async def` で、戻り値で共通の後処理を分ける。
 `None` は「自分で送信済み」（`back` / `back2` / `back_all` / `fwd` /
-`fwd2` / `fwd_all` / `clear_hist` / `new` / `set_gameinfo` の 9 つ。表の
+`fwd2` / `fwd_all` / `clear_hist` / `new` の 8 つ。表の
 `history` は見ないので `False`）か「盤面と合わないので捨てた」（下を見ること）、`float` は「アニメーションの秒数」
-（盤面とクロックを変える 20 個）。秒数を返すのは `put_checker` と `move`
+（盤面とクロックを変える 16 個）。秒数を返すのは `put_checker` と `move`
 （`SEC_CHECKER_MOVE`）だけで、残りは `0`。`float` のときの後処理は、
 次の順に行う。
 
 1. **`turn` が -1 に変わったら、両方のクロックを `Clock.stop()` で止める**
    （処理の前から -1 なら止めない。勝負がついたあとでもクロックを押せば
-   再開できるように）。古い `set_turn` にも効く。`Clock.stop_all()` は
-   経過分を残り時間に反映しないので使わない
+   再開できるように）。`Clock.stop()` は経過分を残り時間に反映して止める
 2. 表の `history` を見て履歴へ積む
 3. `emit_gameinfo()`
 
@@ -470,8 +599,8 @@ float のフィールドには int も通す。**`list` のフィールドは `f
 ### クロック
 
 **表示を進めるのはクライアント側だけ**だが、残り時間の基準はサーバも持つ
-（TODO-016）。`set_clock_limit` / `set_player_clock` / `set_clock_switch` /
-`start_clock` / `stop_clock` / `resume_clock` のハンドラは、いずれも `0` を返し、
+（TODO-016）。`set_clock_limit` / `set_clock_switch` /
+`stop_clock` / `resume_clock` のハンドラは、いずれも `0` を返し、
 `on_json()` の末尾で履歴の判定と `emit_gameinfo()` を通る。
 
 **クロックは `Clock`（`clock.py`）が持ち、`gameinfo` には入れない**
@@ -496,9 +625,10 @@ float のフィールドには int も通す。**`list` のフィールドは `f
 クロックの状態はファイルの 1 行目に書かれる（下の「履歴」）。保存するのは
 `limit` / `sw` / 残り時間で、**`active` は保存しない**。サーバが落ちている
 間の時間は数えられないので、読み込んだときは必ず止まった状態で始める。
-`set_clock_limit` と `set_clock_switch` は、`history: false` で届いても保存する
-（クライアントがそう送るので、そこで保存しないと、変えたまま再起動しても
-`limit` や `sw` が戻ってしまう）。
+`set_clock_limit` と `set_clock_switch` は履歴に積まないので、ハンドラが
+自分で保存する（そこで保存しないと、変えたまま再起動しても
+`limit` や `sw` が戻ってしまう）。どちらも両方のクロックをサーバが止めるので、
+クライアントは `stop_clock` を別に送らない（TODO-050、TODO-051）。
 
 ### 履歴（戻す・進める）
 

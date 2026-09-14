@@ -121,16 +121,6 @@ class Clock:
         self.freeze(player)
         self.active[player] = False
 
-    def stop_all(self):
-        """
-        両方を止める。残り時間は変えない。
-
-        盤面ごと入れ替わる set_gameinfo で使う (TODO-016、TODO-024)。
-        """
-        now = time.monotonic()
-        self.active = [False, False]
-        self._start = [now, now]
-
     def set_switch(self, sw):
         """
         クロック機能の ON/OFF を切り替える。
@@ -144,13 +134,6 @@ class Clock:
     def set_limit(self, index, limit):
         """limit の片側だけを変える"""
         self.limit[index] = limit
-
-    def set_clock(self, player, clock):
-        """
-        残り時間を入れ替える。数え直しの基準も打ち直す。
-        """
-        self.clock[player] = list(clock)
-        self._start[player] = time.monotonic()
 
     def state(self) -> dict[str, Any]:
         """

@@ -1,5 +1,5 @@
 import { log } from "../log.js";
-import { emit_msg } from "../ws.js";
+import { toggle_clock } from "../actions.js";
 import { BgText } from "./base.js";
 
 /**
@@ -33,20 +33,6 @@ export class ClockLimit {
             this.el_limit[index].value = `${this.limit[index]}`;
         }
     } // ClockLimit.set()
-
-    /**
-     * サーバは set_clock_limit を履歴に積まない (TODO-032)。
-     * clock_limit は gameinfo の外にあり、history: true で送っても
-     * 積まれるエントリが sn 以外すべて同じになるだけなので、常に false
-     *
-     * @param {number} index
-     * @param {number} limit - sec
-     */
-    emit_set(index, limit) {
-        emit_msg("set_clock_limit",
-                 { index: index, clock_limit: limit },
-                 false);
-    } // ClockLimit.emit_set()
 } // class ClockLimit
 
 /**
@@ -54,15 +40,16 @@ export class ClockLimit {
  */
 export class PlayerClock extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
+     * @param {HTMLElement} bg_el - 背景 (p{n}clock-bg)
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} deg
      */
-    constructor(id, board, player, x, y, deg) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, bg_el, board, player, x, y, deg) {
+        super(el, x, y, deg, {board: board, player: player});
 
         this.clock = [0, 0];
         this.start_clock = [0, 0];
@@ -73,7 +60,7 @@ export class PlayerClock extends BgText {
         this.bg_width0 = 130;
         this.bg_width = this.bg_width0;
 
-        this.el_bg = document.getElementById(`${this.id}-bg`);
+        this.el_bg = bg_el;
         this.el_bg.style.left = this.x + "px";
         this.el_bg.style.top = this.y + "px";
         this.el_bg.style.width = this.bg_width + "px";
@@ -192,63 +179,11 @@ export class PlayerClock extends BgText {
     } // PlayerClock.stop()
 
     /**
-     * 
-     */
-    change_turn() {
-        this.emit_stop();
-        this.emit();
-
-        this.board.player_clock[1-this.player].emit_start();
-    } // PlayerClock.change_turn()
-
-    /**
-     * 
-     */
-    pause_resume() {
-        if ( this.active ) {
-            this.emit_stop();
-        } else if ( this.board.clock_sw ) {
-            this.emit_resume();
-        }
-        this.emit();
-    } // PlayerClock.push()
-
-    /**
-     * @param {number} player
-     * @param {number[]} clock - [clock0, clock1]
-     * @param {boolean} [add_hist=true]
-     */
-    emit(add_hist=false) {
-        emit_msg("set_player_clock", { player: this.player,
-                                       clock: this.clock }, add_hist);
-    } // PlayerClock.emit()
-
-    /**
-     * @param {boolean} [add_hist=true]
-     */
-    emit_resume(add_hist=false) {
-        emit_msg("resume_clock", { player: this.player }, add_hist);
-    } // PlayerClock.emit_start()
-
-    /**
-     * @param {boolean} [add_hist=true]
-     */
-    emit_start(add_hist=false) {
-        emit_msg("start_clock", { player: this.player }, add_hist);
-    } // PlayerClock.emit_start()
-
-    /**
-     * @param {boolean} [add_hist=true]
-     */
-    emit_stop(add_hist=false) {
-        emit_msg("stop_clock", { player: this.player }, add_hist);
-    } // PlayerClock.emit_pause()
-
-    /**
      * @param {number} x
      * @param {number} y
      */
     on_mouse_down_xy(x, y) {
-        this.pause_resume();
+        // 止める・再開するの判定と送信は actions.js (TODO-051)
+        toggle_clock(this.board, this.player);
     } // PlayerClock.on_mouse_down_xy()
 } // class PlayerClock

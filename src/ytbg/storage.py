@@ -33,7 +33,9 @@ from .mylog import getLogger
 # サーバが起動しなくなる
 # 旧 load_data() と同じ範囲 + lines[0] のための IndexError。
 # TypeError / AttributeError / ValueError まで握ると、gameinfo.py 側の
-# 書き間違いを「壊れたファイル」として黙って握りつぶしてしまう (TODO-024)
+# 書き間違いを「壊れたファイル」として黙って握りつぶしてしまう (TODO-024)。
+# "board": null のように dict であるべき所が dict でないファイルは、
+# GameInfo.from_dict() などの入口で KeyError にしている (TODO-051)
 LOAD_ERRORS = (OSError, UnicodeDecodeError, json.JSONDecodeError,
                KeyError, IndexError)
 
@@ -131,14 +133,12 @@ class Storage:
             fwd_hist: list[GameInfo] = []
             for ln in lines[1:]:
                 ent = json.loads(ln)
-                # strict=True: キーが欠けた履歴は「壊れたファイル」
+                # キーが欠けた履歴は「壊れたファイル」
                 # として扱う (LOAD_ERRORS の KeyError に落ちる)
                 if 'h' in ent:
-                    history.append(
-                        GameInfo.from_dict(ent['h'], strict=True))
+                    history.append(GameInfo.from_dict(ent['h']))
                 elif 'f' in ent:
-                    fwd_hist.append(
-                        GameInfo.from_dict(ent['f'], strict=True))
+                    fwd_hist.append(GameInfo.from_dict(ent['f']))
                 else:
                     raise KeyError('h/f')
 

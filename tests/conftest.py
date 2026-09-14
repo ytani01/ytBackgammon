@@ -161,7 +161,7 @@ def make_bg_server(tmp_path, monkeypatch, emitted):
     """
     BackgammonServer を、呼んだときに作るフィクスチャ。
 
-    - DATAFILE_DIR を tmp_path に差し替え、利用者の
+    - 環境変数 YTBG_DATA_DIR を tmp_path に差し替え、利用者の
       ~/ytbg-* を読み書きしないようにする
     - ClientHub.broadcast() を差し替え、全員へ送られた msg を
       emitted へ積む。**クラスごと差し替える**ので、同じテストで
@@ -171,8 +171,10 @@ def make_bg_server(tmp_path, monkeypatch, emitted):
     作る時点を自分で決める必要があるので、bg_server ではなく
     こちらを使う。
     """
-    monkeypatch.setattr(
-        BackgammonServer, 'DATAFILE_DIR', str(tmp_path))
+    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
+    # 保存先を import のときに読む形へ戻っても、利用者の $HOME に書かない
+    # ように HOME も逃がす (TODO-055 のレビュー)
+    monkeypatch.setenv('HOME', str(tmp_path))
 
     async def fake_broadcast(_self, msg):
         emitted.append(msg)
@@ -215,10 +217,10 @@ def bg_server_raw(tmp_path, monkeypatch):
 
     broadcast() の中身と、接続の出入り (on_connect / on_disconnect) を
     確かめるテスト用 (TODO-009)。送信先は FakeClient を _hub._clients
-    へ直接入れて用意する。DATAFILE_DIR を tmp_path に差し替えるのは
+    へ直接入れて用意する。YTBG_DATA_DIR を tmp_path に差し替えるのは
     bg_server と同じ。
     """
-    monkeypatch.setattr(
-        BackgammonServer, 'DATAFILE_DIR', str(tmp_path))
+    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('HOME', str(tmp_path))
 
     return BackgammonServer(svr_ver='test', svr_id='test')

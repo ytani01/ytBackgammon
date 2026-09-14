@@ -8,8 +8,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { all_inner, calc_dst_point, dice_for_move, dst_point,
-         dst_points, usable_dice } from
+import { all_inner, calc_dst_point, dice_for_move, disable_unusable,
+         dst_point, dst_points, usable_dice } from
     '../../src/ytbg/webroot/static/js/rules/move.js';
 import { bar_point, goal_point } from
     '../../src/ytbg/webroot/static/js/rules/position.js';
@@ -224,7 +224,7 @@ describe('usable_dice()', () => {
     });
 
     it('使用済み (11〜16) と非表示 (0, 10) は、判定せずに true', () => {
-        // Dice.value が取るのは 0 / 10 (非表示)、1〜6 (有効)、
+        // gameinfo.board.dice の値が取るのは 0 / 10 (非表示)、1〜6 (有効)、
         // 11〜16 (使用済み) だけ。7 や -1 は来ない。
         // 11 を素の目として判定すると、2 がふさがれているので
         // false になってしまう
@@ -351,5 +351,41 @@ describe('dice_for_move()', () => {
     it('ベアオフでも、ちょうどの目があればそれを使う', () => {
         assert.deepEqual(dice_for_move(0, [3, 6], 3, goal_point(0)), [3]);
         assert.deepEqual(dice_for_move(1, [3, 6], 22, goal_point(1)), [3]);
+    });
+});
+
+describe('disable_unusable()', () => {
+    it('使えない目だけを 11〜16 にし、ほかはそのまま', () => {
+        // usable_dice() の「動かせる駒が 1 つも無ければ false」と同じ盤面
+        const pos = make_position({13: [0],
+                                   8: stack(1, 2),
+                                   11: stack(1, 2),
+                                   10: stack(1, 2),
+                                   5: stack(1, 2)});
+        assert.deepEqual(disable_unusable(pos, 0, [2, 5, 0, 0]),
+                         [12, 15, 0, 0]);
+    });
+
+    it('使用済み (11〜16) は 11〜16 のまま', () => {
+        // 5 は使えない。11 は判定の対象外なので 21 にはならない
+        const pos = make_position({13: [0],
+                                   8: stack(1, 2),
+                                   11: stack(1, 2),
+                                   10: stack(1, 2),
+                                   5: stack(1, 2)});
+        assert.deepEqual(disable_unusable(pos, 0, [11, 5, 0, 0]),
+                         [11, 15, 0, 0]);
+    });
+
+    it('渡した配列は書き換えない', () => {
+        const pos = make_position({13: [0],
+                                   8: stack(1, 2),
+                                   11: stack(1, 2),
+                                   10: stack(1, 2),
+                                   5: stack(1, 2)});
+        const dice = [2, 5, 0, 0];
+        const got = disable_unusable(pos, 0, dice);
+        assert.deepEqual(dice, [2, 5, 0, 0]);
+        assert.notEqual(got, dice);
     });
 });

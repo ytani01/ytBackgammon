@@ -5,9 +5,9 @@
 //
 //   node --test tests/browser/
 //
-// Board.load_player() は cookie の値 (文字列) を読む。数に直さないと、
-// プレーヤー 0 の画面を開き直したときに board.player が "0" のまま残り、
-// 投了ボタンが set_turn の resign に文字列を送る。サーバは data の型を
+// Settings.load_player() は cookie の値 (文字列) を読む。数に直さないと、
+// プレーヤー 0 の画面を開き直したときに board.settings.player が "0" のまま残り、
+// 投了ボタンが resign の player に文字列を送る。サーバは data の型を
 // 確かめるので、それを弾いて投了が効かなくなる。
 //
 import assert from 'node:assert/strict';
@@ -37,7 +37,7 @@ describe('cookie のプレーヤー番号', () => {
         }
     });
 
-    it('cookie が "0" の画面を開き直して投了すると、resign は数の 0',
+    it('cookie が "0" の画面を開き直して投了すると、resign の player は数の 0',
        async () => {
            await page.evaluate(() => {
                document.cookie = `board${board.svr_id}_player=0;`;
@@ -56,7 +56,7 @@ describe('cookie のプレーヤー番号', () => {
                    return orig.call(this, d);
                };
                const cookie = document.cookie;
-               const player = board.player;
+               const player = board.settings.player;
                board.button_resign.on_mouse_down_xy(0, 0);
                WebSocket.prototype.send = orig;
                return { cookie, player, sent };
@@ -64,11 +64,13 @@ describe('cookie のプレーヤー番号', () => {
 
            assert.match(sent.cookie, /_player=0/, 'cookie が "0" でない');
            assert.equal(sent.player, 0);
-           const set_turn = sent.sent.find(m => m.type === 'set_turn');
-           assert.deepEqual(set_turn.data, { turn: -1, resign: 0 });
+           // 投了は resign 1 通だけ (TODO-051)。キューブは 1 でテイク済み
+           // なので、相手に足す点数は 3
+           assert.deepEqual(sent.sent.map(m => [m.type, m.data]),
+                            [['resign', { player: 0, score: 3 }]]);
 
            // サーバが弾かずに受け付け、turn が -1 になる
-           await page.waitForFunction(() => board.turn === -1);
+           await page.waitForFunction(() => board.gameinfo.turn === -1);
        });
 
     it('コンソールエラーが出ていない', async () => {

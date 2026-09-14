@@ -1,14 +1,17 @@
 import { log } from "./log.js";
-import { emit_msg } from "./ws.js";
+import { end_turn as action_end_turn,
+         set_clock_switch as action_set_clock_switch,
+         set_clock_limit as action_set_clock_limit } from "./actions.js";
 import { BX, BY, label_geometry, point_geometry,
          score_geometry } from "./layout.js";
-import { CookieBase, get_sound_query, get_server_id } from "./settings.js";
-import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
-         SOUND_ROLL, SOUND_PUT, SOUND_HIT,
+import { Drag } from "./drag.js";
+import { Settings, get_server_id } from "./settings.js";
+import { SoundBase, SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
 import { BgImage } from "./ui/base.js";
-import { Position, N_POINT } from "./rules/position.js";
+import { Position, N_POINT, copy_gameinfo } from "./rules/position.js";
 import { all_inner as rule_all_inner,
+         disable_unusable as rule_disable_unusable,
          dst_point as rule_dst_point,
          dst_points as rule_dst_points } from "./rules/move.js";
 import { closeout as rule_closeout,
@@ -53,68 +56,55 @@ import { BoardPoint } from "./ui/point.js";
  */
 export class Board extends BgImage {
     /*
-     * @param {string} id - div tag id
+     * @param {Object} els - build_dom() が作った要素 (TODO-054)
      * @param {number} x - 
      * @param {number} y - 
-     * @param {number} player - 0 or 1
      */
-    constructor(id, x, y) {
-        log(`Board(id=${id},x=${x},y=${y})`);
-        super(id, x, y, 0);
+    constructor(els, x, y) {
+        log(`Board(x=${x},y=${y})`);
+        super(els.board, x, y, 0);
 
-        this.free_move = false;
-        this.disp_pip = false;
-        
         // 座標は layout.js にある (書き換えても元は汚さないよう複製する)
         this.bx = [...BX];
         this.by = [...BY];
-
-        this.resign = -1;
 
         // server ID
         this.svr_id = get_server_id();
         log(`Board> svr_id=${this.svr_id}`);
 
-        // Cookie
-        this.cookie = new CookieBase();
-        this.cookie_board_player = `board${this.svr_id}_player`;
-        this.cookie_sound = `board${this.svr_id}_sound`;
+        // 音・free move・PIP・プレーヤー番号 (TODO-053)
+        this.settings = new Settings(this.svr_id);
+
+        // 掴んでいるチェッカーとキューブ (TODO-053)
+        this.drag = new Drag(this);
 
         // sound setup
-        this.el_sound = document.getElementById("sound-switch");
-        this.sound = true;
-        this.load_sound_switch();
         this.sound_turn_change = new SoundBase(this, SOUND_TURN_CHANGE);
         this.sound_roll = new SoundBase(this, SOUND_ROLL);
         this.sound_put = new SoundBase(this, SOUND_PUT);
         this.sound_hit = new SoundBase(this, SOUND_HIT);
 
-        // Player
-        if ( this.load_player() === undefined ) {
-            this.set_player(0);
-        }
-
-        this.turn = -1;
-
+        // 盤面の状態はこれだけ。判定もここを読む (TODO-052)。
+        // サーバから届くまでは undefined で、何も操作できない
         this.gameinfo = undefined;
 
         // Buttons
         const bx0 = this.x + this.w + 30;
 
         this.button_resign = new ResignButton(
-            "button-resign", this, bx0, 20);
+            els.button_resign, this, bx0, 20);
 
         this.button_back = new EmitButton(
-            "button-back", this, "back", {n: 1}, bx0, this.h);
+            els.button_back, this, "back", {n: 1}, bx0, this.h);
         this.button_back.move(bx0, this.y + this.h - this.button_back.h - 60);
 
         this.button_fwd = new EmitButton(
-            "button-fwd",
+            els.button_fwd,
             this, "fwd", {n: 1}, bx0,
             this.button_back.y - this.button_back.h - 40);
         
         this.button_inverse = new InverseButton(
-            "button-inverse", this, bx0, 0);
+            els.button_inverse, this, bx0, 0);
         this.button_inverse.move(
             bx0, this.h / 2 - this.button_inverse.h / 2);
         
@@ -131,31 +121,31 @@ export class Board extends BgImage {
         // PlayerScore
         const score_at = (p) => score_geo[p].label;
         this.score = [];
-        this.score[1] = new PlayerScore("p1score", this, 1,
+        this.score[1] = new PlayerScore(els.score[1], this, 1,
                                         score_at(1).x, score_at(1).y,
                                         score_at(1).deg);
-        this.score[0] = new PlayerScore("p0score", this, 0,
+        this.score[0] = new PlayerScore(els.score[0], this, 0,
                                         score_at(0).x, score_at(0).y,
                                         score_at(0).deg);
 
         // Score buttons
-        const score_btn = (id, p, key, offset) => {
+        const score_btn = (p, key, offset) => {
             const g = score_geo[p][key];
-            return new ScoreButton(id, this, g.x, g.y, g.w, g.h,
+            return new ScoreButton(els.score_btn[p][key], this, g.x, g.y, g.w, g.h,
                                    this.score[p], offset);
         };
         this.score_btn = [{}, {}];
-        this.score_btn[1].up   = score_btn("score_up1",   1, "up",   +1);
-        this.score_btn[1].down = score_btn("score_down1", 1, "down", -1);
-        this.score_btn[0].up   = score_btn("score_up0",   0, "up",   +1);
-        this.score_btn[0].down = score_btn("score_down0", 0, "down", -1);
+        this.score_btn[1].up   = score_btn(1, "up",   +1);
+        this.score_btn[1].down = score_btn(1, "down", -1);
+        this.score_btn[0].up   = score_btn(0, "up",   +1);
+        this.score_btn[0].down = score_btn(0, "down", -1);
 
         // PlayerName
         this.player_name = [];
         for (let p=0; p < 2; p++) {
             const g = label_geo.name[p];
             this.player_name.push(new PlayerName(
-                `p${p}name`, this, p, g.x, g.y, g.deg));
+                els.name[p], els.name_input[p], this, p, g.x, g.y, g.deg));
         }
 
         for (let p=0; p < 2; p++) {
@@ -170,11 +160,12 @@ export class Board extends BgImage {
         for (let p=0; p < 2; p++) {
             const g = label_geo.clock[p];
             this.player_clock.push(new PlayerClock(
-                `p${p}clock`, this, p, g.x, g.y, g.deg));
+                els.clock[p], els.clock_bg[p], this, p, g.x, g.y, g.deg));
         }
 
-        this.clock_sw = false;
-        this.apply_clock_sw();
+        // 表示の更新なので送らない (TODO-051)。つないだあとは
+        // サーバから届く clock_state で合わせる
+        this.clock_sw = document.getElementById("clock_sw").checked;
 
         const update_clock = () => {
             this.player_clock[0].update();
@@ -187,26 +178,24 @@ export class Board extends BgImage {
         for (let p=0; p < 2; p++) {
             const g = label_geo.pip[p];
             this.pip.push(new PlayerPipCount(
-                `p${p}pip`, this, p, g.x, g.y, g.deg));
+                els.pip[p], this, p, g.x, g.y, g.deg));
         }
 
         // Checkers
         this.checker = [Array(15), Array(15)];
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
-                let c_id = "p" + player + ("0" + i).slice(-2);
-                this.checker[player][i] = new Checker(c_id, this, player);
+                this.checker[player][i] = new Checker(
+                    els.checker[player][i], this, player, i);
             } // for(i)
         } // for(player)
 
-        this.moving_checker = undefined;
-
         // Cube
-        this.cube = new Cube("cube", this);
+        this.cube = new Cube(els.cube, this);
 
         // Points
         this.point = point_geometry(this.bx, this.by, this.h).map(
-            (g, p) => new BoardPoint("", this, g.x, g.y, g.w, g.h,
+            (g, p) => new BoardPoint(undefined, this, g.x, g.y, g.w, g.h,
                                      p, g.direction, g.max_n));
 
         // RollButton
@@ -214,9 +203,9 @@ export class Board extends BgImage {
 
         this.roll_btn = [];
         this.roll_btn.push(new RollButton(
-            "rollbutton0", this, 0, this.bx[4] + bx1, this.h / 2));
+            els.roll_btn[0], els.dice[0], this, 0, this.bx[4] + bx1, this.h / 2));
         this.roll_btn.push(new RollButton(
-            "rollbutton1", this, 1, this.bx[3] - bx1, this.h / 2));
+            els.roll_btn[1], els.dice[1], this, 1, this.bx[3] - bx1, this.h / 2));
 
         const dy1 = 200;
 
@@ -228,8 +217,7 @@ export class Board extends BgImage {
             log(`pass banner.on_click>player=${btn.player}`);
 
             btn.off();
-            this.player_clock[btn.player].change_turn();
-            this.emit_turn(1 - btn.player, -1, true);
+            action_end_turn(this, btn.player);
         };
         const on_win = (btn) => {
             log(`win banner.on_click>player=${btn.player}`);
@@ -238,97 +226,46 @@ export class Board extends BgImage {
         // ResignBanner
         this.resign_banner_btn = [];
         this.resign_banner_btn.push(new BannerButton(
-            "resignbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
+            els.resign_banner_btn[0], this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
             0, on_resign_banner));
         this.resign_banner_btn.push(new BannerButton(
-            "resignbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
+            els.resign_banner_btn[1], this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_resign_banner));
 
         // Pass
         this.pass_btn = [];
         this.pass_btn.push(new BannerButton(
-            "passbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
+            els.pass_btn[0], this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
             0, on_pass));
         this.pass_btn.push(new BannerButton(
-            "passbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
+            els.pass_btn[1], this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_pass));
 
         // Win
         this.win_btn = [];
         this.win_btn.push(new BannerButton(
-            "winbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
+            els.win_btn[0], this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
             0, on_win));
         this.win_btn.push(new BannerButton(
-            "winbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
+            els.win_btn[1], this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_win));
 
-        if ( this.player == 1 ) {
-            this.player = 0;
+        if ( this.settings.player == 1 ) {
+            this.settings.player = 0;
             this.inverse(0);
         }
     } // Board.constructor()
 
     /**
-     * @return {boolean} sound
-     */
-    load_sound_switch() {
-        log("Board.load_sound_switch>"
-                    + `cookie_sound=${this.cookie_sound}`);
-
-        const s = this.cookie.get(this.cookie_sound);
-        // log(`Board.load_sound_switch>s=${s}`);
-        if ( s === undefined ) {
-            this.sound = true;
-        } else {
-            this.sound = JSON.parse(s);
-        }
-        log(`Board.load_sound_switch>sound=${this.sound}`);
-        this.el_sound.checked = this.sound;
-        //this.apply_sound_switch();
-
-        return this.sound;
-    } // Board.load_sound_switch()
-        
-    /**
-     * @return {boolean} sound
-     */
-    apply_sound_switch() {
-        log("Board.apply_sound_switch>"
-                    + `cookie_sound=${this.cookie_sound}`);
-
-        set_global_sound_switch(get_sound_query());
-        log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
-
-        this.sound = document.getElementById("sound-switch").checked;
-        this.cookie.set(this.cookie_sound, this.sound);
-        this.el_sound.checked = this.sound;
-
-        log(`Board.apply_sound_switch>sound=${this.sound}`);
-        return this.sound;
-    } // Board.apply_sound_switch()
-
-    /**
-     * @return {boolean} free_move
-     */
-    apply_free_move() {
-        log(`Board.apply_free_move()`);
-
-        this.free_move = document.getElementById("free-move").checked;
-        log(`Board.apply_free_move>free_move=${this.free_move}`);
-
-        return this.free_move;
-    } // Board.apply_free_move()
-
-    /**
+     * ヘッダの Pip を切り替えたとき。値は Settings に持たせ、
+     * 表示はここで切り替える (TODO-053)
+     *
      * @return {boolean} disp_pip
      */
     apply_disp_pip() {
-        log(`Board.apply_disp_pip()`);
+        const disp_pip = this.settings.apply_disp_pip();
 
-        this.disp_pip = document.getElementById("disp-pip").checked;
-        log(`Board.apply_disp_pip>disp_pip=${this.disp_pip}`);
-
-        if ( this.disp_pip ) {
+        if ( disp_pip ) {
             this.pip[0].on();
             this.pip[1].on();
         } else {
@@ -336,7 +273,7 @@ export class Board extends BgImage {
             this.pip[1].off();
         }
 
-        return this.disp_pip;
+        return disp_pip;
     } // Board.apply_disp_pip()
 
     /**
@@ -357,13 +294,12 @@ export class Board extends BgImage {
     } // Board.set_clock_switch()
 
     /**
-     *
+     * ヘッダの Clock を切り替えたとき。両方のクロックはサーバが止める
+     * (TODO-050)
      */
     apply_clock_sw() {
         this.clock_sw = document.getElementById("clock_sw").checked;
-        emit_msg("set_clock_switch", { switch: this.clock_sw }, false);
-        this.player_clock[0].emit_stop();
-        this.player_clock[1].emit_stop();
+        action_set_clock_switch(this, this.clock_sw);
     } // Board.apply_clock_sw()
     
     /**
@@ -379,68 +315,10 @@ export class Board extends BgImage {
         }
         log(`Board.apply_clock_limit(${index}):limit=${limit}`);
 
-        this.player_clock[0].emit_stop();
-        this.player_clock[1].emit_stop();
-
-        this.clock_limit.emit_set(index, limit);
+        // 両方のクロックはサーバが止める (TODO-050)
+        action_set_clock_limit(this, index, limit);
     } // Board.apply_clock_limit()
 
-    /**
-     * load player number from cookie
-     *
-     * cookie の値は文字列なので数に直す (TODO-050)。直さないと "0" の
-     * まま残り、投了で set_turn の resign に文字列を送ってしまう
-     * (サーバは data の型を確かめて弾く)。値が無ければ undefined のまま
-     */
-    load_player() {
-        const player = this.cookie.get(this.cookie_board_player);
-        this.player = player === undefined ? undefined : parseInt(player);
-        return this.player;
-    } // Board.load_player()
-
-    /**
-     * set player number and save to cookie
-     *
-     * @param {number} player
-     */
-    set_player(player) {
-        this.player = player;
-        this.cookie.set(this.cookie_board_player, this.player);
-    } // board.set_player()
-
-    /**
-     * search checker object by checker id
-     *
-     * @param {string} ch_id - checker id
-     * @return {Checker | undefined} - checker object or undefined
-     */
-    search_checker(ch_id) {
-        log(`Board.search_checker(ch_id=${ch_id})`);
-        let player = parseInt(ch_id[1]);
-
-        for (let i=0; i < 15; i++) {
-            let ch = this.checker[player][i];
-            if ( ch.id == ch_id ) {
-                return ch;
-            }
-        }
-        return undefined;
-    } // Board.search_checker()
-
-    /**
-     * @param {number} turn
-     *   <= -1 : all off
-     *       0 : player 0
-     *       1 : player 1
-     *   >=  2 : all on
-     * @param {boolean} add_hist
-     */
-    emit_turn(turn, resign=-1, add_hist=false) {
-        log(`Boad.emit_turn(turn=${turn},resign=${resign},add_hist=${add_hist})`);
-        // this.turn = turn;
-        emit_msg("set_turn", { turn: turn,
-                               resign: resign }, add_hist);
-    } // Board.emit_turn()
 
     /**
      * ターンを設定
@@ -451,17 +329,12 @@ export class Board extends BgImage {
      *       1 : player 1
      *   >=  2 : all on
      * @param {number} resign
-     * @param {boolean} sound - sound switch
-     * @param {boolean} [emit=true] - サーバへ送ってよいか。
-     *     **予測 (先行実行) から呼ぶときは false。**
-     *     予測は最後に届いた gameinfo の turn をなぞるだけなので、
-     *     ここで送ると同じ stop_clock が 2 回飛ぶ (TODO-030)
+     * @param {boolean} sound - 手番が変わる音を鳴らすか
+     *
+     * **サーバへは何も送らない** (TODO-051)。勝負がついたときに
+     * クロックを止めるのはサーバ (TODO-050)。
      */
-    set_turn(turn, resign=-1, sound=true, emit=true) {
-        const prev_turn = this.turn;
-        this.turn = turn;
-        this.resign = resign;
-        
+    set_turn(turn, resign=-1, sound=true) {
         for (let p=0; p < 2; p++) {
             this.roll_btn[p].off();
             this.pass_btn[p].off();
@@ -488,22 +361,6 @@ export class Board extends BgImage {
 
             if ( winner >= 0 ) {
                 log(`Board.set_turn>plyaer${winner} win ${score}!`);
-                // 動いているときだけ止める (TODO-015)
-                //
-                // set_turn() は apply() から毎回呼ばれる。
-                // 無条件に emit_stop() を送ると、サーバが返す gameinfo で
-                // また apply() が走り、stop_clock を送り直す。
-                // stop_clock は turn も resign も変えないので、止まる条件が
-                // 無いまま回り続ける (実測: 5 秒で 606 通)。
-                // active を見れば 1 巡で収まる。サーバが Clock.active を
-                // false にすると、次の clock_state で resume() されなくなり、
-                // active が false のままになるため
-                // 予測 (emit=false) からは送らない。掴んでいる間に
-                // turn が -1 に変わると、離した瞬間の予測でも
-                // ここを通る (TODO-030 で実測した)
-                if ( emit && this.player_clock[winner].active ) {
-                    this.player_clock[winner].emit_stop();
-                }
                 this.win_btn[winner].on();
                 this.player_name[winner].on();
             }
@@ -520,11 +377,11 @@ export class Board extends BgImage {
         }
             
         // turn == 0 or 1
-        if ( turn != prev_turn && sound ) {
+        if ( sound ) {
             let playpromise = this.sound_turn_change.play();
         }
 
-        if ( this.closeout(1 - this.turn) ) {
+        if ( this.closeout(1 - turn) ) {
             this.pass_btn[turn].on();
         } else {
             this.roll_btn[turn].update();
@@ -625,22 +482,22 @@ export class Board extends BgImage {
     /**
      * player の勝ちなら、その点数を返す。
      *
-     * 判定は rules/judge.js。投了による勝ちだったときに
-     * this.resign を戻すのはここ (TODO-027)。
+     * 判定は rules/judge.js。**判定するだけで、状態は書き換えない**
+     * (TODO-051。以前は投了による勝ちのときに resign を戻していた)。
      *
      * @param {number} player
      * @return {number} points - 0 なら勝ちではない
      */
     winner_is(player) {
-        const result = rule_winner_is(this.position(), player, {
-            resign: this.resign,
-            cube_value: this.cube.value,
-            cube_accepted: this.cube.accepted,
-        });
-        if ( result.by_resign ) {
-            this.resign = -1;
+        const gi = this.gameinfo;
+        if ( gi === undefined ) {
+            return 0;
         }
-        return result.score;
+        return rule_winner_is(this.position(), player, {
+            resign: gi.resign,
+            cube_value: gi.board.cube.value,
+            cube_accepted: gi.board.cube.accepted,
+        }).score;
     } // Board.winner_is()
 
     /**
@@ -668,12 +525,32 @@ export class Board extends BgImage {
     } // Board.closeout()
 
     /**
-     * 使えるダイスを取得
-     * @return {number[]}
+     * 使えるダイス (1〜6) の目。gameinfo から求める (TODO-052)
+     *
+     * @param {number} player
+     * @return {number[]} - gameinfo がまだ無いときは空
      */
     get_active_dice(player) {
-        return this.roll_btn[player].get_active_dice();
+        if ( this.gameinfo === undefined ) {
+            return [];
+        }
+        return this.gameinfo.board.dice[player].filter(
+            (v) => v >= 1 && v <= 6);
     } // Board.get_active_dice
+
+    /**
+     * ダイスが出ているか (使い終わった 11〜16 も含む)。
+     * gameinfo から求める (TODO-052。以前は RollButton.dice_active)
+     *
+     * @param {number} player
+     * @return {boolean} - gameinfo がまだ無いときは false
+     */
+    has_dice(player) {
+        if ( this.gameinfo === undefined ) {
+            return false;
+        }
+        return this.gameinfo.board.dice[player].some((v) => v > 0);
+    } // Board.has_dice()
 
     /**
      * 移動可能なポイントの取得
@@ -725,25 +602,25 @@ export class Board extends BgImage {
      * @param {Object} [opts.last_op] - 直前の操作 {type, data, ..}。
      *     無ければ null。**予測のときは渡さない** (音は、サーバから
      *     gameinfo が届いたときに鳴らす)
-     * @param {boolean} [opts.predict=false] - 予測 (先行実行) かどうか。
-     *     true のときは、表示を変えるだけで**サーバへ何も送らない**
-     *     (TODO-030)
+     *
+     * **サーバへは何も送らない** (TODO-051)。
      */
     apply(gameinfo, {sec=2, history_flag=false, clock_state=undefined,
-                     last_op=undefined, predict=false} = {}) {
+                     last_op=undefined} = {}) {
         this.gameinfo = gameinfo;
 
         // last_op は無いこともある (履歴の再生、接続時)。
         // サーバは JSON の null で送ってくるので、真偽で見る
         const op_type = last_op ? last_op.type : undefined;
 
-        // put / hit の音は動かす前の位置で決まるので、チェッカーを
-        // 配り直す前に控えておく (TODO-015)
+        // put_checker の put / hit の音は動かす前の位置で決まるので、
+        // チェッカーを配り直す前に控えておく (TODO-015)
         let put_ch = undefined;
         let put_prev_p = undefined;
         if ( op_type == "put_checker" ) {
-            const ch_id = "p" + ("000" + last_op.data.ch).slice(-3);
-            put_ch = this.search_checker(ch_id);
+            // ID は player * 100 + num。範囲外なら undefined
+            const ch_id = last_op.data.ch;
+            put_ch = this.checker[Math.floor(ch_id / 100)]?.[ch_id % 100];
             if ( put_ch !== undefined ) {
                 put_prev_p = put_ch.cur_point;
             }
@@ -775,7 +652,7 @@ export class Board extends BgImage {
         // 名前を変えただけでも掴んでいる駒が一瞬戻ってしまう。
         // 積み順と cur_point は gameinfo どおりに作らせたまま、
         // 見えている位置と重なり順だけを戻す
-        const mv_ch = this.moving_checker;
+        const mv_ch = this.drag.checker;
         let mv_pos = undefined;
         if ( mv_ch !== undefined ) {
             mv_pos = { x: mv_ch.x, y: mv_ch.y, z: mv_ch.z };
@@ -797,12 +674,7 @@ export class Board extends BgImage {
         // score
         this.score[0].set(gameinfo.score[0]);
         this.score[1].set(gameinfo.score[1]);
-        log(`Board.apply>score[]=[`
-                    + `${this.score[0].score},`
-                    + `${this.score[1].score}]`);
-
-        // resign
-        this.resign = gameinfo.resign;
+        log(`Board.apply>score[]=${JSON.stringify(gameinfo.score)}`);
 
         // clock
         //
@@ -843,12 +715,12 @@ export class Board extends BgImage {
 
         // dice
         //
-        // 振ったときだけ、そのプレーヤーの dice を回して音を鳴らす
-        // (TODO-015)。turn == -1 (操作不可) では演出しない
+        // 振ったとき (roll) だけ、そのプレーヤーの dice を回して音を
+        // 鳴らす (TODO-015、TODO-051)。turn == -1 (操作不可) では演出しない
         const d = gameinfo.board.dice;
         // log(`Board.apply> dice=${JSON.stringify(d)}`);
         let roll_player = -1;
-        if ( op_type == "dice" && last_op.data.roll && gameinfo.turn != -1 ) {
+        if ( op_type == "roll" && gameinfo.turn != -1 ) {
             roll_player = last_op.data.player;
         }
         this.roll_btn[0].set(d[0], roll_player == 0);
@@ -858,11 +730,12 @@ export class Board extends BgImage {
         //
         // turn
         //
-        // turn_change の音は set_turn が鳴らす。turn が変わったときだけ
-        // 鳴るので、set_turn の操作で来たときだけ許す (TODO-015)
+        // turn_change の音は set_turn が鳴らす。手番が変わる操作
+        // (opening と end_turn) で来たときだけ許す。turn が変わったかは
+        // 見ない (TODO-051。どちらの操作でも turn は変わる)
         log(`Board.apply>turn=${gameinfo.turn}`);
-        this.set_turn(gameinfo.turn, this.resign, op_type == "set_turn",
-                      ! predict);
+        this.set_turn(gameinfo.turn, gameinfo.resign,
+                      op_type == "opening" || op_type == "end_turn");
 
         // pip count
         this.pip_count(0);
@@ -871,9 +744,21 @@ export class Board extends BgImage {
         // put / hit の音 (TODO-015)
         //
         // 盤面はもう gameinfo で揃っているので、ここで出すのは音だけ。
-        // turn == -1 (操作不可) では鳴らさない
-        if ( put_ch !== undefined && this.turn != -1 ) {
+        // put_checker (free move) は turn == -1 (操作不可) では鳴らさない
+        if ( put_ch !== undefined && gameinfo.turn != -1 ) {
             if ( last_op.data.p >= 26 && put_prev_p < 26 ) {
+                this.sound_hit.play();
+            } else {
+                this.sound_put.play();
+            }
+        }
+
+        // move は turn を見ずに鳴らす (TODO-051)。勝ちになる move では、
+        // 届いた gameinfo の turn がもう -1 になっている。
+        // ヒットは moves にバーへの移動があるかで決める。動かす前の位置を
+        // 見ると、先行実行した画面では駒がもうバーにあるので見分けられない
+        if ( op_type == "move" ) {
+            if ( last_op.data.moves.some((mv) => mv.p >= 26) ) {
                 this.sound_hit.play();
             } else {
                 this.sound_put.play();
@@ -906,27 +791,29 @@ export class Board extends BgImage {
      *
      * サーバの応答を待たずに表示を変えるための「予測」。土台は
      * this.gameinfo (apply() が最後に受け取ったもの) で、動かした
-     * チェッカーの [point, idx] だけを書き換える。
+     * チェッカーの [point, idx] を書き換える。
      *
      * - **sn は書き換えない。** 予測はサーバの通し番号を進めない
      * - **動かせるかを Position.with_move() で確かめる。**
      *   駒が無ければ例外になる (TODO-027)
-     * - idx は、そのポイントに既にある枚数。emit_put_checker() が
-     *   送る idx も、この予測から取る
-     * - **dice だけは画面の方が新しいことがある** (使ったダイスを
-     *   disable() したのが、まだサーバへ届いていない)。
-     *   予測が古い値に戻してしまわないよう、roll_btn から写す
+     * - idx は、そのポイントに既にある枚数。move で送る idx も、
+     *   この予測から取る
+     * - player を渡すと、そのプレーヤーのダイスも書き換える (TODO-051)。
+     *   used_dice の目を 11〜16 にし、動かしたあとの盤面で使えなく
+     *   なった目も 11〜16 にする。move で送る dice はこれ
      *
      * @param {{ch: Checker, p: number}[]} moves - 動かす順に並べる
+     * @param {number} [player] - ダイスを書き換えるプレーヤー
+     * @param {number[]} [used_dice=[]] - 使ったダイスの目
      * @return {Object} - 新しい gameinfo (this.gameinfo は変えない)
      * @throws {Error} gameinfo がまだ無いとき、動かせないとき
      */
-    predict_gameinfo(moves) {
+    predict_gameinfo(moves, player=undefined, used_dice=[]) {
         if ( this.gameinfo === undefined ) {
             throw new Error("Board.predict_gameinfo: gameinfo が無い");
         }
 
-        const gameinfo = JSON.parse(JSON.stringify(this.gameinfo));
+        const gameinfo = copy_gameinfo(this.gameinfo);
         let pos = Position.from_gameinfo(gameinfo);
 
         for (let mv of moves) {
@@ -936,12 +823,20 @@ export class Board extends BgImage {
             // 動かせるか確かめる (駒が無ければ例外)
             pos = pos.with_move(ch.cur_point, mv.p, ch.player);
 
-            const ch_i = parseInt(ch.id.slice(1)) % 100;
-            gameinfo.board.checker[ch.player][ch_i] = [mv.p, idx];
+            gameinfo.board.checker[ch.player][ch.num] = [mv.p, idx];
         } // for (mv)
 
-        gameinfo.board.dice = [this.roll_btn[0].get(),
-                               this.roll_btn[1].get()];
+        if ( player !== undefined ) {
+            const dice = gameinfo.board.dice[player];
+            for (let d1 of used_dice) {
+                const i = dice.indexOf(d1);
+                if ( i >= 0 ) {
+                    dice[i] += 10;
+                }
+            } // for (d1)
+            gameinfo.board.dice[player] = rule_disable_unusable(
+                pos, player, dice);
+        }
 
         return gameinfo;
     } // Board.predict_gameinfo()
@@ -952,9 +847,9 @@ export class Board extends BgImage {
     inverse(sec) {
         log(`Board.inverse(sec=${sec})`);
         
-        this.set_player(1 - this.player);
-        
-        if ( this.player == 0 ) {
+        this.settings.set_player(1 - this.settings.player);
+
+        if ( this.settings.player == 0 ) {
             this.rotate(0, true, sec);
         } else {
             this.rotate(180, true, sec);
@@ -980,27 +875,6 @@ export class Board extends BgImage {
     } // Board.chpos2point()
 
     /**
-     * @param {Checker} ch
-     * @param {number} p - point index
-     * @param {boolean} [add_hist=true]
-     * @param {number} [idx] - 省くと、今の表示の枚数から数える。
-     *     予測した gameinfo から取った値を渡すこともできる (TODO-030)
-     */
-    emit_put_checker(ch, p, add_hist, idx=undefined) {
-        if ( idx === undefined ) {
-            idx = this.checkers_at(p).length;
-        }
-        log("Board.emit_put_checker("
-                    + `cd.id=${ch.id},`
-                    + `p=${p},`
-                    + `add_hist=${add_hist})`);
-
-        emit_msg("put_checker", { ch: parseInt(ch.id.slice(1)),
-                                  p:  p,
-                                  idx: idx }, add_hist);
-    } // Board.emit_put_checker()
-
-    /**
      * チェッカーを 1 枚動かして、表示を更新する。
      *
      * 予測した gameinfo を作って apply() に渡すだけ (TODO-030)。
@@ -1018,10 +892,10 @@ export class Board extends BgImage {
         let last_op = undefined;
         if ( sound ) {
             last_op = { type: "put_checker",
-                        data: { ch: parseInt(ch.id.slice(1)), p: p } };
+                        data: { ch: ch.player * 100 + ch.num, p: p } };
         }
 
-        this.apply(gameinfo, {sec: sec, last_op: last_op, predict: true});
+        this.apply(gameinfo, {sec: sec, last_op: last_op});
     } // Board.put_checker()
 
     /**
@@ -1029,11 +903,6 @@ export class Board extends BgImage {
      * @param {number} y
      */
     on_mouse_move_xy(x, y) {
-        if ( this.moving_checker !== undefined ) {
-            this.moving_checker.move(x, y, true);
-        }
-        if ( this.cube.moving ) {
-            this.cube.move(x, y, true);
-        }
+        this.drag.move(x, y);
     } // Board.on_mouse_move_xy()
 } // class Board

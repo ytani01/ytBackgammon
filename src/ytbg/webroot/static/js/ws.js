@@ -20,19 +20,20 @@ const ws_url = () => {
 /**
  * Emit message to server
  *
+ * **import してよいのは actions.js だけ** (TODO-051)。
+ * history は送らない。履歴に積むかはサーバが type ごとに決める。
+ *
  * @param {string} type
  * @param {Object} data
- * @param {boolean} [history=false]
  */
-export const emit_msg = (type, data, history=false) => {
+export const emit_msg = (type, data) => {
     log(`emit_msg> type=${type}, data=${JSON.stringify(data)}`);
     if ( ws === undefined || ws.readyState !== WebSocket.OPEN ) {
         // 切断中は捨てる。つなぎ直せばサーバから gameinfo が送られてくる
         log(`emit_msg> not connected .. ignored`);
         return;
     }
-    ws.send(JSON.stringify({src: "client", type: type,
-                            data: data, history: history}));
+    ws.send(JSON.stringify({src: "client", type: type, data: data}));
 };
 
 /**

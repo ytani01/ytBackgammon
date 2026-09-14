@@ -34,7 +34,7 @@ export class SoundBase {
     play() {
         log(`SoundBase.play>`
                     + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
-        if ( this.board.sound && GlobalSoundSwitch === undefined ) {
+        if ( this.board.settings.sound && GlobalSoundSwitch === undefined ) {
             log(`soundfile=${this.soundfile}`);
             return this.audio.play();
         } else {

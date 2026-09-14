@@ -91,10 +91,10 @@ async def test_clear_history_saves_data(bg_server, add_history):
     add_history(bg_server)
 
     await bg_server.clear_history()
-    [hist_len, fwd_len] = bg_server.load_data()
+    assert bg_server.load_data() is True
 
-    assert hist_len == 1
-    assert fwd_len == 0
+    assert len(bg_server._hist.entries) == 1
+    assert len(bg_server._hist.fwd_entries) == 0
 
 
 async def test_add_history_after_clear_restarts_sn(bg_server, add_history):
@@ -111,8 +111,8 @@ def test_history_add_skips_same_entry():
     """
     1 つ前のエントリと sn 以外が同じなら積まない (TODO-032)。
 
-    set_clock_limit のように gameinfo を書き換えない type が
-    history: true で届いても、無駄なエントリが増えないようにするため。
+    gameinfo を書き換えない操作 (捨てずに処理した、勝負のついたあとの
+    move など) で、無駄なエントリが増えないようにするため。
     _fwd_hist がもともと空なら、戻り値 (履歴が変わったか) も False。
     """
     hist = History()

@@ -17,12 +17,12 @@ import copy
 
 import pytest
 
-from ytbg.gameinfo import CubeState, GameInfo
+from ytbg.gameinfo import GameInfo
 
 # ---------------------------------------------------------------------
-# 末尾へ落ちる型 (put_checker / cube / dice / set_turn /
-# set_playername / set_score / resign / set_clock_limit /
-# set_player_clock と、クロックの動作そのものの 5 つ)
+# 末尾へ落ちる型 (put_checker / dice / set_playername / set_score /
+# resign / set_clock_limit / set_clock_switch / resume_clock /
+# stop_clock と、名前付きの操作。名前付きの操作は test_named_ops.py)
 #
 # これらは return せず、末尾の add_history と emit_gameinfo まで落ちる。
 # 返るのは gameinfo で、受け取った msg は last_op として添えられる
@@ -34,7 +34,7 @@ async def test_put_checker_updates_only_target(bg_server, req):
     before1 = copy.deepcopy(bg_server._gameinfo.board.checker[1][0])
 
     msg = {'type': 'put_checker',
-           'data': {'ch': 101, 'p': 5, 'idx': 2}, 'history': False}
+           'data': {'ch': 101, 'p': 5, 'idx': 2}}
     await bg_server.on_json(req, msg)
 
     assert bg_server._gameinfo.board.checker[1][1] == [5, 2]
@@ -54,7 +54,7 @@ async def test_put_checker_sends_gameinfo_with_last_op(
     添える (べた書き)。
     """
     msg = {'type': 'put_checker',
-           'data': {'ch': 12, 'p': 3, 'idx': 0}, 'history': False}
+           'data': {'ch': 12, 'p': 3, 'idx': 0}}
     expected = copy.deepcopy(msg)
     await bg_server.on_json(req, msg)
 
@@ -70,35 +70,29 @@ async def test_put_checker_sends_gameinfo_with_last_op(
     assert sent['data']['gameinfo']['board']['checker'][0][12] == [3, 0]
 
 
-async def test_history_true_appends_one_entry(bg_server, req):
-    """history: true のときだけ履歴が 1 件増える"""
+async def test_set_score_appends_one_entry(bg_server, req):
+    """履歴に積む type (set_score) は 1 通で 1 件積む (TODO-051)"""
     hist_len0 = len(bg_server._hist.entries)
 
     msg = {'type': 'set_score',
-           'data': {'player': 0, 'score': 1}, 'history': True}
+           'data': {'player': 0, 'score': 1}}
     await bg_server.on_json(req, msg)
 
     assert len(bg_server._hist.entries) == hist_len0 + 1
 
 
-async def test_history_false_does_not_append(bg_server, req):
-    """history: false では履歴は増えない"""
+async def test_msg_history_key_is_not_read(bg_server, req):
+    """
+    メッセージに history が付いていても見ない (TODO-051)。
+    false でも、表で積む type なら積む
+    """
     hist_len0 = len(bg_server._hist.entries)
 
     msg = {'type': 'set_score',
            'data': {'player': 0, 'score': 1}, 'history': False}
     await bg_server.on_json(req, msg)
 
-    assert len(bg_server._hist.entries) == hist_len0
-
-
-async def test_cube_updates_gameinfo(bg_server, req):
-    """cube は board.cube を丸ごと置き換える"""
-    data = {'side': 1, 'value': 4, 'accepted': False}
-    msg = {'type': 'cube', 'data': data, 'history': False}
-    await bg_server.on_json(req, msg)
-
-    assert bg_server._gameinfo.board.cube == CubeState(**data)
+    assert len(bg_server._hist.entries) == hist_len0 + 1
 
 
 async def test_dice_updates_only_target_player(bg_server, req):
@@ -109,21 +103,11 @@ async def test_dice_updates_only_target_player(bg_server, req):
     区別が付かない)
     """
     data = {'player': 1, 'dice': [3, 4, 0, 0]}
-    msg = {'type': 'dice', 'data': data, 'history': False}
+    msg = {'type': 'dice', 'data': data}
     await bg_server.on_json(req, msg)
 
     assert bg_server._gameinfo.board.dice[1] == [3, 4, 0, 0]
     assert bg_server._gameinfo.board.dice[0] == [0, 0, 0, 0]
-
-
-async def test_set_turn_updates_turn_and_resign(bg_server, req):
-    """set_turn は turn と resign の両方を変える"""
-    data = {'turn': 1, 'resign': 0}
-    msg = {'type': 'set_turn', 'data': data, 'history': False}
-    await bg_server.on_json(req, msg)
-
-    assert bg_server._gameinfo.turn == 1
-    assert bg_server._gameinfo.resign == 0
 
 
 async def test_set_playername_updates_only_target_player(bg_server, req):
@@ -132,7 +116,7 @@ async def test_set_playername_updates_only_target_player(bg_server, req):
     player: 1 を渡して確かめる (player: 0 だと固定と区別が付かない)
     """
     data = {'player': 1, 'name': 'Alice'}
-    msg = {'type': 'set_playername', 'data': data, 'history': False}
+    msg = {'type': 'set_playername', 'data': data}
     await bg_server.on_json(req, msg)
 
     assert bg_server._gameinfo.board.playername[1] == 'Alice'
@@ -145,7 +129,7 @@ async def test_set_score_updates_only_target_player(bg_server, req):
     player: 1 を渡して確かめる (player: 0 だと固定と区別が付かない)
     """
     data = {'player': 1, 'score': 5}
-    msg = {'type': 'set_score', 'data': data, 'history': False}
+    msg = {'type': 'set_score', 'data': data}
     await bg_server.on_json(req, msg)
 
     assert bg_server._gameinfo.score[1] == 5
@@ -155,7 +139,7 @@ async def test_set_score_updates_only_target_player(bg_server, req):
 async def test_resign_updates_resign(bg_server, req):
     """resign は resign にプレーヤー番号を入れる"""
     data = {'player': 1, 'score': 1}
-    msg = {'type': 'resign', 'data': data, 'history': False}
+    msg = {'type': 'resign', 'data': data}
     await bg_server.on_json(req, msg)
 
     assert bg_server._gameinfo.resign == 1
@@ -171,24 +155,11 @@ async def test_set_clock_limit_updates_only_target_index(bg_server, req):
     限度は gameinfo ではなく Clock が持つ (TODO-024)。
     """
     data = {'index': 1, 'clock_limit': 60}
-    msg = {'type': 'set_clock_limit', 'data': data, 'history': False}
+    msg = {'type': 'set_clock_limit', 'data': data}
     await bg_server.on_json(req, msg)
 
     assert bg_server._clock.limit[1] == 60
     assert bg_server._clock.limit[0] == 120
-
-
-async def test_set_player_clock_updates_only_target_player(bg_server, req):
-    """
-    set_player_clock は data.player で指定したプレーヤーの残り時間だけを
-    変える。player: 1 を渡して確かめる (player: 0 だと固定と区別が付かない)
-    """
-    data = {'player': 1, 'clock': [90, 5]}
-    msg = {'type': 'set_player_clock', 'data': data, 'history': False}
-    await bg_server.on_json(req, msg)
-
-    assert bg_server._clock.clock[1] == [90, 5]
-    assert bg_server._clock.clock[0] == [120, 12]
 
 
 def no_clock_keys(gameinfo):
@@ -202,26 +173,19 @@ def no_clock_keys(gameinfo):
     [
         ('put_checker', {'ch': 5, 'p': 10, 'idx': 0},
          lambda g: g['board']['checker'][0][5], [10, 0]),
-        ('cube', {'side': 0, 'value': 2, 'accepted': True},
-         lambda g: g['board']['cube'],
-         {'side': 0, 'value': 2, 'accepted': True}),
         ('dice', {'player': 1, 'dice': [1, 2, 0, 0]},
          lambda g: g['board']['dice'][1], [1, 2, 0, 0]),
-        ('set_turn', {'turn': 0, 'resign': -1},
-         lambda g: g['turn'], 0),
         ('set_playername', {'player': 1, 'name': 'Bob'},
          lambda g: g['board']['playername'][1], 'Bob'),
         ('set_score', {'player': 1, 'score': 2},
          lambda g: g['score'][1], 2),
         ('resign', {'player': 0, 'score': 1},
          lambda g: g['resign'], 0),
-        # クロック系の 4 つ。クロックは gameinfo の外に出した
+        # クロック系の 3 つ。クロックは gameinfo の外に出した
         # (TODO-024) ので、gameinfo にクロックのキーは戻ってこない。
         # それを見る (状態は clock_state で送られる。
         # そちらは tests/test_clock.py)
         ('set_clock_limit', {'index': 1, 'clock_limit': 30},
-         no_clock_keys, True),
-        ('set_player_clock', {'player': 1, 'clock': [60, 3]},
          no_clock_keys, True),
         ('set_clock_switch', {'switch': False},
          no_clock_keys, True),
@@ -239,7 +203,7 @@ async def test_fallthrough_types_send_gameinfo_with_last_op(
     受け取った msg をそのまま転送していた形の置き換え。転送をやめても
     「何が起きたか」がクライアントに届くことを、last_op で確かめる。
     """
-    msg = {'type': msg_type, 'data': data, 'history': False}
+    msg = {'type': msg_type, 'data': data}
     expected = copy.deepcopy(msg)
     await bg_server.on_json(req, msg)
 
@@ -254,7 +218,7 @@ async def test_fallthrough_types_send_gameinfo_with_last_op(
 
 # ---------------------------------------------------------------------
 # return する型 (back / back2 / back_all / fwd / fwd2 / fwd_all /
-# new / set_gameinfo)
+# new)
 #
 # これらは末尾まで落ちず、元の msg は last_op として返らない。
 # ---------------------------------------------------------------------
@@ -262,11 +226,11 @@ async def test_fallthrough_types_send_gameinfo_with_last_op(
 @pytest.mark.parametrize(
     'msg_type',
     ['back', 'back2', 'back_all', 'fwd', 'fwd2', 'fwd_all',
-     'new', 'set_gameinfo'],
+     'new'],
 )
 async def test_returning_types_do_not_broadcast_original_msg(
         bg_server, req, emitted, no_sleep, msg_type, add_history):
-    """return する 8 つの type では、元の msg の type は送られない"""
+    """return する 7 つの type では、元の msg の type は送られない"""
     add_history(bg_server)
     add_history(bg_server)
 
@@ -279,10 +243,8 @@ async def test_returning_types_do_not_broadcast_original_msg(
     # 前準備 (backward_hist など) の emit は判定に混ぜない
     emitted.clear()
 
-    data = {'n': 1} if msg_type in ('back', 'fwd') else \
-        (bg_server._gameinfo.to_dict()
-         if msg_type == 'set_gameinfo' else {})
-    msg = {'type': msg_type, 'data': data, 'history': False}
+    data = {'n': 1} if msg_type in ('back', 'fwd') else {}
+    msg = {'type': msg_type, 'data': data}
     await bg_server.on_json(req, msg)
     # 連続再生 (n == 0) だけは Task として走るので、あれば完了を待つ
     # (TODO-009)
@@ -303,7 +265,7 @@ async def test_back_moves_history_by_n(bg_server, req, no_sleep, add_history):
     hist_len0 = len(bg_server._hist.entries)
     fwd_len0 = len(bg_server._hist.fwd_entries)
 
-    msg = {'type': 'back', 'data': {'n': 2}, 'history': False}
+    msg = {'type': 'back', 'data': {'n': 2}}
     await bg_server.on_json(req, msg)
 
     assert len(bg_server._hist.entries) == hist_len0 - 2
@@ -315,7 +277,7 @@ async def test_back_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep
     add_history(bg_server)
     add_history(bg_server)
 
-    msg = {'type': 'back', 'data': {'n': 1}, 'history': False}
+    msg = {'type': 'back', 'data': {'n': 1}}
     await bg_server.on_json(req, msg)
 
     assert emitted.last['data']['sec'] == 0.2
@@ -330,7 +292,7 @@ async def test_fwd_moves_history_by_n(bg_server, req, no_sleep, add_history):
     hist_len0 = len(bg_server._hist.entries)
     fwd_len0 = len(bg_server._hist.fwd_entries)
 
-    msg = {'type': 'fwd', 'data': {'n': 2}, 'history': False}
+    msg = {'type': 'fwd', 'data': {'n': 2}}
     await bg_server.on_json(req, msg)
 
     assert len(bg_server._hist.entries) == hist_len0 + 2
@@ -343,7 +305,7 @@ async def test_fwd_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep,
     add_history(bg_server)
     await bg_server.backward_hist(2, sleep_sec=0)
 
-    msg = {'type': 'fwd', 'data': {'n': 1}, 'history': False}
+    msg = {'type': 'fwd', 'data': {'n': 1}}
     await bg_server.on_json(req, msg)
 
     assert emitted.last['data']['sec'] == 0.2
@@ -356,7 +318,7 @@ async def test_back_all_leaves_one_entry(
     add_history(bg_server)
     add_history(bg_server)
 
-    msg = {'type': 'back_all', 'data': {}, 'history': False}
+    msg = {'type': 'back_all', 'data': {}}
     await bg_server.on_json(req, msg)
     # 連続再生 (n == 0) は Task として走るので、完了を待つ
     # (TODO-009)
@@ -373,7 +335,7 @@ async def test_fwd_all_moves_history_to_the_end(bg_server, req, emitted, no_slee
     add_history(bg_server)
     await bg_server.backward_hist(-1, sleep_sec=0)
 
-    msg = {'type': 'fwd_all', 'data': {}, 'history': False}
+    msg = {'type': 'fwd_all', 'data': {}}
     await bg_server.on_json(req, msg)
     # 連続再生 (n == 0) は Task として走るので、完了を待つ
     # (TODO-009)
@@ -391,7 +353,7 @@ async def test_back2_behaves_like_back_all(
     add_history(bg_server)
     add_history(bg_server)
 
-    msg = {'type': 'back2', 'data': {}, 'history': False}
+    msg = {'type': 'back2', 'data': {}}
     await bg_server.on_json(req, msg)
     # 連続再生 (n == 0) は Task として走るので、完了を待つ
     # (TODO-009)
@@ -407,7 +369,7 @@ async def test_fwd2_behaves_like_fwd_all(
     add_history(bg_server)
     await bg_server.backward_hist(-1, sleep_sec=0)
 
-    msg = {'type': 'fwd2', 'data': {}, 'history': False}
+    msg = {'type': 'fwd2', 'data': {}}
     await bg_server.on_json(req, msg)
     # 連続再生 (n == 0) は Task として走るので、完了を待つ
     # (TODO-009)
@@ -425,7 +387,7 @@ async def test_clear_hist_leaves_one_entry(
     await bg_server.backward_hist(1, sleep_sec=0)
     emitted.clear()
 
-    msg = {'type': 'clear_hist', 'data': {}, 'history': False}
+    msg = {'type': 'clear_hist', 'data': {}}
     await bg_server.on_json(req, msg)
 
     assert len(bg_server._hist.entries) == 1
@@ -445,10 +407,10 @@ async def test_clear_hist_keeps_board(bg_server, req):
     """clear_hist は盤面を変えない"""
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 101, 'p': 5, 'idx': 2}, 'history': True})
+              'data': {'ch': 101, 'p': 5, 'idx': 2}})
     before = copy.deepcopy(bg_server._gameinfo.board)
 
-    msg = {'type': 'clear_hist', 'data': {}, 'history': False}
+    msg = {'type': 'clear_hist', 'data': {}}
     await bg_server.on_json(req, msg)
 
     assert bg_server._gameinfo.board == before
@@ -466,13 +428,13 @@ async def test_clear_hist_stops_running_replay(bg_server, req, add_history):
         add_history(bg_server)
 
     await bg_server.on_json(
-        req, {'type': 'back_all', 'data': {}, 'history': False})
+        req, {'type': 'back_all', 'data': {}})
     task = bg_server._replayer._task
     await asyncio.sleep(0.25)
     assert not task.done(), '0.1 秒間隔なのでまだ走っているはず'
 
     await bg_server.on_json(
-        req, {'type': 'clear_hist', 'data': {}, 'history': False})
+        req, {'type': 'clear_hist', 'data': {}})
 
     assert task.cancelled()
     assert len(bg_server._hist.entries) == 1
@@ -497,7 +459,7 @@ async def test_new_keeps_score_playername_limit_and_resets_board(
     bg_server._gameinfo.put_checker(0, 1, 0)
     hist_len0 = len(bg_server._hist.entries)
 
-    msg = {'type': 'new', 'data': {}, 'history': False}
+    msg = {'type': 'new', 'data': {}}
     await bg_server.on_json(req, msg)
 
     gameinfo = bg_server._gameinfo
@@ -541,11 +503,11 @@ async def test_new_after_back_all_clears_fwd_hist(
     add_history(bg_server)
 
     await bg_server.on_json(
-        req, {'type': 'back_all', 'data': {}, 'history': False})
+        req, {'type': 'back_all', 'data': {}})
     await bg_server._replayer._task
     assert len(bg_server._hist.fwd_entries) > 0
 
-    await bg_server.on_json(req, {'type': 'new', 'data': {}, 'history': False})
+    await bg_server.on_json(req, {'type': 'new', 'data': {}})
 
     # 積まれていないこと。ここが 1 件でなくなったら、この筋書きは
     # 「積まないのに進む側を捨てる」分岐を見ていない
@@ -553,59 +515,13 @@ async def test_new_after_back_all_clears_fwd_hist(
     assert bg_server._hist.fwd_entries == []
 
     await bg_server.on_json(
-        req, {'type': 'fwd_all', 'data': {}, 'history': False})
+        req, {'type': 'fwd_all', 'data': {}})
     if bg_server._replayer._task is not None:
         await bg_server._replayer._task
 
     fresh = GameInfo(server_version='test')
     assert bg_server._hist.fwd_entries == []
     assert bg_server._gameinfo.board.checker == fresh.board.checker
-
-
-async def test_set_gameinfo_replaces_gameinfo(bg_server, req, emitted):
-    """
-    set_gameinfo は gameinfo (board 以下を含む) を渡した dict で丸ごと
-    置き換え、履歴に積む。GameInfo.from_dict() が作り直すので渡した
-    dict とは縁が切れ、渡した後に元の dict を書き換えても
-    gameinfo は変わらない。
-    """
-    hist_len0 = len(bg_server._hist.entries)
-
-    new_gameinfo = bg_server._gameinfo.to_dict()
-    new_gameinfo['score'] = [9, 9]
-    new_gameinfo['board']['playername'] = ['Alice', 'Bob']
-
-    msg = {'type': 'set_gameinfo', 'data': new_gameinfo, 'history': False}
-    await bg_server.on_json(req, msg)
-
-    # 渡した dict を after で書き換えても gameinfo は変わらないこと
-    new_gameinfo['score'] = [0, 0]
-    new_gameinfo['board']['playername'] = ['changed', 'changed']
-
-    assert bg_server._gameinfo.score == [9, 9]
-    assert bg_server._gameinfo.board.playername == ['Alice', 'Bob']
-    assert len(bg_server._hist.entries) == hist_len0 + 1
-    assert emitted.last['type'] == 'gameinfo'
-
-
-async def test_set_gameinfo_accepts_partial_dict(bg_server, req, emitted):
-    """
-    set_gameinfo は、キーが欠けた dict でも受ける (TODO-031)。
-
-    GameInfo.from_dict() の既定が strict=False なのは、この経路の
-    ため。**ファイルを読むときの strict=True と取り違えて、ここまで
-    strict にしないこと。** 欠けたキーは既定値になる。
-    """
-    msg = {'type': 'set_gameinfo', 'data': {'score': [3, 4]},
-           'history': False}
-    await bg_server.on_json(req, msg)
-
-    assert bg_server._gameinfo.score == [3, 4]
-    # 欠けたキーは既定値
-    assert bg_server._gameinfo.turn == 2
-    assert bg_server._gameinfo.board.playername == ['', '']
-    assert len(bg_server._gameinfo.board.checker[0]) == 15
-    assert emitted.last['type'] == 'gameinfo'
 
 
 # ---------------------------------------------------------------------
@@ -615,7 +531,7 @@ async def test_set_gameinfo_accepts_partial_dict(bg_server, req, emitted):
 async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
     """emit_gameinfo() が送る msg の形 (src/dst/type/data の各キー)"""
     msg = {'type': 'set_score',
-           'data': {'player': 0, 'score': 1}, 'history': True}
+           'data': {'player': 0, 'score': 1}}
     await bg_server.on_json(req, msg)
 
     # 引数なしで呼んだときの形を確かめる (TODO-015 で last_op が増えた)
@@ -653,7 +569,7 @@ async def test_back_moves_hist_i_by_n(
     assert sent['data']['hist_n'] == 3
     emitted.clear()
 
-    msg = {'type': 'back', 'data': {'n': 1}, 'history': False}
+    msg = {'type': 'back', 'data': {'n': 1}}
     await bg_server.on_json(req, msg)
 
     sent = emitted.last
@@ -678,7 +594,7 @@ async def test_unknown_type_is_ignored(bg_server, req, emitted):
     hist_len0 = len(bg_server._hist.entries)
     before = copy.deepcopy(bg_server._gameinfo)
 
-    msg = {'type': 'no_such_type', 'data': {}, 'history': True}
+    msg = {'type': 'no_such_type', 'data': {}}
     await bg_server.on_json(req, msg)
 
     assert emitted.messages == []
@@ -690,11 +606,10 @@ async def test_unknown_type_does_not_block_next_msg(
         bg_server, req, emitted):
     """無視したあとも、次のメッセージは普通に処理される"""
     await bg_server.on_json(
-        req, {'type': 'no_such_type', 'data': {}, 'history': False})
+        req, {'type': 'no_such_type', 'data': {}})
 
     await bg_server.on_json(
-        req, {'type': 'set_score', 'data': {'player': 1, 'score': 3},
-              'history': False})
+        req, {'type': 'set_score', 'data': {'player': 1, 'score': 3}})
 
     assert bg_server._gameinfo.score[1] == 3
     assert emitted.types == ['gameinfo']

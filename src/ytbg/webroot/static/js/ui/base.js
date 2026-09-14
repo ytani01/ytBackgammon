@@ -30,6 +30,8 @@ import { get_image_dir } from "../settings.js";
  *    |
  *    +- BoardPoint                                          ui/point.js
  *
+ * Drag .. 掴む・動かす・離す (チェッカーとキューブ)         drag.js
+ * Settings .. 音・free move・PIP・プレーヤー番号            settings.js
  * CookieBase .. cookie                                      settings.js
  * SoundBase .. sound                                        sound.js
  *=====================================================
@@ -40,7 +42,8 @@ import { get_image_dir } from "../settings.js";
  */
 export class BgBase {
     /**
-     * @param {string} id
+     * @param {HTMLElement|undefined} el - build_dom() が作った要素
+     *     (TODO-054)。要素を持たない部品 (BoardPoint) は undefined
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
@@ -50,21 +53,15 @@ export class BgBase {
      * @param {Board} [opts.board] - 盤面に置く部品のとき
      * @param {number} [opts.player] - プレーヤーの持ち物のとき (0 or 1)
      */
-    constructor(id, x, y, deg=0,
+    constructor(el, x, y, deg=0,
                 {w=undefined, h=undefined,
                  board=undefined, player=undefined}={}) {
         [this.x, this.y] = [x, y];
         [this.w, this.h] = [w, h];
         this.deg = deg;
-        this.id = id;
+        this.el = el;
         this.board = board;
         this.player = player;
-        
-        if ( this.id !== undefined && this.id.length > 0 ) {
-            this.el = document.getElementById(this.id);
-        } else {
-            this.el = undefined;
-        }
 
         if ( w === undefined && this.el ) {
             this.w = this.el.clientWidth;
@@ -83,6 +80,15 @@ export class BgBase {
             this.el.ondragstart = this.null_handler.bind(this);
         }
     } // BgBase.constructor()
+
+    /**
+     * 要素の id 属性。ログとブラウザのテストのためだけにある (TODO-054)
+     *
+     * @return {string|undefined}
+     */
+    get id() {
+        return this.el ? this.el.id : undefined;
+    } // BgBase.id
 
     /**
      * @param {number} x
@@ -204,9 +210,12 @@ export class BgBase {
         
         let [x, y] = [e.pageX - origin_x, e.pageY - origin_y];
 
+        // 画面の向きはプレーヤー番号で決まる (Settings が持つ。TODO-053)
         let player = this.player;
-        if ( this.board) {
-            player = this.board.player;
+        if ( this.board ) {
+            player = this.board.settings.player;
+        } else if ( this.settings ) {
+            player = this.settings.player;   // Board 自身
         }
         if ( player == 1 ) {
             [x, y] = this.inverse_xy(e);
@@ -247,11 +256,11 @@ export class BgBase {
 } // class BgBase
 
 /**
- * <div id="${id}">some text</div>
+ * <div>some text</div>
  */
 export class BgText extends BgBase {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {number} x
      * @param {number} y
      * @param {number} deg
@@ -260,9 +269,9 @@ export class BgText extends BgBase {
      * @param {Board} [opts.board]
      * @param {number} [opts.player]
      */
-    constructor(id, x, y, deg, {text="", board=undefined,
+    constructor(el, x, y, deg, {text="", board=undefined,
                                 player=undefined}={}) {
-        super(id, x, y, deg, {board: board, player: player});
+        super(el, x, y, deg, {board: board, player: player});
 
         // set text
         this.text = text;
@@ -329,11 +338,11 @@ export class BgText extends BgBase {
 } // class BgText
 
 /**
- * <div id="${id}"><image src="${image_dir}/..${image_suffix}"></div>
+ * <div><image src="${image_dir}/..${image_suffix}"></div>
  */
 export class BgImage extends BgBase {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
@@ -343,8 +352,8 @@ export class BgImage extends BgBase {
      * @param {Board} [opts.board]
      * @param {number} [opts.player]
      */
-    constructor(id, x, y, deg=0, opts={}) {
-        super(id, x, y, deg, opts);
+    constructor(el, x, y, deg=0, opts={}) {
+        super(el, x, y, deg, opts);
         const {w=undefined, h=undefined} = opts;
 
         this.image_suffix = ".png";

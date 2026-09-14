@@ -1,5 +1,6 @@
 import { log } from "./log.js";
-import { emit_msg, ws_connect } from "./ws.js";
+import { ws_connect } from "./ws.js";
+import { history_op, set_playername } from "./actions.js";
 import { get_sound_query } from "./settings.js";
 import { set_global_sound_switch } from "./sound.js";
 import { build_dom, wait_images } from "./dom.js";
@@ -8,7 +9,8 @@ import { Board } from "./board.js";
 // 盤面の要素を作る (TODO-029)。
 // ES Modules は defer と同じ扱いなので、この時点で <body> はできている。
 // ここで作った <img> の読み込みは window.onload の中で待つ。
-build_dom();
+// 作った要素は Board へ渡す (TODO-054)
+const els = build_dom();
 
 // メニュー (ハンバーガー) のチェックボックス。項目を押したら閉じる
 const nav = document.getElementById("nav-input");
@@ -32,25 +34,24 @@ const menu_emit = (type, data={}, confirm_msg=undefined) => {
     if ( confirm_msg !== undefined && ! confirm(confirm_msg) ) {
         return;
     }
-    emit_msg(type, data, false);
+    history_op(type, data);
 };
 
 /**
  * @param {number} player
  */
 const emit_playername = (player) => {
-    const el = document.getElementById(`p${player}name-input`);
+    const el = els.name_input[player];
     const name = el.value;
 
-    const player_name = board.player_name[player];
-    const cur_name = player_name.get();
+    const cur_name = board.player_name[player].get();
 
     log(`emit_playername2>player=${player},`
                 + `cur_name=${cur_name},`
                 + `name=${name}`
                 + ")");
-    
-    player_name.emit(name, true);
+
+    set_playername(board, player, name);
 
     el.style.zIndex = -2;
 };
@@ -63,7 +64,7 @@ const on_key_down = (e, board) => {
     log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
     log(`e.keyCode=${e.keyCode}`);
 
-    const player = board.player;
+    const player = board.settings.player;
     const roll_btn = board.roll_btn[player];
     const pass_btn = board.pass_btn[player];
 
@@ -124,7 +125,7 @@ window.onload = async () => {
     const nav_el = document.getElementById("nav-drawer");
 
     // initialize board
-    board = new Board("board",
+    board = new Board(els,
                       nav_el.offsetWidth  + 20,
                       nav_el.offsetHeight + 40);
 
@@ -180,8 +181,12 @@ for (const [id, handler] of [
 } // for(id, handler)
 
 for (const [id, handler] of [
-    ["sound-switch", () => board.apply_sound_switch()],
-    ["free-move", () => board.apply_free_move()],
+    ["sound-switch", () => {
+        // ?sound をここで読み直す (TODO-053 より前は apply_sound_switch() の中)
+        set_global_sound_switch(get_sound_query());
+        board.settings.apply_sound_switch();
+    }],
+    ["free-move", () => board.settings.apply_free_move()],
     ["disp-pip", () => board.apply_disp_pip()],
     ["clock_sw", () => board.apply_clock_sw()],
     ["clock_limit0", () => board.apply_clock_limit(0)],
@@ -192,7 +197,7 @@ for (const [id, handler] of [
 
 // 名前の <input> は focusout と change の両方から送る (元の属性と同じ)
 for (let player=0; player < 2; player++) {
-    const el = document.getElementById(`p${player}name-input`);
+    const el = els.name_input[player];
     for (const ev of ["focusout", "change"]) {
         el.addEventListener(ev, () => emit_playername(player));
     } // for(ev)

@@ -64,13 +64,13 @@ async def test_save_and_load_roundtrip(bg_server, make_bg_server, req):
     """
     await bg_server.on_json(
         req, {'type': 'set_clock_limit',
-              'data': {'index': 0, 'clock_limit': 90}, 'history': False})
+              'data': {'index': 0, 'clock_limit': 90}})
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 0, 'p': 5, 'idx': 0}, 'history': True})
+              'data': {'ch': 0, 'p': 5, 'idx': 0}})
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 1, 'p': 4, 'idx': 0}, 'history': True})
+              'data': {'ch': 1, 'p': 4, 'idx': 0}})
     await bg_server.backward_hist(1, sleep_sec=0)
 
     assert len(bg_server._hist.entries) == 2
@@ -99,7 +99,7 @@ async def test_saved_file_is_jsonl(bg_server, req):
     """
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 0, 'p': 5, 'idx': 0}, 'history': True})
+              'data': {'ch': 0, 'p': 5, 'idx': 0}})
     await bg_server.backward_hist(1, sleep_sec=0)
 
     lines = read_lines(bg_server._storage.path)
@@ -120,7 +120,7 @@ async def test_set_clock_limit_is_saved(bg_server, req):
     """
     set_clock_limit はファイルに保存される (TODO-032)。
 
-    クロック系は history: true で届いても履歴に積まない
+    クロック系は履歴に積まない
     (登録表 MESSAGE_TYPES の history が False) ので、add_history()
     経由の保存が効かない。
     _on_set_clock_limit() が自分で save_data() を呼んでいること
@@ -128,7 +128,7 @@ async def test_set_clock_limit_is_saved(bg_server, req):
     """
     await bg_server.on_json(
         req, {'type': 'set_clock_limit',
-              'data': {'index': 0, 'clock_limit': 111}, 'history': True})
+              'data': {'index': 0, 'clock_limit': 111}})
 
     lines = read_lines(bg_server._storage.path)
 
@@ -147,21 +147,17 @@ async def test_new_game_saves_clock_reset(bg_server, req):
     積まない (履歴もまだ 1 件だけで進む側も空)。それでも New Game の
     あとは、ファイルの clock が limit に戻っていること
     """
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 0, 'clock': [10.0, 2.0]}, 'history': False})
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 1, 'clock': [10.0, 2.0]}, 'history': False})
+    # set_player_clock は TODO-051 で消したので、直接書き換える
+    bg_server._clock.clock = [[10.0, 2.0], [10.0, 2.0]]
     # board を変えずに、いまの clock ([10.0, 2.0]) をファイルへ保存する。
     # back (n=1) は、戻る先が無くても finally で必ず save_data() を呼ぶ
     await bg_server.on_json(
-        req, {'type': 'back', 'data': {'n': 1}, 'history': False})
+        req, {'type': 'back', 'data': {'n': 1}})
 
     lines = read_lines(bg_server._storage.path)
     assert lines[0]['clock']['clock'] == [[10.0, 2.0], [10.0, 2.0]]
 
-    await bg_server.on_json(req, {'type': 'new', 'data': {}, 'history': False})
+    await bg_server.on_json(req, {'type': 'new', 'data': {}})
 
     lines = read_lines(bg_server._storage.path)
     limit = bg_server._clock.limit
@@ -177,21 +173,19 @@ async def test_running_clock_is_saved_stopped(
     サーバが落ちている間の時間は数えられないので、動作中のまま
     復元すると残り時間が実際とずれる。
     """
-    await bg_server.on_json(
-        req, {'type': 'set_player_clock',
-              'data': {'player': 1, 'clock': [80, 5]}, 'history': False})
-    await bg_server.on_json(
-        req, {'type': 'start_clock', 'data': {'player': 1},
-              'history': False})
+    # set_player_clock と start_clock は TODO-051 で消したので、
+    # クロックを直接動かす
+    bg_server._clock.clock[1] = [80, 5]
+    bg_server._clock.start(1)
     # 保存は履歴を積んだときに走る
     await bg_server.on_json(
         req, {'type': 'put_checker',
-              'data': {'ch': 0, 'p': 5, 'idx': 0}, 'history': True})
+              'data': {'ch': 0, 'p': 5, 'idx': 0}})
 
     svr = make_bg_server()
 
     assert svr._clock.active == [False, False]
-    # start_clock は猶予を limit[1] に戻すので、残るのは持ち時間の側
+    # start() は猶予を limit[1] に戻すので、残るのは持ち時間の側
     assert svr._clock.clock[1][0] == 80
 
 
@@ -199,13 +193,11 @@ async def test_clock_switch_is_saved(bg_server, make_bg_server, req):
     """
     sw は保存して復元する (切ったまま再起動したら切れたまま)。
 
-    クライアント (board.js の apply_clock_sw()) は history: false で
-    送るので、その形で確かめる。set_clock_switch の分岐で save_data() を
-    呼ばないと、履歴が積まれず sw が残らない (TODO-024)。
+    set_clock_switch は履歴に積まないので、その分岐で save_data() を
+    呼ばないと sw が残らない (TODO-024)。
     """
     await bg_server.on_json(
-        req, {'type': 'set_clock_switch', 'data': {'switch': False},
-              'history': False})
+        req, {'type': 'set_clock_switch', 'data': {'switch': False}})
 
     svr = make_bg_server()
 
@@ -301,12 +293,66 @@ def test_jsonl_misspelled_key_is_broken_file(tmp_path):
     assert Storage(path).load() == ([], [], None)
 
 
+@pytest.mark.parametrize(
+    ('name', 'where', 'value'),
+    [
+        ('board-null', ('board',), None),
+        ('cube-null', ('board', 'cube'), None),
+        ('cube-int', ('board', 'cube'), 3),
+        ('h-list', (), []),
+    ],
+)
+async def test_jsonl_not_dict_is_broken_file(
+        make_bg_server, tmp_path, name, where, value):
+    """
+    dict であるべき所が dict でない履歴も「壊れたファイル」で、
+    サーバは初期配置から起動する (TODO-051)。
+
+    from_dict() の入口で KeyError にしている。TypeError のまま
+    抜けると LOAD_ERRORS で捕まらず、サーバが起動しない。
+    """
+    if where:
+        ent = GameInfo(sn=1, score=[7, 7]).to_dict()
+        target = ent
+        for key in where[:-1]:
+            target = target[key]
+        target[where[-1]] = value
+    else:
+        ent = value
+    path = tmp_path / f'ytbg-{name}.jsonl'
+    path.write_text(
+        json.dumps({'v': 2, 'clock': {}}) + '\n'
+        + json.dumps({'h': ent}) + '\n')
+
+    assert Storage(path).load() == ([], [], None)
+
+    svr = make_bg_server(name)
+
+    assert len(svr._hist.entries) == 1
+    assert svr._gameinfo.score == [0, 0]
+
+
+def test_header_only_file_starts_with_one_entry(make_bg_server, tmp_path):
+    """
+    ヘッダだけで履歴が 0 件のファイルでも、今の盤面を 1 件目として積む。
+
+    load_data() は「読めて、履歴が 1 件以上あったか」を返す (TODO-055)。
+    読めただけで True を返すと、履歴が空のまま起動してしまう。
+    """
+    path = tmp_path / 'ytbg-header.jsonl'
+    path.write_text(json.dumps({'v': 2, 'clock': {}}) + '\n')
+
+    svr = make_bg_server('header')
+
+    assert len(svr._hist.entries) == 1
+
+
 def test_load_data_keeps_history_when_broken(bg_server):
     """読み込みに失敗したときは、サーバの履歴を書き換えない"""
     bg_server._storage.path.write_text('{')
     before = [h.to_dict() for h in bg_server._hist.entries]
 
-    assert bg_server.load_data() == (0, 0)
+    assert bg_server.load_data() is False
     assert [h.to_dict() for h in bg_server._hist.entries] == before
 
 

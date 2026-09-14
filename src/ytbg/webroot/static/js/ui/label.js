@@ -1,27 +1,27 @@
 import { log } from "../log.js";
-import { emit_msg } from "../ws.js";
 import { BgText } from "./base.js";
 
 /**
- * <div id="${id}">${name}</div>
+ * <div>${name}</div>
  */
 export class PlayerName extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
+     * @param {HTMLInputElement} input_el - 名前の入力欄 (p{n}name-input)
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} deg
      */
-    constructor(id, board, player, x, y, deg) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, input_el, board, player, x, y, deg) {
+        super(el, x, y, deg, {board: board, player: player});
 
         // this.def_name = `Player ${this.player}`;
         this.def_name = "[Input name]";
         this.name = this.def_name;
 
-        this.el_input = document.getElementById(`${id}-input`);
+        this.el_input = input_el;
         this.el_input.style.left = this.board.x + this.x + "px";
         this.el_input.style.top = this.board.y + this.y + "px";
         //this.el_input.transitionDuration = "5s";
@@ -76,15 +76,6 @@ export class PlayerName extends BgText {
     } // PlayerName.off()
 
     /**
-     * @param {string} name
-     * @param {boolean} add_hist
-     */
-    emit(name, add_hist=true) {
-        emit_msg("set_playername", { player: parseInt(this.player),
-                                     name: name }, add_hist);
-    } // PlayerName.emit()
-
-    /**
      * 
      */
     on_mouse_down_xy(x, y) {
@@ -96,25 +87,25 @@ export class PlayerName extends BgText {
 } // class PlayerName
 
 /**
- * <div id="${id}">Pip: ${pip_count}</div>
+ * <div>Pip: ${pip_count}</div>
  */
 export class PlayerPipCount extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} deg
      */
-    constructor(id, board, player, x, y, deg) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, board, player, x, y, deg) {
+        super(el, x, y, deg, {board: board, player: player});
 
         this.prefix = "Pip:";
         this.pip_count = 167;
         this.set(this.pip_count);
 
-        if ( document.getElementById("disp-pip").checked ) {
+        if ( this.board.settings.disp_pip ) {
             this.on();
         } else {
             this.off();
@@ -148,21 +139,19 @@ export class PlayerPipCount extends BgText {
 } // class PlayerPipCount
 
 /**
- * <div id="${id}">${score}</div>
+ * <div>${score}</div>
  */
 export class PlayerScore extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
      */
-    constructor(id, board, player, x, y, deg=0) {
-        super(id, x, y, deg, {board: board, player: player});
-
-        this.score = 0;
+    constructor(el, board, player, x, y, deg=0) {
+        super(el, x, y, deg, {board: board, player: player});
 
         this.el.style.width = "42px";
         this.el.style.textAlign = "center";
@@ -180,7 +169,6 @@ export class PlayerScore extends BgText {
      * @param {number} score
      */
     set(score) {
-        this.score = score;
         super.set(`${score}`);
     }
 
@@ -190,32 +178,4 @@ export class PlayerScore extends BgText {
     get() {
         return parseInt(super.get());
     }
-
-    /**
-     * @param {number} score
-     */
-    up(score) {
-        this.score += score;
-        if ( this.score > 99 ) {
-            this.score = 99;
-        }
-        this.emit(this.score, true);
-    }
-
-    /**
-     *
-     */
-    clear() {
-        this.score = 0;
-        this.emit(this.score, true);
-    }
-
-    /**
-     * @param {number} score
-     * @param {boolean} add_hist
-     */
-    emit(score, add_hist=true) {
-        emit_msg("set_score", { player: parseInt(this.player),
-                                score: parseInt(score) }, add_hist);
-    } // PlayerScore.emit()
 } // class PlayerScore

@@ -82,7 +82,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
         """
         クライアントとの WebSocket 1 本ぶんの受信ループ (TODO-009)。
 
-        メッセージは全て {'src', 'type', 'data', 'history'} の JSON で、
+        メッセージは全て {'src', 'type', 'data'} の JSON で (TODO-051)、
         中身の分岐は svr.on_json() が見る。
         """
         await websocket.accept()
