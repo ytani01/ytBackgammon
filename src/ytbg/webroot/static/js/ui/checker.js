@@ -6,12 +6,14 @@ import { get_pip as rule_get_pip } from "../rules/position.js";
  */
 export class Checker extends BgImage {
     /**
-     * @param {string} id - div tag id
-     * @param {number} player - 0 or 1
+     * @param {HTMLElement} el
      * @param {Board} board - board object
+     * @param {number} player - 0 or 1
+     * @param {number} num - 通し番号 (0〜14)。ID は player * 100 + num
      */
-    constructor(id, board, player) {
-        super(id, 0, 0, 0, {board: board, player: player});
+    constructor(el, board, player, num) {
+        super(el, 0, 0, 0, {board: board, player: player});
+        this.num = num;
 
         this.z = 0;
         

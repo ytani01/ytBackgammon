@@ -2,25 +2,26 @@ import { log } from "../log.js";
 import { BgText } from "./base.js";
 
 /**
- * <div id="${id}">${name}</div>
+ * <div>${name}</div>
  */
 export class PlayerName extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
+     * @param {HTMLInputElement} input_el - 名前の入力欄 (p{n}name-input)
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} deg
      */
-    constructor(id, board, player, x, y, deg) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, input_el, board, player, x, y, deg) {
+        super(el, x, y, deg, {board: board, player: player});
 
         // this.def_name = `Player ${this.player}`;
         this.def_name = "[Input name]";
         this.name = this.def_name;
 
-        this.el_input = document.getElementById(`${id}-input`);
+        this.el_input = input_el;
         this.el_input.style.left = this.board.x + this.x + "px";
         this.el_input.style.top = this.board.y + this.y + "px";
         //this.el_input.transitionDuration = "5s";
@@ -86,19 +87,19 @@ export class PlayerName extends BgText {
 } // class PlayerName
 
 /**
- * <div id="${id}">Pip: ${pip_count}</div>
+ * <div>Pip: ${pip_count}</div>
  */
 export class PlayerPipCount extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} deg
      */
-    constructor(id, board, player, x, y, deg) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, board, player, x, y, deg) {
+        super(el, x, y, deg, {board: board, player: player});
 
         this.prefix = "Pip:";
         this.pip_count = 167;
@@ -138,19 +139,19 @@ export class PlayerPipCount extends BgText {
 } // class PlayerPipCount
 
 /**
- * <div id="${id}">${score}</div>
+ * <div>${score}</div>
  */
 export class PlayerScore extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
      */
-    constructor(id, board, player, x, y, deg=0) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, board, player, x, y, deg=0) {
+        super(el, x, y, deg, {board: board, player: player});
 
         this.el.style.width = "42px";
         this.el.style.textAlign = "center";

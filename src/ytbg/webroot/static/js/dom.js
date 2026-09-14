@@ -7,7 +7,9 @@
 // ベタ書きされていた。ここで作る形 (id・親子の並び・<img> の src /
 // width / style) は、そのときの index.html と同じにしてある。
 //
-//  - BgBase は document.getElementById(id) で要素を拾う
+//  - build_dom() は作った要素を返し、main.js が Board へ渡す。
+//    表示部品は id ではなく要素を受け取る (TODO-054)。id 属性は
+//    tests/browser/ が要素を探すのに使うので残してある
 //  - BgImage は el.children[0] を画像として読む
 //    (だから各 <div> の最初の子が <img> でなければならない)
 //  - 絶対配置の要素は、z-index が同じなら DOM の並び順で重なりが決まる
@@ -47,7 +49,7 @@ function create_img(dir, file, {width=undefined, transform=undefined}={}) {
 /**
  * <div id="${id}">...</div>
  *
- * @param {string} id
+ * @param {string} id - id 属性 (tests/browser/ が要素を探すのに使う)
  * @param {Object} [opts]
  * @param {string} [opts.cls] - class 属性
  * @param {string} [opts.text] - 中の文字
@@ -97,26 +99,28 @@ function create_name_input(player) {
  *
  * @param {string} dir - 画像ディレクトリ
  * @param {HTMLElement} board_el
+ * @param {Object} els - 作った要素をここへ入れる
  */
-function build_board(dir, board_el) {
+function build_board(dir, board_el, els) {
     // 盤の下地。Board 自身が BgImage なので、children[0] はこれ
     board_el.appendChild(create_img(dir, "board-base.png"));
 
     // クロック
     for (let p=0; p < 2; p++) {
-        board_el.appendChild(create_div(`p${p}clock-bg`));
-        board_el.appendChild(create_div(`p${p}clock`, {cls: "bordertext"}));
+        els.clock_bg[p] = board_el.appendChild(create_div(`p${p}clock-bg`));
+        els.clock[p] = board_el.appendChild(
+            create_div(`p${p}clock`, {cls: "bordertext"}));
     } // for(p)
 
     // PIP カウント
     for (let p=0; p < 2; p++) {
-        board_el.appendChild(
+        els.pip[p] = board_el.appendChild(
             create_div(`p${p}pip`, {cls: "bordertext", text: "167"}));
     } // for(p)
 
     // プレーヤー名
     for (let p=0; p < 2; p++) {
-        board_el.appendChild(
+        els.name[p] = board_el.appendChild(
             create_div(`p${p}name`, {
                 cls: "bordertext",
                 img: create_img(dir, `checker${p}.png`),
@@ -126,7 +130,7 @@ function build_board(dir, board_el) {
     // スコアの増減ボタン
     for (let p=0; p < 2; p++) {
         for (const dir_name of ["up", "down"]) {
-            board_el.appendChild(
+            els.score_btn[p][dir_name] = board_el.appendChild(
                 create_div(`score_${dir_name}${p}`, {
                     img: create_img(dir, "cube01.png"),
                 }));
@@ -135,7 +139,7 @@ function build_board(dir, board_el) {
 
     // スコア
     for (let p=0; p < 2; p++) {
-        board_el.appendChild(
+        els.score[p] = board_el.appendChild(
             create_div(`p${p}score`, {
                 style: {fontWeight: "bold", color: "#333"},
                 img: create_img(dir, `checker${p}.png`),
@@ -146,19 +150,19 @@ function build_board(dir, board_el) {
     for (let p=0; p < 2; p++) {
         for (let i=0; i < N_CHECKER; i++) {
             const c_id = "p" + p + ("0" + i).slice(-2);
-            board_el.appendChild(
+            els.checker[p][i] = board_el.appendChild(
                 create_div(c_id, {img: create_img(dir, `checker${p}.png`)}));
         } // for(i)
     } // for(p)
 
     // キューブ
-    board_el.appendChild(
+    els.cube = board_el.appendChild(
         create_div("cube", {img: create_img(dir, "cube01.png")}));
 
     // ダイス
     for (let p=0; p < 2; p++) {
         for (let i=0; i < N_DICE; i++) {
-            board_el.appendChild(
+            els.dice[p][i] = board_el.appendChild(
                 create_div(`dice${p}${i}`, {
                     img: create_img(dir, `dice${p}1.png`),
                 }));
@@ -167,7 +171,7 @@ function build_board(dir, board_el) {
 
     // Roll ボタン (dicecup)
     for (let p=0; p < 2; p++) {
-        board_el.appendChild(
+        els.roll_btn[p] = board_el.appendChild(
             create_div(`rollbutton${p}`, {
                 img: create_img(dir, "dicecup.png", {
                     width: "120px",
@@ -177,12 +181,14 @@ function build_board(dir, board_el) {
     } // for(p)
 
     // バナー (パス・勝ち・投了)
-    for (const [id, file, width] of [["passbutton", "pass.png", "180px"],
-                                     ["winbutton", "win.png", "180px"],
-                                     ["resignbutton", "button-resign.png",
-                                      "100px"]]) {
+    for (const [id, key, file, width] of [
+        ["passbutton", "pass_btn", "pass.png", "180px"],
+        ["winbutton", "win_btn", "win.png", "180px"],
+        ["resignbutton", "resign_banner_btn", "button-resign.png", "100px"],
+    ]) {
+        els[key] = [];
         for (let p=0; p < 2; p++) {
-            board_el.appendChild(
+            els[key][p] = board_el.appendChild(
                 create_div(`${id}${p}`, {
                     img: create_img(dir, file, {
                         width: width,
@@ -190,7 +196,7 @@ function build_board(dir, board_el) {
                     }),
                 }));
         } // for(p)
-    } // for(id)
+    } // for(id, key, file, width)
 } // build_board()
 
 /**
@@ -198,21 +204,24 @@ function build_board(dir, board_el) {
  *
  * @param {string} dir - 画像ディレクトリ
  * @param {HTMLElement} body_el
+ * @param {Object} els - 作った要素をここへ入れる
  */
-function build_side(dir, body_el) {
+function build_side(dir, body_el, els) {
     for (let p=0; p < 2; p++) {
-        body_el.appendChild(create_name_input(p));
+        els.name_input[p] = body_el.appendChild(create_name_input(p));
     } // for(p)
 
     const buttons_el = document.createElement("div");
     buttons_el.id = "buttons";
-    for (const [id, file] of [["button-resign", "button-resign.png"],
-                              ["button-inverse", "button-inverse.png"],
-                              ["button-fwd", "button-fwd.png"],
-                              ["button-back", "button-bak.png"]]) {
-        buttons_el.appendChild(
+    for (const [id, key, file] of [
+        ["button-resign", "button_resign", "button-resign.png"],
+        ["button-inverse", "button_inverse", "button-inverse.png"],
+        ["button-fwd", "button_fwd", "button-fwd.png"],
+        ["button-back", "button_back", "button-bak.png"],
+    ]) {
+        els[key] = buttons_el.appendChild(
             create_div(id, {img: create_img(dir, file, {width: "70px"})}));
-    } // for(id, file)
+    } // for(id, key, file)
     body_el.appendChild(buttons_el);
 } // build_side()
 
@@ -220,12 +229,39 @@ function build_side(dir, body_el) {
  * 盤面の要素を作る。
  *
  * index.html にあるのは <header> と空の <div id="board"> だけ。
+ *
+ * 作った要素を返す (TODO-054)。キーは Board のフィールド名に近い名前にする
+ * (name は player_name、clock は player_clock に渡す。name_input と clock_bg
+ * は PlayerName と PlayerClock に、dice は RollButton に渡すもので、Board に
+ * 同じ名前のフィールドは無い)。プレーヤーごとのものは [0 の分, 1 の分] の
+ * 配列にする。
+ *
+ * @return {{board: HTMLElement,
+ *           clock: HTMLElement[], clock_bg: HTMLElement[],
+ *           pip: HTMLElement[], name: HTMLElement[],
+ *           name_input: HTMLInputElement[],
+ *           score: HTMLElement[],
+ *           score_btn: {up: HTMLElement, down: HTMLElement}[],
+ *           checker: HTMLElement[][], cube: HTMLElement,
+ *           dice: HTMLElement[][], roll_btn: HTMLElement[],
+ *           pass_btn: HTMLElement[], win_btn: HTMLElement[],
+ *           resign_banner_btn: HTMLElement[],
+ *           button_resign: HTMLElement, button_inverse: HTMLElement,
+ *           button_fwd: HTMLElement, button_back: HTMLElement}}
+ *     checker は [[15 個], [15 個]]、dice は [[4 個], [4 個]]
  */
 export function build_dom() {
     const dir = get_image_dir();
 
-    build_board(dir, document.getElementById("board"));
-    build_side(dir, document.body);
+    const els = {
+        board: document.getElementById("board"),
+        clock: [], clock_bg: [], pip: [], name: [], name_input: [],
+        score: [], score_btn: [{}, {}],
+        checker: [[], []], dice: [[], []], roll_btn: [],
+    };
+    build_board(dir, els.board, els);
+    build_side(dir, document.body, els);
+    return els;
 } // build_dom()
 
 /**

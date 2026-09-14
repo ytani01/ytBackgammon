@@ -283,7 +283,7 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
   `~/ytbg-{server_id}.jsonl` への保存・読み込み
 - `src/ytbg/webroot/static/js/` — クライアント。ES Modules で、バンドラは
   使わない（TODO-028）。クラス階層図は `ui/base.js` の先頭にある
-  - `main.js` — エントリ。`build_dom()` で要素を作り、`Board` を作り、
+  - `main.js` — エントリ。`build_dom()` で要素を作り、それを渡して `Board` を作り、
     WebSocket をつなぐ。ヘッダとメニューの操作は、末尾でまとめて
     `addEventListener` でつなぐ（TODO-029。`window` への橋渡しはもう無い）。
     `window.board` はデバッグ用に残してある。
@@ -293,6 +293,15 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     `window.board` が無くても ReferenceError にならず、黙って DIV を掴む
   - `dom.js` — 盤面の要素を作る（TODO-029）。チェッカー 30 個・ダイス 8 個
     などの `<div>` と、名前の `<input>` 2 つ、`#buttons`。
+    **作った要素を返し**、`main.js` がそれを `Board` に渡す（TODO-054）。
+    キーは `Board` のフィールド名に近い名前にしてある（`checker`、`cube`、
+    `roll_btn` などは同じ名前。`name` は `player_name`、`clock` は
+    `player_clock` に渡す。`name_input` と `clock_bg` はそれぞれ
+    `PlayerName` と `PlayerClock` に、`dice` は `RollButton` に渡すもので、
+    `Board` に同じ名前のフィールドは無い。一覧は `build_dom()` の JSDoc）。
+    `board` には `#board` 自身が入る。
+    **id 属性は `tests/browser/` が要素を探すためだけに残してある**
+    （部品は id で要素を拾わない）。
     **`BgImage` は `<img>` の幅・高さを読んで大きさを決めるので、
     読み込み前に `Board` を組むと幅が 0 になって配置が崩れる。**
     これを防いでいるのは次の 2 つで、**効いているのは前者**。
@@ -357,8 +366,13 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     返す（TODO-044。`this.gameinfo` がまだ無いときは空の盤面）
   - `ui/` — 表示部品。`base.js` に `BgBase` / `BgText` / `BgImage`、
     ほかは `point.js` / `checker.js` / `cube.js` / `dice.js` / `clock.js` /
-    `label.js` / `button.js`。`board` と `player` は基底のコンストラクタの
-    options で渡す。**マウスの処理と表示だけを受け持ち、サーバへは
+    `label.js` / `button.js`。コンストラクタの第 1 引数は `build_dom()` が
+    作った要素で、id ではない（TODO-054。`PlayerClock` の背景と
+    `PlayerName` の `<input>`、`RollButton` のダイス 4 個も要素で渡す。
+    `BoardPoint` は要素を持たず `undefined`）。`id` は要素の id 属性を返す
+    getter で、ログとテストのためだけにある。`board` と `player` は基底の
+    コンストラクタの options で渡す。`Checker` は通し番号を `num`
+    （0〜14）で持つ。**マウスの処理と表示だけを受け持ち、サーバへは
     送らない**（判定と送信は `actions.js`。TODO-051）
 - `src/ytbg/webroot/templates/index.html` — ボード 1 面。
   `<script type="module" src="/static/js/main.js">` の 1 行で読み込む。
@@ -385,8 +399,10 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
 **クロックはここに入っていない**（TODO-024。下の「クロック」を見ること）。
 
 チェッカーは `checker[player][i] = [point, idx]` の配列で、**ID は
-`player * 100 + i`**（例: 012, 101）。**チェッカーの位置はこれでしか
-持たず**、表示の部品は持たない（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
+`player * 100 + i`**（例: 012, 101）。クライアントでは
+`Checker` の `player * 100 + num` で求める（id の文字列からは取らない。
+TODO-054）。**チェッカーの位置はこれでしか持たず**、表示の部品は持たない
+（TODO-044。`BoardPoint` は座標の計算だけを持つ）。
 積み順を決めているのは `Board.checker_order()` だけで、`apply()` の
 配り直しと `Board.checkers_at()` / `top_checker()` がそれを使う。
 

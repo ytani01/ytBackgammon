@@ -25,7 +25,7 @@ const SCORE_MAX = 99;
  * @param {Checker} ch
  * @return {number}
  */
-const checker_id = (ch) => parseInt(ch.id.slice(1));
+const checker_id = (ch) => ch.player * 100 + ch.num;
 
 // -----------------------------------------------------------------
 // ダイス

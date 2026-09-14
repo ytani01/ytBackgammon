@@ -79,6 +79,56 @@ describe('ブラウザでの基本の動作確認', () => {
         assert.ok(png.length > 10000, `screenshot が小さい: ${png.length}`);
     });
 
+    it('表示部品が dom.js の作った要素を取り違えずに持っている', async () => {
+        // 部品は id でなく要素を受け取る (TODO-054)。渡す要素を取り違えても
+        // id 属性は dom.js が正しく付けたままなので、#id で探すテストでは
+        // 気づけない。部品が持つ el の id を、期待する id と照らす
+        const r = await page1.evaluate(() => {
+            const pairs = [
+                [board, 'board'], [board.cube, 'cube'],
+                [board.button_resign, 'button-resign'],
+                [board.button_inverse, 'button-inverse'],
+                [board.button_fwd, 'button-fwd'],
+                [board.button_back, 'button-back'],
+            ];
+            // 部品ではなく要素そのものを持っているもの
+            const pair_el = (el, id) => pairs.push([{ el }, id]);
+            const wrong = [];
+            for (let p = 0; p < 2; p++) {
+                for (let i = 0; i < 15; i++) {
+                    const ch = board.checker[p][i];
+                    pairs.push([ch, 'p' + p + ('0' + i).slice(-2)]);
+                    if (ch.player !== p || ch.num !== i) {
+                        wrong.push(`checker[${p}][${i}]: `
+                                   + `player=${ch.player} num=${ch.num}`);
+                    }
+                }
+                board.roll_btn[p].dice.forEach(
+                    (d, i) => pairs.push([d, `dice${p}${i}`]));
+                pairs.push([board.roll_btn[p], `rollbutton${p}`]);
+                pairs.push([board.pass_btn[p], `passbutton${p}`]);
+                pairs.push([board.win_btn[p], `winbutton${p}`]);
+                pairs.push([board.resign_banner_btn[p], `resignbutton${p}`]);
+                pairs.push([board.score[p], `p${p}score`]);
+                pairs.push([board.score_btn[p].up, `score_up${p}`]);
+                pairs.push([board.score_btn[p].down, `score_down${p}`]);
+                pairs.push([board.player_name[p], `p${p}name`]);
+                pair_el(board.player_name[p].el_input, `p${p}name-input`);
+                pairs.push([board.player_clock[p], `p${p}clock`]);
+                pair_el(board.player_clock[p].el_bg, `p${p}clock-bg`);
+                pairs.push([board.pip[p], `p${p}pip`]);
+            }
+            for (const [obj, id] of pairs) {
+                if (obj.el?.id !== id) {
+                    wrong.push(`${id}: ${obj.el?.id}`);
+                }
+            }
+            return { n: pairs.length, wrong };
+        });
+        assert.deepEqual(r.wrong, []);
+        assert.equal(r.n, 68);
+    });
+
     it('Roll ボタンでダイスが出る', async () => {
         // 新しい盤面は turn == 2 (両方可) なので、両方の Roll が出ている
         const active = await page1.evaluate(() => board.roll_btn[0].active);

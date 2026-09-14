@@ -40,15 +40,16 @@ export class ClockLimit {
  */
 export class PlayerClock extends BgText {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
+     * @param {HTMLElement} bg_el - 背景 (p{n}clock-bg)
      * @param {Board} board
      * @param {number} player
      * @param {number} x
      * @param {number} y
      * @param {number} deg
      */
-    constructor(id, board, player, x, y, deg) {
-        super(id, x, y, deg, {board: board, player: player});
+    constructor(el, bg_el, board, player, x, y, deg) {
+        super(el, x, y, deg, {board: board, player: player});
 
         this.clock = [0, 0];
         this.start_clock = [0, 0];
@@ -59,7 +60,7 @@ export class PlayerClock extends BgText {
         this.bg_width0 = 130;
         this.bg_width = this.bg_width0;
 
-        this.el_bg = document.getElementById(`${this.id}-bg`);
+        this.el_bg = bg_el;
         this.el_bg.style.left = this.x + "px";
         this.el_bg.style.top = this.y + "px";
         this.el_bg.style.width = this.bg_width + "px";

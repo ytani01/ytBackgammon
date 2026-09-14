@@ -56,14 +56,13 @@ import { BoardPoint } from "./ui/point.js";
  */
 export class Board extends BgImage {
     /*
-     * @param {string} id - div tag id
+     * @param {Object} els - build_dom() が作った要素 (TODO-054)
      * @param {number} x - 
      * @param {number} y - 
-     * @param {number} player - 0 or 1
      */
-    constructor(id, x, y) {
-        log(`Board(id=${id},x=${x},y=${y})`);
-        super(id, x, y, 0);
+    constructor(els, x, y) {
+        log(`Board(x=${x},y=${y})`);
+        super(els.board, x, y, 0);
 
         // 座標は layout.js にある (書き換えても元は汚さないよう複製する)
         this.bx = [...BX];
@@ -93,19 +92,19 @@ export class Board extends BgImage {
         const bx0 = this.x + this.w + 30;
 
         this.button_resign = new ResignButton(
-            "button-resign", this, bx0, 20);
+            els.button_resign, this, bx0, 20);
 
         this.button_back = new EmitButton(
-            "button-back", this, "back", {n: 1}, bx0, this.h);
+            els.button_back, this, "back", {n: 1}, bx0, this.h);
         this.button_back.move(bx0, this.y + this.h - this.button_back.h - 60);
 
         this.button_fwd = new EmitButton(
-            "button-fwd",
+            els.button_fwd,
             this, "fwd", {n: 1}, bx0,
             this.button_back.y - this.button_back.h - 40);
         
         this.button_inverse = new InverseButton(
-            "button-inverse", this, bx0, 0);
+            els.button_inverse, this, bx0, 0);
         this.button_inverse.move(
             bx0, this.h / 2 - this.button_inverse.h / 2);
         
@@ -122,31 +121,31 @@ export class Board extends BgImage {
         // PlayerScore
         const score_at = (p) => score_geo[p].label;
         this.score = [];
-        this.score[1] = new PlayerScore("p1score", this, 1,
+        this.score[1] = new PlayerScore(els.score[1], this, 1,
                                         score_at(1).x, score_at(1).y,
                                         score_at(1).deg);
-        this.score[0] = new PlayerScore("p0score", this, 0,
+        this.score[0] = new PlayerScore(els.score[0], this, 0,
                                         score_at(0).x, score_at(0).y,
                                         score_at(0).deg);
 
         // Score buttons
-        const score_btn = (id, p, key, offset) => {
+        const score_btn = (p, key, offset) => {
             const g = score_geo[p][key];
-            return new ScoreButton(id, this, g.x, g.y, g.w, g.h,
+            return new ScoreButton(els.score_btn[p][key], this, g.x, g.y, g.w, g.h,
                                    this.score[p], offset);
         };
         this.score_btn = [{}, {}];
-        this.score_btn[1].up   = score_btn("score_up1",   1, "up",   +1);
-        this.score_btn[1].down = score_btn("score_down1", 1, "down", -1);
-        this.score_btn[0].up   = score_btn("score_up0",   0, "up",   +1);
-        this.score_btn[0].down = score_btn("score_down0", 0, "down", -1);
+        this.score_btn[1].up   = score_btn(1, "up",   +1);
+        this.score_btn[1].down = score_btn(1, "down", -1);
+        this.score_btn[0].up   = score_btn(0, "up",   +1);
+        this.score_btn[0].down = score_btn(0, "down", -1);
 
         // PlayerName
         this.player_name = [];
         for (let p=0; p < 2; p++) {
             const g = label_geo.name[p];
             this.player_name.push(new PlayerName(
-                `p${p}name`, this, p, g.x, g.y, g.deg));
+                els.name[p], els.name_input[p], this, p, g.x, g.y, g.deg));
         }
 
         for (let p=0; p < 2; p++) {
@@ -161,7 +160,7 @@ export class Board extends BgImage {
         for (let p=0; p < 2; p++) {
             const g = label_geo.clock[p];
             this.player_clock.push(new PlayerClock(
-                `p${p}clock`, this, p, g.x, g.y, g.deg));
+                els.clock[p], els.clock_bg[p], this, p, g.x, g.y, g.deg));
         }
 
         // 表示の更新なので送らない (TODO-051)。つないだあとは
@@ -179,24 +178,24 @@ export class Board extends BgImage {
         for (let p=0; p < 2; p++) {
             const g = label_geo.pip[p];
             this.pip.push(new PlayerPipCount(
-                `p${p}pip`, this, p, g.x, g.y, g.deg));
+                els.pip[p], this, p, g.x, g.y, g.deg));
         }
 
         // Checkers
         this.checker = [Array(15), Array(15)];
         for (let player=0; player < 2; player++) {
             for (let i=0; i < 15; i++) {
-                let c_id = "p" + player + ("0" + i).slice(-2);
-                this.checker[player][i] = new Checker(c_id, this, player);
+                this.checker[player][i] = new Checker(
+                    els.checker[player][i], this, player, i);
             } // for(i)
         } // for(player)
 
         // Cube
-        this.cube = new Cube("cube", this);
+        this.cube = new Cube(els.cube, this);
 
         // Points
         this.point = point_geometry(this.bx, this.by, this.h).map(
-            (g, p) => new BoardPoint("", this, g.x, g.y, g.w, g.h,
+            (g, p) => new BoardPoint(undefined, this, g.x, g.y, g.w, g.h,
                                      p, g.direction, g.max_n));
 
         // RollButton
@@ -204,9 +203,9 @@ export class Board extends BgImage {
 
         this.roll_btn = [];
         this.roll_btn.push(new RollButton(
-            "rollbutton0", this, 0, this.bx[4] + bx1, this.h / 2));
+            els.roll_btn[0], els.dice[0], this, 0, this.bx[4] + bx1, this.h / 2));
         this.roll_btn.push(new RollButton(
-            "rollbutton1", this, 1, this.bx[3] - bx1, this.h / 2));
+            els.roll_btn[1], els.dice[1], this, 1, this.bx[3] - bx1, this.h / 2));
 
         const dy1 = 200;
 
@@ -227,28 +226,28 @@ export class Board extends BgImage {
         // ResignBanner
         this.resign_banner_btn = [];
         this.resign_banner_btn.push(new BannerButton(
-            "resignbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
+            els.resign_banner_btn[0], this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
             0, on_resign_banner));
         this.resign_banner_btn.push(new BannerButton(
-            "resignbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
+            els.resign_banner_btn[1], this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_resign_banner));
 
         // Pass
         this.pass_btn = [];
         this.pass_btn.push(new BannerButton(
-            "passbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
+            els.pass_btn[0], this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
             0, on_pass));
         this.pass_btn.push(new BannerButton(
-            "passbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
+            els.pass_btn[1], this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_pass));
 
         // Win
         this.win_btn = [];
         this.win_btn.push(new BannerButton(
-            "winbutton0", this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
+            els.win_btn[0], this, 0, this.bx[4] + bx1, this.h / 2 + dy1,
             0, on_win));
         this.win_btn.push(new BannerButton(
-            "winbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
+            els.win_btn[1], this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_win));
 
         if ( this.settings.player == 1 ) {
@@ -320,24 +319,6 @@ export class Board extends BgImage {
         action_set_clock_limit(this, index, limit);
     } // Board.apply_clock_limit()
 
-    /**
-     * search checker object by checker id
-     *
-     * @param {string} ch_id - checker id
-     * @return {Checker | undefined} - checker object or undefined
-     */
-    search_checker(ch_id) {
-        log(`Board.search_checker(ch_id=${ch_id})`);
-        let player = parseInt(ch_id[1]);
-
-        for (let i=0; i < 15; i++) {
-            let ch = this.checker[player][i];
-            if ( ch.id == ch_id ) {
-                return ch;
-            }
-        }
-        return undefined;
-    } // Board.search_checker()
 
     /**
      * ターンを設定
@@ -637,8 +618,9 @@ export class Board extends BgImage {
         let put_ch = undefined;
         let put_prev_p = undefined;
         if ( op_type == "put_checker" ) {
-            const ch_id = "p" + ("000" + last_op.data.ch).slice(-3);
-            put_ch = this.search_checker(ch_id);
+            // ID は player * 100 + num。範囲外なら undefined
+            const ch_id = last_op.data.ch;
+            put_ch = this.checker[Math.floor(ch_id / 100)]?.[ch_id % 100];
             if ( put_ch !== undefined ) {
                 put_prev_p = put_ch.cur_point;
             }
@@ -841,8 +823,7 @@ export class Board extends BgImage {
             // 動かせるか確かめる (駒が無ければ例外)
             pos = pos.with_move(ch.cur_point, mv.p, ch.player);
 
-            const ch_i = parseInt(ch.id.slice(1)) % 100;
-            gameinfo.board.checker[ch.player][ch_i] = [mv.p, idx];
+            gameinfo.board.checker[ch.player][ch.num] = [mv.p, idx];
         } // for (mv)
 
         if ( player !== undefined ) {
@@ -911,7 +892,7 @@ export class Board extends BgImage {
         let last_op = undefined;
         if ( sound ) {
             last_op = { type: "put_checker",
-                        data: { ch: parseInt(ch.id.slice(1)), p: p } };
+                        data: { ch: ch.player * 100 + ch.num, p: p } };
         }
 
         this.apply(gameinfo, {sec: sec, last_op: last_op});

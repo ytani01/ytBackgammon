@@ -26,8 +26,8 @@ import { BgImage } from "./base.js";
  *                 ----------------------------------------------------- 
  */
 export class Cube extends BgImage {
-    constructor(id, board) {
-        super(id, 0, 0, 0, {board: board});
+    constructor(el, board) {
+        super(el, 0, 0, 0, {board: board});
 
         // 値・向き・テイク済みかは持たない。表示は apply() が
         // gameinfo から毎回作り、判定は gameinfo を読む (TODO-052)

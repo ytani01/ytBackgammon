@@ -9,7 +9,8 @@ import { Board } from "./board.js";
 // 盤面の要素を作る (TODO-029)。
 // ES Modules は defer と同じ扱いなので、この時点で <body> はできている。
 // ここで作った <img> の読み込みは window.onload の中で待つ。
-build_dom();
+// 作った要素は Board へ渡す (TODO-054)
+const els = build_dom();
 
 // メニュー (ハンバーガー) のチェックボックス。項目を押したら閉じる
 const nav = document.getElementById("nav-input");
@@ -40,7 +41,7 @@ const menu_emit = (type, data={}, confirm_msg=undefined) => {
  * @param {number} player
  */
 const emit_playername = (player) => {
-    const el = document.getElementById(`p${player}name-input`);
+    const el = els.name_input[player];
     const name = el.value;
 
     const cur_name = board.player_name[player].get();
@@ -124,7 +125,7 @@ window.onload = async () => {
     const nav_el = document.getElementById("nav-drawer");
 
     // initialize board
-    board = new Board("board",
+    board = new Board(els,
                       nav_el.offsetWidth  + 20,
                       nav_el.offsetHeight + 40);
 
@@ -196,7 +197,7 @@ for (const [id, handler] of [
 
 // 名前の <input> は focusout と change の両方から送る (元の属性と同じ)
 for (let player=0; player < 2; player++) {
-    const el = document.getElementById(`p${player}name-input`);
+    const el = els.name_input[player];
     for (const ev of ["focusout", "change"]) {
         el.addEventListener(ev, () => emit_playername(player));
     } // for(ev)

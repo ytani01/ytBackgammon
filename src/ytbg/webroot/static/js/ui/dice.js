@@ -7,8 +7,8 @@ import { BannerButton } from "./button.js";
  *
  */
 export class Dice extends BgImage {
-    constructor(id, board, player, x1, y1, file_prefix) {
-        super(id, x1, y1, 0, {board: board, player: player});
+    constructor(el, board, player, x1, y1, file_prefix) {
+        super(el, x1, y1, 0, {board: board, player: player});
         // log(`Dice> (x1,y1)=(${x1},${y1})`);
         this.file_prefix = file_prefix;
 
@@ -134,8 +134,17 @@ export class Dice extends BgImage {
  *
  */
 export class RollButton extends BannerButton {
-    constructor(id, board, player, x, y, deg=0) {
-        super(id, board, player, x, y, deg);
+    /**
+     * @param {HTMLElement} el
+     * @param {HTMLElement[]} dice_els - ダイス 4 個の要素
+     * @param {Board} board
+     * @param {number} player
+     * @param {number} x
+     * @param {number} y
+     * @param {number} [deg=0]
+     */
+    constructor(el, dice_els, board, player, x, y, deg=0) {
+        super(el, board, player, x, y, deg);
 
         [this.x1, this.y1] = [this.x, this.y];
         // log(`(x1,y1)=(${this.x1},${this.y1})`);
@@ -157,7 +166,7 @@ export class RollButton extends BannerButton {
             log(`x1=${this.x1},xd=${xd}`);
             let yd = this.y1 + 20 * (i % 2 - 0.5);
 
-            this.dice.push(new Dice(dice_prefix + i,
+            this.dice.push(new Dice(dice_els[i],
                                     this.board, this.player,
                                     xd, yd,
                                     dice_prefix));

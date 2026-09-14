@@ -42,7 +42,8 @@ import { get_image_dir } from "../settings.js";
  */
 export class BgBase {
     /**
-     * @param {string} id
+     * @param {HTMLElement|undefined} el - build_dom() が作った要素
+     *     (TODO-054)。要素を持たない部品 (BoardPoint) は undefined
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
@@ -52,21 +53,15 @@ export class BgBase {
      * @param {Board} [opts.board] - 盤面に置く部品のとき
      * @param {number} [opts.player] - プレーヤーの持ち物のとき (0 or 1)
      */
-    constructor(id, x, y, deg=0,
+    constructor(el, x, y, deg=0,
                 {w=undefined, h=undefined,
                  board=undefined, player=undefined}={}) {
         [this.x, this.y] = [x, y];
         [this.w, this.h] = [w, h];
         this.deg = deg;
-        this.id = id;
+        this.el = el;
         this.board = board;
         this.player = player;
-        
-        if ( this.id !== undefined && this.id.length > 0 ) {
-            this.el = document.getElementById(this.id);
-        } else {
-            this.el = undefined;
-        }
 
         if ( w === undefined && this.el ) {
             this.w = this.el.clientWidth;
@@ -85,6 +80,15 @@ export class BgBase {
             this.el.ondragstart = this.null_handler.bind(this);
         }
     } // BgBase.constructor()
+
+    /**
+     * 要素の id 属性。ログとブラウザのテストのためだけにある (TODO-054)
+     *
+     * @return {string|undefined}
+     */
+    get id() {
+        return this.el ? this.el.id : undefined;
+    } // BgBase.id
 
     /**
      * @param {number} x
@@ -252,11 +256,11 @@ export class BgBase {
 } // class BgBase
 
 /**
- * <div id="${id}">some text</div>
+ * <div>some text</div>
  */
 export class BgText extends BgBase {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {number} x
      * @param {number} y
      * @param {number} deg
@@ -265,9 +269,9 @@ export class BgText extends BgBase {
      * @param {Board} [opts.board]
      * @param {number} [opts.player]
      */
-    constructor(id, x, y, deg, {text="", board=undefined,
+    constructor(el, x, y, deg, {text="", board=undefined,
                                 player=undefined}={}) {
-        super(id, x, y, deg, {board: board, player: player});
+        super(el, x, y, deg, {board: board, player: player});
 
         // set text
         this.text = text;
@@ -334,11 +338,11 @@ export class BgText extends BgBase {
 } // class BgText
 
 /**
- * <div id="${id}"><image src="${image_dir}/..${image_suffix}"></div>
+ * <div><image src="${image_dir}/..${image_suffix}"></div>
  */
 export class BgImage extends BgBase {
     /**
-     * @param {string} id
+     * @param {HTMLElement} el
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
@@ -348,8 +352,8 @@ export class BgImage extends BgBase {
      * @param {Board} [opts.board]
      * @param {number} [opts.player]
      */
-    constructor(id, x, y, deg=0, opts={}) {
-        super(id, x, y, deg, opts);
+    constructor(el, x, y, deg=0, opts={}) {
+        super(el, x, y, deg, opts);
         const {w=undefined, h=undefined} = opts;
 
         this.image_suffix = ".png";
