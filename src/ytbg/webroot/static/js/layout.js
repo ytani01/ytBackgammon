@@ -2,7 +2,7 @@
  * 盤面の座標
  *
  * 表示要素の位置は、すべてこの 2 つの配列を基準に組み立てる。
- * Board が複製して this.bx / this.by として持つ。
+ * BoardView が複製して this.bx / this.by として持つ。
  */
 
 // 横方向の区切り
@@ -54,6 +54,47 @@ export const point_geometry = (bx, by, board_h) => {
     } // for (p)
     return geo;
 }; // point_geometry()
+
+/**
+ * そのポイントの index 枚目 (0 から) の駒の座標と重なり順
+ *
+ * 5 枚ごとに段を変え、段が上がるごとに少しずつずらして重ねる。
+ * x / y は駒の中心。
+ *
+ * @param {{x: number, y: number, w: number, h: number,
+ *          direction: number, max_n: number}} point
+ *     point_geometry() の 1 つぶん
+ * @param {number} index - 積む位置 (0 から)
+ * @param {{w: number, h: number}} size - 駒の大きさ
+ * @return {{x: number, y: number, z: number}}
+ */
+export const checker_geometry = (point, index, size) => {
+    const n2 = index % point.max_n;
+    const n3 = Math.floor(index / point.max_n);
+    const cx = point.x + point.w / 2;
+    const y0 = point.direction > 0 ? point.y : point.y + point.h;
+    return {
+        x: cx - size.w * 0.05 * n3,
+        y: parseInt(Math.round(y0 + size.h * (0.5 + n2 * 0.75 + 0.1 * n3)
+                               * point.direction)),
+        z: index,
+    };
+}; // checker_geometry()
+
+/**
+ * 座標 (x, y) があるポイントの番号。どのポイントにも無ければ undefined
+ *
+ * @param {{x: number, y: number, w: number, h: number}[]} points
+ *     point_geometry() の戻り値
+ * @param {number} x
+ * @param {number} y
+ * @return {number|undefined}
+ */
+export const point_at = (points, x, y) => {
+    const i = points.findIndex((g) => (x >= g.x) && (x < g.x + g.w)
+                               && (y >= g.y) && (y < g.y + g.h));
+    return i < 0 ? undefined : i;
+}; // point_at()
 
 /**
  * スコアの表示と、その上の ▲ / ▼ ボタンの座標 (TODO-046)

@@ -1,7 +1,7 @@
 /**
  * 操作の判定と、送る内容・予測した盤面を求める純粋関数。
  *
- * **ここは DOM も Board も WebSocket も見ない。** 受け取るのは gameinfo と
+ * **ここは DOM も表示部品も WebSocket も見ない。** 受け取るのは gameinfo と
  * チェッカーの ID (player * 100 + i)・プレーヤー番号のような値だけ。
  * import してよいのは rules/ の中だけ。
  *
@@ -137,24 +137,24 @@ export const decide_dst = (gi, id, point) => {
 }; // decide_dst()
 
 /**
- * チェッカーを動かしたあとの gameinfo を予測する
+ * チェッカーを動かしたあとの gameinfo を予測する (plan_move() の中身)
  *
  * 動かしたチェッカーの [point, idx] を書き換える。idx は、そのポイントに
  * 既にある枚数。移動元は gameinfo から読む。
  *
  * - **sn は書き換えない。** 予測はサーバの通し番号を進めない
  * - **動かせるかを Position.with_move() で確かめる。** 駒が無ければ例外
- * - player を渡すと、そのプレーヤーのダイスも書き換える。used_dice の目を
- *   11〜16 にし、動かしたあとの盤面で使えなくなった目も 11〜16 にする
+ * - player のダイスも書き換える。used_dice の目を 11〜16 にし、
+ *   動かしたあとの盤面で使えなくなった目も 11〜16 にする
  *
  * @param {Object} gi
  * @param {{ch: number, p: number}[]} moves - ch は ID。動かす順に並べる
- * @param {number} [player] - ダイスを書き換えるプレーヤー
- * @param {number[]} [used_dice=[]] - 使ったダイスの目
+ * @param {number} player - ダイスを書き換えるプレーヤー
+ * @param {number[]} used_dice - 使ったダイスの目
  * @return {Object} - 新しい gameinfo (gi は変えない)
  * @throws {Error} 動かせないとき
  */
-export const predict_moves = (gi, moves, player=undefined, used_dice=[]) => {
+const predict_moves = (gi, moves, player, used_dice) => {
     const gameinfo = copy_gameinfo(gi);
     let pos = Position.from_gameinfo(gameinfo);
 
@@ -170,16 +170,14 @@ export const predict_moves = (gi, moves, player=undefined, used_dice=[]) => {
         gameinfo.board.checker[ch_player][i] = [mv.p, idx];
     } // for (mv)
 
-    if ( player !== undefined ) {
-        const dice = gameinfo.board.dice[player];
-        for (let d1 of used_dice) {
-            const i = dice.indexOf(d1);
-            if ( i >= 0 ) {
-                dice[i] += 10;
-            }
-        } // for (d1)
-        gameinfo.board.dice[player] = disable_unusable(pos, player, dice);
-    }
+    const dice = gameinfo.board.dice[player];
+    for (let d1 of used_dice) {
+        const i = dice.indexOf(d1);
+        if ( i >= 0 ) {
+            dice[i] += 10;
+        }
+    } // for (d1)
+    gameinfo.board.dice[player] = disable_unusable(pos, player, dice);
 
     return gameinfo;
 }; // predict_moves()

@@ -1,7 +1,7 @@
 /**
  * 盤面を単純なデータで表す Position と、ポイント番号の計算 (TODO-027)。
  *
- * **ここは DOM も Board も見ない。** 受け取るのは gameinfo・Position・
+ * **ここは DOM も表示部品も見ない。** 受け取るのは gameinfo・Position・
  * player・出目のような単純な値だけ。import してよいのは rules/ の中だけ。
  */
 
@@ -34,11 +34,6 @@ export const bar_point = (player) => {
  * 指定したポイントの PIP カウントを取得
  *
  * バー (26, 27) は 25 として数える。
- *
- * 注: 移す前の `BgBase.get_pip()` は、引数の player ではなく
- * `this.player` を見ていた。呼び出しは `Checker.get_pip()` の
- * 1 か所だけで、そこは `this.player` を渡していたので結果は変わらない
- * (TODO-027)。
  *
  * @param {number} player - 0 or 1
  * @param {number} point

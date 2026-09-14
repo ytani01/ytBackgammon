@@ -1,37 +1,40 @@
-import { log } from "../log.js";
-import { click_dice, roll } from "../actions.js";
 import { BgImage } from "./base.js";
-import { BannerButton } from "./button.js";
 
 /**
+ * ダイス 1 個。
  *
+ * 目は持たない。表示は BoardView が gameinfo から毎回作り、
+ * 判定は gameinfo.board.dice を読む (TODO-052)。
+ * 押したときの処理は BoardView がつなぐ。
  */
 export class Dice extends BgImage {
-    constructor(el, board, player, x1, y1, file_prefix) {
-        super(el, x1, y1, 0, {board: board, player: player});
-        // log(`Dice> (x1,y1)=(${x1},${y1})`);
+    /**
+     * @param {HTMLElement} el
+     * @param {number} player
+     * @param {number} x1 - 出したときの x
+     * @param {number} y1 - 出したときの y
+     * @param {string} file_prefix - 画像のファイル名の頭 ("dice0")
+     * @param {number} board_w - 盤面の幅 (隠す位置を決める)
+     * @param {number} board_h - 盤面の高さ
+     */
+    constructor(el, player, x1, y1, file_prefix, board_w, board_h) {
+        super(el, x1, y1, 0, {player: player});
         this.file_prefix = file_prefix;
 
         [this.x1, this.y1] = [x1, y1];
 
         const offset0 = 5;
-        
+
         if ( this.player == 0 ) {
-            this.x0 = this.board.w - this.w / 2 - offset0;
-            this.y0 = this.board.h - this.h / 2 - offset0;
+            this.x0 = board_w - this.w / 2 - offset0;
+            this.y0 = board_h - this.h / 2 - offset0;
         } else {
             this.x0 = this.w / 2 + offset0;
             this.y0 = this.h / 2 + offset0;
         }
 
-        this.deg = 0;
-
-        // 目は持たない。表示は apply() が gameinfo から毎回作り、
-        // 判定は gameinfo.board.dice を読む (TODO-052)
-
         this.image_el = this.el.firstElementChild;
 
-        // this.el.hidden = true;
         this.el.style.backgroundColor = "#000";
         this.el.style.cursor = "pointer";
 
@@ -61,14 +64,7 @@ export class Dice extends BgImage {
     } // Dice.get_filename()
 
     /**
-     * 
-     */
-    clear() {
-        this.set(0);
-    } // Dice.clear()
-
-    /**
-     * 
+     * 隠す (盤の隅へ)
      */
     move0() {
         this.set_z(-1);
@@ -90,11 +86,11 @@ export class Dice extends BgImage {
     } // Dice.move1()
 
     /**
+     * 目の画像・不透明度・定位置を反映する
+     *
      * @param {number} val - dice number 1-6:active, 11-16:inactive, 0:no dice
-     * @param {boolean} [roll_flag=false]
      */
-    set(val, roll_flag=false) {
-        // log(`Dice.set(val=${val},roll_flag=${roll_flag})>`);
+    set(val) {
         this.enable();
 
         if (val % 10 < 1) {
@@ -108,168 +104,20 @@ export class Dice extends BgImage {
 
         this.image_el.src = this.get_filename(val % 10);
 
-        if ( roll_flag ) {
-            this.deg = Math.floor(Math.random() * 720 - 360);
-            this.move1(this.deg, 0.5);
-        } else {
-            this.move1(this.deg, 0);
-        }
+        // 描画のたびにまっすぐ (プレーヤー 1 は 180 度) に置き直す。
+        // 傾くのは振った直後 (animate_roll()) だけ
+        this.move1(0, 0);
     } // Dice.set()
 
     /**
-     * 押したときの判定と送信は actions.js の click_dice() (TODO-051)
-     *
-     * @param {number} x
-     * @param {number} y
+     * 振ったときの回転。**set() のあと、スタイルが確定する前に呼ぶ**
+     * (カップの位置から出てくる動きを、set() の 0 秒の移動と
+     * まとめて 0.5 秒で見せるため)。隠れているダイスは回さない
      */
-    on_mouse_down_xy(x, y) {
-        log(`Dice.on_mouse_down_xy(${x},${y})`);
-        click_dice(this.board, this.player,
-                   this.board.roll_btn[this.player].dice.indexOf(this));
-        return false;
-    } // Dice.on_mouse_down_xy()
+    animate_roll() {
+        if ( this.z < 0 ) {
+            return;
+        }
+        this.move1(Math.floor(Math.random() * 720 - 360), 0.5);
+    } // Dice.animate_roll()
 } // class Dice
-
-/**
- *
- */
-export class RollButton extends BannerButton {
-    /**
-     * @param {HTMLElement} el
-     * @param {HTMLElement[]} dice_els - ダイス 4 個の要素
-     * @param {Board} board
-     * @param {number} player
-     * @param {number} x
-     * @param {number} y
-     * @param {number} [deg=0]
-     */
-    constructor(el, dice_els, board, player, x, y, deg=0) {
-        super(el, board, player, x, y, deg);
-
-        [this.x1, this.y1] = [this.x, this.y];
-        // log(`(x1,y1)=(${this.x1},${this.y1})`);
-
-        if ( this.player == 0 ) {
-            this.x0 = this.board.w - this.w;
-            this.y0 = this.board.h - this.h;
-        } else {
-            this.x0 = this.w;
-            this.y0 = this.h;
-        }
-        // log(`(x0,y0)=(${this.x0},${this.y0})`);
-
-        const dice_prefix = "dice" + this.player;
-
-        this.dice = [];
-        for (let i=0; i < 4; i++) {
-            let xd = this.x1 + 60 * (i - 1.5);
-            log(`x1=${this.x1},xd=${xd}`);
-            let yd = this.y1 + 20 * (i % 2 - 0.5);
-
-            this.dice.push(new Dice(dice_els[i],
-                                    this.board, this.player,
-                                    xd, yd,
-                                    dice_prefix));
-        } // for(i)
-
-        this.off();
-    } // RollButton.constructor()
-
-    /**
-     * 
-     */
-    on() {
-        this.active = true;
-        this.set_z(5);
-        this.move(this.x1, this.y1);
-    } // RollButton.on()
-
-    /**
-     * 
-     */
-    off() {
-        if ( ! this.active ) {
-            return;
-        }
-        this.active = false;
-        this.move(this.x0, this.y0);
-        this.set_z(-1);
-    } // RollButton.off()
-
-    /**
-     * 
-     */
-    update() {
-        // apply() の中から呼ばれるので、gameinfo は届いている (TODO-052)
-        const gi = this.board.gameinfo;
-
-        if ( gi.turn != this.player && gi.turn < 2 ) {
-            this.off();
-            return;
-        }
-
-        if ( this.board.has_dice(this.player) ) {
-            this.off();
-            return;
-        }
-
-        this.board.pass_btn[1 - this.player].off();
-        this.on();
-    } // RollButton.on()
-
-    /**
-     * Set dice values
-     * @param {number[][]} dice_value
-     * @param {boolean} [roll_flag=false] 
-     */
-    set(dice_value, roll_flag=false) {
-        if ( roll_flag ) {
-            this.board.sound_roll.play();
-        }
-
-        this.clear();
-        this.off();
-        
-        for (let i=0; i < 4; i++) {
-            this.dice[i].set(dice_value[i], roll_flag);
-        } // for(i)
-
-        if ( ! dice_value.some((v) => v > 0) ) {
-            if ( this.board.closeout(1 - this.player) ) {
-                this.board.pass_btn[1 - this.player].on();
-            }
-        }
-        
-    } // RollButton.set()
-
-    /**
-     *
-     */
-    clear() {
-        for ( let d=0; d < 4; d++ ) {
-            this.dice[d].clear();
-        }
-        return [];
-    } // RollButton.clear()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_down_xy(x, y) {
-        log(`RollButton.on_mouse_down_xy>player=${this.player}`);
-
-        // 振ってよいかの判定と送信は actions.js (TODO-051)
-        if ( ! roll(this.board, this.player) ) {
-            return;
-        }
-
-        this.off();
-
-        if ( this.board.has_dice(1 - this.player) ) {
-            log(`settimeout`);
-            const click0 = this.dice[0].on_mouse_down_xy.bind(this.dice[0]);
-            setTimeout(click0, 2000);
-        }
-    } // RollButton.on_mouse_down_xy()
-} // class RollButton

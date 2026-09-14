@@ -26,28 +26,34 @@ import { BgImage } from "./base.js";
  *                 ----------------------------------------------------- 
  */
 export class Cube extends BgImage {
-    constructor(el, board) {
-        super(el, 0, 0, 0, {board: board});
+    /**
+     * @param {HTMLElement} el
+     * @param {number[]} bx - layout.js の BX
+     * @param {number[]} by - layout.js の BY
+     * @param {number} board_h - 盤面の高さ
+     */
+    constructor(el, bx, by, board_h) {
+        super(el, 0, 0, 0);
 
-        // 値・向き・テイク済みかは持たない。表示は apply() が
+        // 値・向き・テイク済みかは持たない。表示は BoardView が
         // gameinfo から毎回作り、判定は gameinfo を読む (TODO-052)
 
         this.move_sec = 0.3;
-        
-        this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
-        this.x1 = [(this.board.bx[4] + this.board.bx[5]) / 2,
-                   (this.board.bx[2] + this.board.bx[3]) / 2];
-        this.y0 = this.board.h / 2;
-        this.y2 = [this.board.by[9] - this.h / 2,
-                   this.board.by[0] + this.h / 2];
-        this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
-                   (this.y2[1] + this.board.h / 2) / 2];
+
+        this.x0 = (bx[0] + bx[1]) / 2;
+        this.x1 = [(bx[4] + bx[5]) / 2,
+                   (bx[2] + bx[3]) / 2];
+        this.y0 = board_h / 2;
+        this.y2 = [by[9] - this.h / 2,
+                   by[0] + this.h / 2];
+        this.y1 = [(this.y2[0] + board_h / 2) / 2,
+                   (this.y2[1] + board_h / 2) / 2];
 
         this.file_prefix = this.image_dir + "cube";
 
         this.el.style.cursor = "pointer";
 
-        this.move(this.x0, this.board.h / 2, true);
+        this.move(this.x0, board_h / 2, true);
     } // Cube.constructor()
 
     /**
@@ -90,30 +96,4 @@ export class Cube extends BgImage {
                       true, this.move_sec);
         }
     } // Cube.set()
-
-    /**
-     * 掴む・動かす・離すは drag.js (TODO-053)
-     *
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_down_xy(x, y) {
-        this.board.drag.hold_cube(x, y);
-    } // Cube.on_mouse_down_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_move_xy(x, y) {
-        this.board.drag.move_cube(x, y);
-    } // Cube.on_mouse_move_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_up_xy(x, y) {
-        this.board.drag.drop_cube(x, y);
-    } // Cube.on_mouse_up_xy()
 } // class Cube

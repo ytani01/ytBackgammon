@@ -1,7 +1,7 @@
 /**
  * 行き先の計算 (TODO-027)。
  *
- * **ここは DOM も Board も見ない。**
+ * **ここは DOM も表示部品も見ない。**
  */
 
 import { bar_point } from "./position.js";

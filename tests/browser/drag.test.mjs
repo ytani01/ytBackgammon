@@ -6,8 +6,8 @@
 //   node --test tests/browser/drag.test.mjs
 //
 // 共有ボードなので、駒を掴んでいる間にも他の人の操作で gameinfo が届く。
-// apply() はチェッカーを配り直すが、掴んでいる駒は
-// 手元の座標に残すこと。
+// BoardView.render() はチェッカーとキューブを置き直すが、掴んでいる駒と
+// キューブは手元の座標と z に残すこと。
 //
 // 掴んだ位置はチェッカーとキューブで別に持つこと。free move なら
 // マルチタッチで両方を同時に掴める。
@@ -17,8 +17,8 @@ import { after, before, describe, it } from 'node:test';
 
 import {
     center_of, dragging, drop_cube_while_holding_checker, gameinfo,
-    launch_browser, open_board, send_msg, set_turn, sleep, start_server,
-    wait_for,
+    holding_cube, launch_browser, open_board, send_msg, set_turn, sleep,
+    start_server, wait_for, wait_still,
 } from './helper.mjs';
 
 describe('ドラッグ中に gameinfo が届く', () => {
@@ -88,5 +88,43 @@ describe('ドラッグ中に gameinfo が届く', () => {
         // キューブを掴む → チェッカーを掴む → キューブをテイクの側へ離す
         const sent = await drop_cube_while_holding_checker(page1, 30);
         assert.ok(sent.includes('take'), `take を送っていない: ${sent}`);
+    });
+
+    it('掴んでいるキューブも手元の座標と z に残る', async () => {
+        // キューブに触れるように、手番を自分 (プレーヤー 0) にする。
+        // キューブはプレーヤー 0 の側でテイク済み
+        await set_turn(page1, 0);
+        await wait_for(
+            async () => (await gameinfo(page1)).board.cube,
+            c => c.side === 0 && c.accepted === true, { msg: 'take' });
+
+        // 新しく開いた画面では、テイク済みのキューブの z は決まっていない。
+        // 掴んでいる間に届く double の描画は z を 100 にするので、
+        // z を手元に残さなければ変わる
+        const page3 = await open_board(browser, server.url);
+        try {
+            // 開いた直後のキューブは、最初の描画で定位置へ動いている途中
+            await wait_still(page3, '#cube');
+            const src = await center_of(page3, '#cube');
+            await page3.mouse.move(src.x, src.y);
+            await page3.mouse.down();
+            await page3.mouse.move(src.x + 60, src.y - 40, { steps: 10 });
+
+            const before_pos = await holding_cube(page3);
+            assert.notEqual(before_pos, undefined, 'キューブを掴めていない');
+
+            await send_msg(page2, 'double', { player: 0 });
+            await wait_for(
+                async () => (await gameinfo(page3)).board.cube,
+                c => c.side === 1 && c.accepted === false,
+                { msg: 'gameinfo が届かない' });
+
+            assert.deepEqual(await holding_cube(page3), before_pos,
+                             '掴んでいるキューブが手元の座標と z に残っていない');
+
+            await page3.mouse.up();
+        } finally {
+            await page3.close();
+        }
     });
 });

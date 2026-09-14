@@ -5,9 +5,10 @@
 //
 //   node --test tests/browser/
 //
-// ドラッグを離すと、actions.js の drop_checker() が、rules/actions.js の
+// ドラッグを離すと、BoardController.drop_checker() が、rules/actions.js の
 // plan_move() で「動かしたあとの gameinfo」の予測と move を作り、
-// サーバの応答を待たずに move を 1 通送って予測を Board.apply() に渡す。ここで見るのは次のとおり。
+// サーバの応答を待たずに move を 1 通送って予測を predict() で表示する。
+// ここで見るのは次のとおり。
 //
 //   1. 応答が無くても表示が変わる (先行実行)
 //   2. 予測した盤面に、使ったダイスと使えなくなったダイス (11〜16) が
@@ -34,8 +35,8 @@
 // なので、先行実行を通らない (free move はサーバの応答だけで動く)。
 //
 // **ポイントの枚数は cur_point から数える** (TODO-044)。cur_point を
-// 設定するのは apply() の配り直しだけなので、「表示が変わったか」を
-// 見ていることになる。board.checkers_at(p).length は gameinfo を
+// 設定するのは BoardView.render() の配り直しだけなので、「表示が変わったか」を
+// 見ていることになる。gameinfo の checkers_at(p).length は gameinfo を
 // 数え直した値で、届いた gameinfo からほぼ自明に決まってしまう。
 //
 // テストは書いた順に走り、1 つのサーバの盤面を順に変えていく。
@@ -130,7 +131,7 @@ async function put_p100(page, p) {
  * player 0 の手番で、checker[0][0] を src に、残り 14 枚をゴール (0) に
  * 置く。player 1 は blocks の各ポイントに 2 枚ずつ、残りをゴール (25) に
  * 置く。ダイスは dice。**元に戻すのは呼んだ側** (返す gameinfo を
- * apply() する)。
+ * apply_gameinfo() する)。
  *
  * @param {import('playwright').Page} page
  * @param {{src: number, blocks: number[], dice: number[]}} opts
@@ -247,7 +248,7 @@ describe('ドラッグの先行実行 (予測)', () => {
         assert.deepEqual(state.gi_dice, [13, 0, 0, 0]);
         assert.deepEqual(state.active_dice, []);
 
-        // apply() は予測で 1 回だけ呼ばれた。last_op も clock_state も無い
+        // 描画は予測で 1 回だけ (controller.predict())。last_op も clock_state も無い
         const applied = await take_applied(page);
         assert.equal(applied.length, 1);
         assert.equal(applied[0].has_last_op, false);

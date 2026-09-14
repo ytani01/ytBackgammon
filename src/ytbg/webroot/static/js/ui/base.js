@@ -2,12 +2,13 @@ import { get_image_dir } from "../settings.js";
 
 /**
  *=====================================================
- * [Class tree] (TODO-028)
+ * [Class tree]
  *
- * board と player は、中間クラスではなくコンストラクタの options で渡す
- * (BgBase が this.board / this.player に入れる)。
+ * 表示部品は、DOM の移動・回転・表示だけを受け持つ。盤面の状態・
+ * Settings・操作の関数は参照しない。入力のイベントは、要る部品にだけ
+ * BoardView がつなぐ (board_view.js)。
  *
- * BgBase .. (x, y, w, h), mouse handlers, board / player   ui/base.js
+ * BgBase .. (x, y, w, h), move / rotate, 入力の座標変換   ui/base.js
  *    |
  *    +- BgText .. have a text                               ui/base.js
  *    |    +- PlayerClock                                    ui/clock.js
@@ -16,21 +17,15 @@ import { get_image_dir } from "../settings.js";
  *    |    +- PlayerScore                                    ui/label.js
  *    |
  *    +- BgImage .. have an image                            ui/base.js
- *    |    +- Board                                          board.js
- *    |    +- Cube                                           ui/cube.js
- *    |    +- Checker                                        ui/checker.js
- *    |    +- Dice                                           ui/dice.js
- *    |    +- InverseButton                                  ui/button.js
- *    |    +- ResignButton                                   ui/button.js
- *    |    +- EmitButton .. type と data を生成時に渡す      ui/button.js
- *    |    +- ScoreButton                                    ui/button.js
- *    |    +- BannerButton .. 押したときの動作を on_click で  ui/button.js
- *    |         |            渡す (投了・パス・勝ちのバナー)
- *    |         +- RollButton                                ui/dice.js
- *    |
- *    +- BoardPoint                                          ui/point.js
+ *         +- Cube                                           ui/cube.js
+ *         +- Checker                                        ui/checker.js
+ *         +- Dice                                           ui/dice.js
+ *         +- ScoreButton                                    ui/button.js
+ *         +- BannerButton .. 投了・パス・勝ちのバナー       ui/button.js
+ *              +- RollButton                                ui/button.js
  *
- * Drag .. 掴む・動かす・離す (チェッカーとキューブ)         drag.js
+ * BoardController .. 状態・操作・時計の計算                board_controller.js
+ * BoardView .. 部品・入力・layout・ドラッグ・演出          board_view.js
  * Settings .. 音・free move・PIP・プレーヤー番号            settings.js
  * CookieBase .. cookie                                      settings.js
  * SoundBase .. sound                                        sound.js
@@ -42,25 +37,21 @@ import { get_image_dir } from "../settings.js";
  */
 export class BgBase {
     /**
-     * @param {HTMLElement|undefined} el - build_dom() が作った要素
-     *     (TODO-054)。要素を持たない部品 (BoardPoint) は undefined
+     * @param {HTMLElement} el - build_dom() が作った要素 (TODO-054)
      * @param {number} x
      * @param {number} y
      * @param {number} [deg=0]
      * @param {Object} [opts]
      * @param {number} [opts.w] - 省略すると要素の clientWidth
      * @param {number} [opts.h] - 省略すると要素の clientHeight
-     * @param {Board} [opts.board] - 盤面に置く部品のとき
      * @param {number} [opts.player] - プレーヤーの持ち物のとき (0 or 1)
      */
-    constructor(el, x, y, deg=0,
-                {w=undefined, h=undefined,
-                 board=undefined, player=undefined}={}) {
+    constructor(el, x, y, deg=0, {w=undefined, h=undefined,
+                                  player=undefined}={}) {
         [this.x, this.y] = [x, y];
         [this.w, this.h] = [w, h];
         this.deg = deg;
         this.el = el;
-        this.board = board;
         this.player = player;
 
         if ( w === undefined && this.el ) {
@@ -68,16 +59,6 @@ export class BgBase {
         }
         if ( h === undefined && this.el ) {
             this.h = this.el.clientHeight;
-        }
-
-        if ( this.el ) {
-            this.el.onmousedown = this.on_mouse_down.bind(this);
-            this.el.ontouchstart = this.on_mouse_down.bind(this);
-            this.el.onmouseup = this.on_mouse_up.bind(this);
-            this.el.ontouchend = this.on_mouse_up.bind(this);
-            this.el.onmousemove = this.on_mouse_move.bind(this);
-            this.el.ontouchmove = this.on_mouse_move.bind(this);
-            this.el.ondragstart = this.null_handler.bind(this);
         }
     } // BgBase.constructor()
 
@@ -89,16 +70,6 @@ export class BgBase {
     get id() {
         return this.el ? this.el.id : undefined;
     } // BgBase.id
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     * @return {boolean}
-     */
-    in_this(x, y) {
-        return (x >= this.x) && (x < this.x + this.w)
-            && (y >= this.y) && (y < this.y + this.h);
-    }
 
     /**
      * @param {number} x
@@ -120,11 +91,11 @@ export class BgBase {
     } // BgBase.move()
 
     /**
-     * @param {number} z
+     * @param {number|undefined} z - undefined なら重なり順を指定しない
      */
     set_z(z) {
         this.z = z;
-        this.el.style.zIndex = this.z;
+        this.el.style.zIndex = z === undefined ? "" : z;
     } // BgBase.set_z()
 
     /**
@@ -144,115 +115,32 @@ export class BgBase {
     } // BgBase.rotate()
 
     /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_down_xy(x, y) {
-        // to be overridden
-    } // BgBase.on_mouse_down_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_up_xy(x, y) {
-        // to be overridden
-    } // BgBase.on_mouse_down_xy()
-
-    /**
-     * @param {number} x
-     * @param {number} y
-     */
-    on_mouse_move_xy(x, y) {
-        // to be overridden
-    } // BgBase.on_mouse_down_xy()
-
-    /**
      * touch event to mouse event
      * only for get_xy() function
      *
-     * @param {MouseEvent} e
+     * @param {MouseEvent|TouchEvent} e
+     * @return {MouseEvent|Touch}
      */
     touch2mouse(e) {
-        // log(`BgBase.touch2mouse()`);
         e.preventDefault();
         if ( e.changedTouches ) {
             e = e.changedTouches[0];
         }
         return e;
     } // BgBase.touch2mouse()
-    
+
     /**
-     * only for get_xy() function
+     * イベントの位置を盤面の座標にする
      *
-     * @param {MouseEvent} e
+     * @param {MouseEvent|TouchEvent} e
+     * @param {function(MouseEvent|Touch): number[]} to_xy - ページ座標
+     *     (pageX / pageY) を盤面の座標 [x, y] に直す関数。盤面の位置と
+     *     向きは BoardView が持つので、呼ぶ側が渡す
+     * @return {number[]} [x, y]
      */
-    inverse_xy(e) {
-        let [origin_x, origin_y] = [this.x, this.y];
-        let [w, h] = [this.w, this.h];
-        if ( this.board ) {
-            [origin_x, origin_y] = [this.board.x, this.board.y];
-            [w, h] = [this.board.w, this.board.h];
-        }
-        
-        return [w - e.pageX + origin_x, h - e.pageY + origin_y];
-    } // BgBase.inverse_xy()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    get_xy(e) {
-        e = this.touch2mouse(e);
-        let [origin_x, origin_y] = [this.x, this.y];
-        if ( this.board ) {
-            [origin_x, origin_y] = [this.board.x, this.board.y];
-        }
-        
-        let [x, y] = [e.pageX - origin_x, e.pageY - origin_y];
-
-        // 画面の向きはプレーヤー番号で決まる (Settings が持つ。TODO-053)
-        let player = this.player;
-        if ( this.board ) {
-            player = this.board.settings.player;
-        } else if ( this.settings ) {
-            player = this.settings.player;   // Board 自身
-        }
-        if ( player == 1 ) {
-            [x, y] = this.inverse_xy(e);
-        }
-        return [x, y];
+    get_xy(e, to_xy) {
+        return to_xy(this.touch2mouse(e));
     } // BgBase.get_xy()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    on_mouse_down(e) {
-        let [x, y] = this.get_xy(e);
-        this.on_mouse_down_xy(x, y);
-    } // BgBase.on_mouse_down()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    on_mouse_up(e) {
-        let [x, y] = this.get_xy(e);
-        this.on_mouse_up_xy(x, y);
-    } // BgBase.on_mouse_up()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    on_mouse_move(e) {
-        let [x, y] = this.get_xy(e);
-        this.on_mouse_move_xy(x, y);
-    } // BgBase.on_mouse_move()
-
-    /**
-     * @param {MouseEvent} e
-     */
-    null_handler(e) {
-        return false;
-    } // BgBase.null_handler()
 } // class BgBase
 
 /**
@@ -266,12 +154,10 @@ export class BgText extends BgBase {
      * @param {number} deg
      * @param {Object} [opts]
      * @param {string} [opts.text=""]
-     * @param {Board} [opts.board]
      * @param {number} [opts.player]
      */
-    constructor(el, x, y, deg, {text="", board=undefined,
-                                player=undefined}={}) {
-        super(el, x, y, deg, {board: board, player: player});
+    constructor(el, x, y, deg, {text="", player=undefined}={}) {
+        super(el, x, y, deg, {player: player});
 
         // set text
         this.text = text;
@@ -349,7 +235,6 @@ export class BgImage extends BgBase {
      * @param {Object} [opts]
      * @param {number} [opts.w] - 省略すると画像の幅
      * @param {number} [opts.h] - 省略すると画像の高さ
-     * @param {Board} [opts.board]
      * @param {number} [opts.player]
      */
     constructor(el, x, y, deg=0, opts={}) {
@@ -378,8 +263,6 @@ export class BgImage extends BgBase {
         this.el.draggable = false;
 
         this.move(this.x, this.y, false);
-
-        this.e = undefined; // MouseEvent
     } // BgImage.constructor()
 
     /**

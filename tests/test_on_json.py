@@ -65,7 +65,7 @@ async def test_put_checker_sends_gameinfo_with_last_op(
     assert sent['type'] == 'gameinfo'
     assert sent['data']['last_op'] == expected
     assert sent['data']['sec'] == 0.2
-    assert sent['data']['history_flag'] is False
+    assert 'history_flag' not in sent['data']
     # 盤面も、その操作を反映したものが送られる
     assert sent['data']['gameinfo']['board']['checker'][0][12] == [3, 0]
 
@@ -281,7 +281,7 @@ async def test_back_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep
     await bg_server.on_json(req, msg)
 
     assert emitted.last['data']['sec'] == 0.2
-    assert emitted.last['data']['history_flag'] is True
+    assert 'history_flag' not in emitted.last['data']
 
 
 async def test_fwd_moves_history_by_n(bg_server, req, no_sleep, add_history):
@@ -309,12 +309,12 @@ async def test_fwd_sends_sec_for_checker_move(bg_server, req, emitted, no_sleep,
     await bg_server.on_json(req, msg)
 
     assert emitted.last['data']['sec'] == 0.2
-    assert emitted.last['data']['history_flag'] is True
+    assert 'history_flag' not in emitted.last['data']
 
 
 async def test_back_all_leaves_one_entry(
         bg_server, req, emitted, no_sleep, add_history):
-    """back_all は履歴の先頭 1 件を残して全部戻り、sec は 0.1 で history_flag は真"""
+    """back_all は履歴の先頭 1 件を残して全部戻り、sec は 0.1 で history_flag は無い"""
     add_history(bg_server)
     add_history(bg_server)
 
@@ -326,11 +326,11 @@ async def test_back_all_leaves_one_entry(
 
     assert len(bg_server._hist.entries) == 1
     assert emitted.last['data']['sec'] == 0.1
-    assert emitted.last['data']['history_flag'] is True
+    assert 'history_flag' not in emitted.last['data']
 
 
 async def test_fwd_all_moves_history_to_the_end(bg_server, req, emitted, no_sleep, add_history):
-    """fwd_all は履歴の末尾まで全部進め、sec は 0.1 で history_flag は真"""
+    """fwd_all は履歴の末尾まで全部進め、sec は 0.1 で history_flag は無い"""
     add_history(bg_server)
     add_history(bg_server)
     await bg_server.backward_hist(-1, sleep_sec=0)
@@ -344,7 +344,7 @@ async def test_fwd_all_moves_history_to_the_end(bg_server, req, emitted, no_slee
     assert len(bg_server._hist.fwd_entries) == 0
     assert len(bg_server._hist.entries) == 3
     assert emitted.last['data']['sec'] == 0.1
-    assert emitted.last['data']['history_flag'] is True
+    assert 'history_flag' not in emitted.last['data']
 
 
 async def test_back2_behaves_like_back_all(
@@ -399,7 +399,7 @@ async def test_clear_hist_leaves_one_entry(
     assert sent['data']['hist_n'] == 1
     # 盤面が動くわけではないので、アニメーションの時間は 0
     assert sent['data']['sec'] == 0
-    assert sent['data']['history_flag'] is False
+    assert 'history_flag' not in sent['data']
     assert sent['data']['last_op'] is None
 
 
@@ -482,7 +482,7 @@ async def test_new_keeps_score_playername_limit_and_resets_board(
 
     assert emitted.last['type'] == 'gameinfo'
     assert emitted.last['data']['sec'] == 3
-    assert emitted.last['data']['history_flag'] is False
+    assert 'history_flag' not in emitted.last['data']
     # emitted に積まれている = broadcast() で全員へ送られた
     assert len(emitted.messages) == 1
 
@@ -543,7 +543,7 @@ async def test_emit_gameinfo_message_shape(bg_server, req, emitted):
     assert sent['type'] == 'gameinfo'
     data = sent['data']
     assert set(data.keys()) == {
-        'gameinfo', 'sec', 'hist_i', 'hist_n', 'history_flag', 'clock_state',
+        'gameinfo', 'sec', 'hist_i', 'hist_n', 'clock_state',
         'last_op'}
     assert set(data['clock_state'].keys()) == {
         'sw', 'active', 'clock', 'limit'}

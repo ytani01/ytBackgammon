@@ -61,7 +61,7 @@ describe('Settings', () => {
     });
 
     it('Pip にチェックが入っていれば、PIP は最初から出る', async () => {
-        // ブラウザがチェックを復元した場面を作る。Board は window.onload で
+        // ブラウザがチェックを復元した場面を作る。BoardView は window.onload で
         // 作るので、その前の DOMContentLoaded でチェックを入れる。
         // (page.route() で index.html を書き換えると、ページが local network
         // の外の扱いになり、/ws への接続が弾かれる)

@@ -11,7 +11,7 @@ import { describe, it } from 'node:test';
 import {
     CUBE_MAX, SCORE_MAX, can_hold_cube, can_pick_checker, decide_dst,
     plan_cube_drop, plan_dice_click, plan_double, plan_move,
-    plan_put_checker, plan_resign, plan_roll, plan_score, predict_moves,
+    plan_put_checker, plan_resign, plan_roll, plan_score,
 } from '../../src/ytbg/webroot/static/js/rules/actions.js';
 import { bar_point, copy_gameinfo } from
     '../../src/ytbg/webroot/static/js/rules/position.js';
@@ -215,6 +215,12 @@ describe('plan_move()', () => {
         assert.equal(plan_move(gi, 12, 19), null);
     });
 
+    it('gameinfo の位置が壊れていれば例外 (呼んだ側は何も送らない)', () => {
+        const gi = gi_with({ dice: [[3, 5, 0, 0], [0, 0, 0, 0]] });
+        gi.board.checker[0][0] = [99, 0];
+        assert.throws(() => plan_move(gi, 0, 5));
+    });
+
     it('バーから復帰できなくなっても、目が 0 のダイスは 0 のまま', () => {
         // バーの 2 枚のうち 1 枚を 3 で 22 へ。残りの 5 は 20 がふさがれて
         // 使えない。0 は 10 にしない
@@ -224,21 +230,6 @@ describe('plan_move()', () => {
         assert.deepEqual(plan.message.data.moves, [{ ch: 1, p: 22, idx: 0 }]);
         assert.deepEqual(plan.message.data.dice, [13, 15, 0, 0]);
         assert.deepEqual(plan.predicted.board.dice[0], [13, 15, 0, 0]);
-    });
-});
-
-describe('predict_moves()', () => {
-    it('gameinfo の位置が壊れていれば例外', () => {
-        const gi = gi_with();
-        gi.board.checker[0][0] = [99, 0];
-        assert.throws(() => predict_moves(gi, [{ ch: 0, p: 5 }]));
-    });
-
-    it('player を渡さなければダイスは変えない', () => {
-        const gi = gi_with({ dice: [[3, 5, 0, 0], [0, 0, 0, 0]] });
-        const got = predict_moves(gi, [{ ch: 0, p: 3 }]);
-        assert.deepEqual(got.board.dice, gi.board.dice);
-        assert.deepEqual(got.board.checker[0][0], [3, 0]);
     });
 });
 

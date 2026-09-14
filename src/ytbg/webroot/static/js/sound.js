@@ -19,11 +19,13 @@ export const set_global_sound_switch = (value) => {
  *
  */
 export class SoundBase {
-    constructor(board, soundfile) {
-        log("SoundBase("
-                    + `board.svr_id=${board.svr_id},`
-                    + `soundfile=${soundfile}`);
-        this.board = board;
+    /**
+     * @param {Settings} settings - 画面ごとの音の ON/OFF を読む
+     * @param {string} soundfile
+     */
+    constructor(settings, soundfile) {
+        log(`SoundBase(soundfile=${soundfile})`);
+        this.settings = settings;
         this.soundfile = soundfile;
         this.audio = new Audio(this.soundfile);
     } // SoundBase.constructor()
@@ -34,7 +36,7 @@ export class SoundBase {
     play() {
         log(`SoundBase.play>`
                     + `GlobalSoundSwitch=${GlobalSoundSwitch}`);
-        if ( this.board.settings.sound && GlobalSoundSwitch === undefined ) {
+        if ( this.settings.sound && GlobalSoundSwitch === undefined ) {
             log(`soundfile=${this.soundfile}`);
             return this.audio.play();
         } else {

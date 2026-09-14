@@ -1,6 +1,3 @@
-// log.js も settings.js を import するので循環している (TODO-053)。
-// **このモジュールのトップレベルで log() を呼ばない** (評価の順によっては
-// log.js がまだ評価されておらず ReferenceError になる)。
 import { log } from "./log.js";
 
 /**
@@ -18,17 +15,6 @@ export function get_sound_query() {
     return new URLSearchParams(window.location.search).get("sound")
         || undefined;
 } // get_sound_query()
-
-/**
- * クエリ文字列に `debug` があるか (TODO-048)
- *
- * `?debug` / `?debug=1` / `?debug=` のどれでも true。値は見ない。
- *
- * @return {boolean}
- */
-export function get_debug_query() {
-    return new URLSearchParams(window.location.search).has("debug");
-} // get_debug_query()
 
 /**
  *
@@ -108,10 +94,10 @@ export function get_server_id() {
  * 音の ON/OFF・free move・PIP を表示するか・cookie に保存する
  * プレーヤー番号を持つ。どれもサーバへは送らない。
  * クロックの ON/OFF と持ち時間はサーバから届く値を表示するものなので、
- * ここではなく Board が持つ。
+ * ここではなく BoardController が持つ。
  *
  * ヘッダのチェックボックスを読んで値を持つ。PIP の表示は変えない
- * (切り替えるのは Board.apply_disp_pip())。
+ * (切り替えるのは BoardView.apply_disp_pip())。
  */
 export class Settings {
     /**

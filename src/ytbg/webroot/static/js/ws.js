@@ -20,7 +20,7 @@ const ws_url = () => {
 /**
  * Emit message to server
  *
- * **import してよいのは actions.js だけ** (TODO-051)。
+ * main.js が BoardController に渡す。
  * history は送らない。履歴に積むかはサーバが type ごとに決める。
  *
  * @param {string} type

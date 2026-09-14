@@ -63,10 +63,11 @@ YTBG_TEST_HEADED=1 YTBG_TEST_SLOWMO=300 node --test tests/browser/drag.test.mjs
 | 対象 | 手段 |
 |------|------|
 | Python | `uv run pytest` |
-| JS のルール層 | `node --test tests/js/` |
+| JS のルール層と Controller | `node --test tests/js/` |
 | ブラウザでの動作 | `node --test tests/browser/` |
 
-`tests/js/` は `rules/` の純粋関数だけを見る（TODO-027）。`node --test` は
+`tests/js/` は `rules/` の純粋関数（TODO-027）と、偽の View を渡した
+`BoardController`（`controller.test.mjs`。TODO-060）を見る。`node --test` は
 Node の標準機能なので、**npm パッケージは要らない**（playwright が要るのは
 `tests/browser/` だけ）。DOM を触るクラスは単体テストせず、ブラウザの確認で見る。
 
@@ -76,9 +77,10 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 
 - `board.test.mjs` — 盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
   コンソールエラー
-- `rules.test.mjs` — **`Board` がルール層につながっているか**（TODO-027）。
-  helper の `judge()` / `pip_count()` / `dst_points()` で、ページの中の
-  `Board` の判定を呼ぶ。`board.test.mjs` と
+- `rules.test.mjs` — ページの中の `gameinfo` とルール層の結果が合っているか
+  （TODO-027）。helper の `judge()` / `pip_count()` / `dst_points()` が、ページの中で
+  `rules/` を import して Controller の `gameinfo` で呼ぶ。`BoardView` がルールを
+  呼ぶ経路は、PIP の表示と、パス・勝ちのバナー（`shown_banners()`）を画面から読んで見る（TODO-060）。`board.test.mjs` と
   `drag.test.mjs` はチェッカーのドラッグを free move で行うので、ルール判定を
   通らない（ルール判定を通るドラッグは `predict.test.mjs`）
 - `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
@@ -106,13 +108,18 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `move` 1 通の中身（使ったダイスと使えなくなったダイスの 11〜16、
   勝ちの点数）と、予測に失敗したら何も送らないこと（TODO-051）
 - `last_op.test.mjs` — 音とダイスの回転を `last_op` から決めているか
-  （TODO-051）。`apply()` に `last_op` を渡し、鳴らした音と回したダイスを数える
+  （TODO-051）。`controller.receive()` に `last_op` を渡し、鳴らした音と回したダイスを数える。
+  振ったダイスが傾くのは振った直後だけか（TODO-060）
 - `opening.test.mjs` — オープニングロールで先手が決まるか（TODO-041）
 - `player_cookie.test.mjs` — cookie から読んだプレーヤー番号が数になって
   いるか（TODO-050）。文字列のままだと、サーバが型の合わない値として弾く
 - `drag.test.mjs` — 駒を掴んでいる間に `gameinfo` が届いても、掴んでいる駒が
   手元の座標に残るか（TODO-053）。別のタブから `set_playername` を送って届かせる。
-  キューブとチェッカーを同時に掴んでも、キューブを離せば take を送るか
+  キューブとチェッカーを同時に掴んでも、キューブを離せば take を送るか。
+  掴んでいるキューブも、受信で手元の座標と z に残るか（TODO-060。
+  **ファイル全体で走らせる**。前のテストが作るキューブの状態を使う）
+- `clock.test.mjs` — Clock のチェックボックスは返事が届くまで計算も表示も
+  変えないか、履歴の返事でも `clock_state` を全部反映するか（TODO-060）
 - `settings.test.mjs` — 音の ON/OFF を cookie に保存して開き直しても残るか、
   PIP の最初の表示が Pip のチェックボックスに合うか（TODO-053）。
   チェックが入った状態は `addInitScript()` の `DOMContentLoaded` で作る
@@ -223,8 +230,9 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 当時の設計そのものは `archives/docs/design.md` に移してある（TODO-033）。
 TODO-049 で決めた構成の見直し（第 3 弾）の設計は `archives/docs/design-3.md` にあり、
 TODO-050〜055 で実装した（TODO-055 で移した）。
-**どちらも現行仕様ではないので、実装の根拠として引かないこと。**
-`docs/design-4.md` は TODO-057〜060 で実装する途中の設計で、これも現行仕様ではない。
+TODO-056 で決めた構成の見直し（第 4 弾）の設計は `archives/docs/design-4.md` にあり、
+TODO-057〜060 で実装した（TODO-060 で移した）。
+**どれも現行仕様ではないので、実装の根拠として引かないこと。**
 
 ## 書き方の慣習
 
@@ -238,5 +246,5 @@ TODO-050〜055 で実装した（TODO-055 で移した）。
   `{` `}` を書くと、抑制される水準でも例外になる（理由は Developer.md）
 - コード内のコメント・docstring は日本語と英語が混在している。周りに合わせる
 - クライアント側の座標は `layout.js` の `BX` / `BY` の配列を基準に
-  組み立てられている（`Board` が複製して `this.bx` / `this.by` として持つ）。
+  組み立てられている（`BoardView` が複製して `this.bx` / `this.by` として持つ）。
   位置を直すときはこの配列を見る

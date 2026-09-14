@@ -5,16 +5,16 @@
 //
 //   node --test tests/browser/
 //
-// turn >= 2 のとき、Roll を押した 2 秒後に dice[0] の
-// on_mouse_down_xy() が自動で呼ばれる (RollButton.on_mouse_down_xy())。
-// この自動クリックの this がずれていても、free move でないときは
+// turn >= 2 のとき、Roll を押した 2 秒後に dice[0] を押したことになる
+// (BoardController.roll() が click_dice(player, 0) を予約する)。
+// 押すダイスを取り違えていても、free move でないときは
 // 押したダイスの目を読まない枝を通るので、見た目には気づけない。
 // そこで free move でも 1 件見る。
 //
 // ダイスの目は roll() が乱数で決めるので、振ったあとに
 // dice を送ってサーバ経由の値へ置き換えてから 2 秒を待つ。
 // **ローカルに set() するだけでは足りない** (roll() が送った
-// メッセージへの返事が届いて、apply() が上書きしてしまう)。
+// メッセージへの返事が届いて、描画が上書きしてしまう)。
 //
 // 各 it は先頭で set_opening() を呼んで turn とダイスを置き直し、
 // free move も毎回設定するので、**書いた順に依存しない**
@@ -131,7 +131,7 @@ describe('先手決め (opening roll)', () => {
        });
 
     it('free move でも、自動クリックが dice[0] を進める', async () => {
-        // 自動クリックの this が RollButton になっていると、
+        // 自動クリックの this を取り違えていると、
         // free move の枝で押したダイスを取り違え、
         // ダイスが NaN になる (TODO-041)
         await set_free_move(page, true);

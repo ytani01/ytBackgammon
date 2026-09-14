@@ -139,7 +139,7 @@ describe('ブラウザでの基本の動作確認', () => {
 
     it('積み順は gameinfo の idx で決まる', async () => {
         // 積み順を決めているのは rules/position.js の checker_order() だけで、
-        // apply() の配り直しと checkers_at() の両方がこれを使う
+        // render() の配り直しと checkers_at() の両方がこれを使う
         // (TODO-044)。初期配置では idx の順と (player, i) の順が
         // たまたま一致するので、入れ替えて確かめる。
         //
@@ -155,7 +155,7 @@ describe('ブラウザでの基本の動作確認', () => {
         gi.board.checker[0][0][1] = 4;
         gi.board.checker[0][4][1] = 0;
 
-        // apply() はサーバへ何も送らない (TODO-051)
+        // receive() はサーバへ何も送らない (TODO-051)
         await apply_gameinfo(page1, gi);
         const r = { before, ...await stack(page1, 6) };
         await apply_gameinfo(page1, save);  // 後始末

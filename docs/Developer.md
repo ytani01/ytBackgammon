@@ -110,11 +110,11 @@ graph TD
   `player * 100 + i`**。`idx` はそのポイントでの積み順。クライアントの
   `Checker` はプレーヤーと通し番号を数値で持つ
 - **チェッカーの位置は、クライアントもこの `checker` でしか持たない。**
-  ポイントの部品（`BoardPoint`）は座標の計算だけで、「そのポイントに
-  どの駒があるか」は毎回 `gameinfo` から引く（`rules/position.js` の
-  `checkers_at()`）。駒の積み順を決めているのは `rules/position.js` の
-  `checker_order()` だけで、`Position.from_gameinfo()` も表示の配り直し
-  （`Board.checker_order()`）もこれを使う
+  ポイントは `layout.js` の座標計算（`checker_geometry()` と当たり判定の
+  `point_at()`）だけで、「そのポイントにどの駒があるか」は毎回 `gameinfo` から
+  引く（`rules/position.js` の `checkers_at()`）。駒の積み順を決めているのは
+  `rules/position.js` の `checker_order()` だけで、`Position.from_gameinfo()` も
+  表示の配り直し（`BoardView.render()`）もこれを使う
 - ポイント番号は 0〜25 が盤上（0 と 25 がゴール）、**26 と 27 がバー**。
   プレーヤー 0 は番号が減る方向、1 は増える方向へ進む
 
@@ -196,7 +196,7 @@ sequenceDiagram
 `on_json()` は `server.py` の 1 つの登録表 `MESSAGE_TYPES` で動く。1 行が
 「`data` の dataclass・ハンドラ・履歴に積むか」で、**type を足すときに直すのは
 この表（と dataclass とハンドラ）だけ**。音やダイスの回転が要るときは、クライアントの
-`Board.apply()` にも足す。登録表に無い `type` は、警告を出して無視する。
+`board_controller.js` の `effects_for()` にも足す。登録表に無い `type` は、警告を出して無視する。
 
 履歴に積むかは type ごとに決まっている。名前付きの操作と、盤面を書き換える
 free move・名前・得点の操作は積む。クロックの操作は `GameInfo` を書き換えないので
@@ -229,9 +229,10 @@ free move・名前・得点の操作は積む。クロックの操作は `GameIn
 - **予測が外れても、サーバから届く `gameinfo` で表示は戻る**
 - 予測に失敗したら何も送らない
 - free move の駒の移動は予測しない（ルール判定を通らないので行き先を確かめられない）
-- **予測を表示するときは、`clock_state` と `last_op` を渡さない。** 渡すと、
-  クロックは古い残り時間から数え直しになり、音は返事の分と二重に鳴る
-- 予測した `gameinfo` は、表示したあとそのまま `board.gameinfo` になり、
+- **予測は `BoardController.predict()` で表示し、クロックの基準と演出には触れない。**
+  触ると、クロックは古い残り時間から数え直しになり、音は返事の分と二重に鳴る
+  （サーバから届いたときの入口 `receive()` だけが、`clock_state` と `last_op` を読む）
+- 予測した `gameinfo` は、表示したあとそのまま `BoardController` の `gameinfo` になり、
   次の予測はそれを土台にする（返事を待たずに続けて操作した分が効くのはこのため）。
   そのかわり、予測を表示してから返事が届くまでの間に、他のクライアントの
   操作による `gameinfo` が届くと、予測で変えた表示がいったん戻る。サーバの返事で必ず直る
@@ -245,17 +246,20 @@ free move での目の変更と、得点の ▲▼（free move に限らない�
 - Roll を押した直後に ▲ や free move のダイスを押すと、予測の表示で
   Roll ボタンがもう一度出ることがある（ダイスがまだ 0 のため）
 
-離したときの流れは、`Drag`（`drag.js`）が掴んでいたものを外し、`actions.js` の
-`drop_checker()` を呼ぶ。`drop_checker()` は `Board.plan_move()` を通して
-`rules/actions.js` の `plan_move()`（`decide_dst()` で行き先とヒットを決め、予測と
-送る `move` を作る）を呼び、`move` を送ってから予測を `apply()` する。
+離したときの流れは、`BoardView` の中の `Drag` が掴んでいたものを外し、
+`BoardController.drop_checker()` に駒の ID とポイント番号を渡す。
+`drop_checker()` は `BoardController.plan_move()` を通して `rules/actions.js` の
+`plan_move()`（`decide_dst()` で行き先とヒットを決め、予測と送る `move` を作る）を
+呼び、`move` を送ってから予測を `predict()` する。
 `false` が返ったら（行けない、予測に失敗した）、`Drag` が駒を元の位置へ戻す。
-予測の入口は `Board.plan_move()` の 1 か所で、ブラウザテストはここを差し替えて
-予測を外す・失敗させる（ES Modules の export は外から差し替えられないため）。
+予測の入口は `BoardController.plan_move()` の 1 か所で、ブラウザテストはここを
+差し替えて予測を外す・失敗させる（ES Modules の export は外から差し替えられないため）。
 
 **掴んでいた駒を外してから `drop_checker()` を呼ぶ順番は変えないこと。**
-`apply()` は掴んでいる駒を手元の座標に残すので、逆にすると先行実行の表示で
-駒が動かない。**この順番はテストでは守られない**（逆にしてもテストは通る）。
+`BoardView.render()` は掴んでいる駒を手元の座標に残すので、逆にすると先行実行の
+表示で駒が動かない。**この順番はテストでは守られない**（逆にしてもテストは通る）。
+駒を押したときは、**押した駒を掴めるか確かめてから**、そのポイントの先端の駒へ
+持ち替える。
 
 ### 音とダイスの回転
 
@@ -309,6 +313,17 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 - 持ち時間と `sw` の変更は履歴に積まないので、ハンドラが自分で保存する
   （しないと、変えたあと再起動すると元に戻る）
 
+クライアントでは、`BoardController` が基準の残り時間・`active`・`sw`・`limit` を
+持ち、**サーバから届いた `clock_state` だけから作る。** 履歴の返事でも全部反映する
+（クロックは履歴の対象外なので巻き戻らない）。表示は 200 ms ごとに
+`snapshot(now)` で計算し、`BoardView.render_clock()` に渡す。
+
+- **ヘッダの Clock のチェックボックスは `set_clock_switch` を送るだけ。**
+  計算も時計の表示・非表示も、チェックボックスの表示も、返事の `clock_state` で変わる
+- クロックを押したときの `stop_clock` / `resume_clock` は、`BoardController` の
+  `active` と `sw` から選ぶ
+- 最初の返事が届く前の設定は、ヘッダの HTML の初期値から作る
+
 ## クライアント側（`src/ytbg/webroot/static/js/`）
 
 **ES Modules で、バンドラは使わない。** `index.html` は
@@ -318,29 +333,46 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 
 | モジュール | 役割 |
 |------------|------|
-| `main.js` | エントリ。DOM を作り、`Board` を作り、WebSocket をつなぐ |
+| `main.js` | エントリ。DOM を作り、画像を待って `Settings`・`BoardView`・`BoardController` を組み、ヘッダ・メニュー・キーボードをつなぎ、WebSocket をつなぐ |
 | `dom.js` | 盤面の要素を作って返す（チェッカー 30 個、ダイス 8 個など） |
-| `board.js` | `Board`。表示部品を作り、`gameinfo` を表示に反映する |
-| `actions.js` | サーバへ送る操作。判定と送る内容は `rules/actions.js` に任せ、返った内容を送り、予測を `apply()` する |
-| `drag.js` | `Drag`。チェッカーとキューブを掴む・動かす・離す |
+| `board_controller.js` | `BoardController`。盤面の状態（`gameinfo`）・履歴の番号・クロックの基準、操作ごとのメソッド、先手決めと時計のタイマー。`effects_for()`（鳴らす音と回すダイス） |
+| `board_view.js` | `BoardView`。表示部品と入力、`render()`・`render_clock()`・`play_effects()`。掴む・動かす・離すの `Drag` |
 | `ws.js` | 接続・再接続・送信 |
-| `layout.js` | 盤面の座標 |
+| `layout.js` | 盤面の座標（部品の位置、駒の積み位置 `checker_geometry()`、ポイントの当たり判定 `point_at()`） |
 | `settings.js` | `Settings`（音、free move、PIP の表示、プレーヤー番号）、Cookie、クエリ文字列、`<body>` の `data-*` |
 | `sound.js`, `log.js` | 音、ログ（`?debug` を付けて開いたときだけ出す） |
 | `rules/` | ルール層（純粋関数） |
 | `ui/` | 表示部品 |
 
 **`index.html` の中身は `<header>` と空の `<div id="board">` だけ**で、
-盤面の要素は `dom.js` が作り、`main.js` が `Board` に渡す。表示部品は
+盤面の要素は `dom.js` が作り、`main.js` が `BoardView` に渡す。表示部品は
 id で要素を探し直さず、渡された要素を使う。
 
-**サーバへ送るのは `actions.js` だけ。** 表示部品はマウスの処理と表示だけを受け持ち、
-`Board.apply()`（表示の更新）もサーバへは何も送らない。「押してよいか」の判定は
-`rules/actions.js` が、表示部品が持つ値ではなく `board.gameinfo` とチェッカーの ID から行う。
-表示部品に残っている盤面の値は `Checker.cur_point` だけで、`apply()` が
+```text
+main.js ── 組み立て・起動
+  ├─ BoardController ── rules/
+  │       ├─ 送信関数（ws.js の emit_msg）
+  │       └─ BoardView ── ui/・layout.js・Drag
+  └─ Settings・音
+```
+
+**状態の持ち主は `BoardController` だけ。** サーバから届いた `data` は
+`receive()` が受け取り、変更前の盤面を控え、`gameinfo` とクロックの基準を
+置き換え、`BoardView.render(snapshot)` で描画してから `play_effects()` で
+音とダイスの回転を出す。`BoardView` は snapshot を保存も書き換えもせず、
+その場で描画する。
+
+**サーバへ送るのは `BoardController` だけ**（送信関数は `main.js` が渡す）。
+`BoardView` は入力を受けると、`connect()` で受け取った `BoardController` の
+メソッドを、駒の ID・値・盤面の座標で呼ぶ。`BoardView` と `ui/` は
+`BoardController` を import しない。「押してよいか」の判定は `rules/actions.js` が、
+表示部品が持つ値ではなく `BoardController` の `gameinfo` とチェッカーの ID から行う。
+表示部品に残っている盤面の値は `Checker.cur_point` だけで、`render()` が
 `gameinfo` と一緒に書き直す。
 `gameinfo` がまだ届いていないときは、盤面を読む操作（ロール、ダイス、チェッカー、
 キューブ、投了、得点）は何もしない。名前・クロック・履歴の操作は送る。
+
+`main.js` はデバッグ用に `window.board = {controller, view}` を公開する。
 
 キャッシュ避けを `?ts=` 付きの URL で行わないのは、`import` した先の
 モジュールに効かないため。`<meta http-equiv>` も今のブラウザは見ないので、
@@ -348,12 +380,12 @@ id で要素を探し直さず、渡された要素を使う。
 
 ### 気をつけること
 
-- **モジュールの中で素の `board` を書かないこと。** `this.board` か、受け取った
-  `board` を使う。`index.html` に `<div id="board">` があり、id を持つ要素は
+- **モジュールの中で素の `board` を書かないこと。** `index.html` に
+  `<div id="board">` があり、id を持つ要素は
   `window` の名前付きプロパティになるので、`window.board`（デバッグ用）が
   無くても ReferenceError にならず、黙って DIV を掴む
 - **盤面の要素は、画像の読み込みより前に作る。** `BgImage` は `<img>` の幅と
-  高さから大きさを決めるので、読み込み前に `Board` を組むと幅が 0 になって
+  高さから大きさを決めるので、読み込み前に `BoardView` を組むと幅が 0 になって
   配置が崩れる。これを防いでいるのは、`main.js` が `build_dom()` をモジュールの
   評価時（`load` より前）に呼んでいること。そこで作った `<img>` が `load`
   イベントを遅らせるので、`window.onload` の時点で読み込みが済んでいる。
@@ -364,32 +396,41 @@ id で要素を探し直さず、渡された要素を使う。
 - `Drag` は、掴んだ位置をチェッカー用とキューブ用で別に持つ。free move なら
   マルチタッチで両方を同時に掴めるので、1 組にするとキューブを離したときに
   テイクやリダブルが送られない
-- `log.js` と `settings.js` は互いに import しているので、`settings.js` の
-  トップレベルで `log()` を呼ばないこと。評価の順によっては ReferenceError になる
+- **受信しても、掴んでいる駒とキューブは見た目の座標と z を手元に残す。**
+  共有ボードなので、掴んでいる間にも他の人の操作で `gameinfo` が届く
+- 振ったダイスの回転は、`render()` がダイスを置いた直後、スタイルが確定する前に
+  `play_effects()` が掛ける。`render()` の中でダイスを最後に置いているのはこのため
+  （間に要素の大きさを読む処理が入ると、ダイスが出てくる動きが消える）
+- 入力のリスナーは、要る部品にだけ `BoardView.listen()` がつなぐ。押す・離す・
+  動かすの 3 つとも登録し、使わないものも既定の動作（スクロールや選択）を止める。
+  盤面の要素にもつないであるので、中の文字（PIP など）を押しても選択にならない
+- 先手決めで Roll を押したあとの 2 秒後の自動クリックと、200 ms の時計の更新は
+  `BoardController` のタイマー。受信のたびに予約し直さない。自動クリックは、
+  予約するときに相手のダイスが出ているかを見て、実行するときの最新の盤面で判定する
 - `?sound=`（`=` はあるが値が空）は「値が無い」扱いで、音が鳴る側になる。
   `URLSearchParams` では `?sound` と区別できないため
 
 ### ルール層（`rules/`）
 
-**DOM も `Board` も見ず、値を返すだけ。** import してよいのは `rules/` の中だけ。
+**DOM も表示部品も見ず、値を返すだけ。** import してよいのは `rules/` の中だけ。
 
 | ファイル | 中身 |
 |----------|------|
 | `position.js` | `Position` と `goal_point()` / `bar_point()` / `get_pip()` / `copy_gameinfo()` / `checker_order()` / `checkers_at()` / `active_dice()` / `has_dice()` |
 | `move.js` | `calc_dst_point()` / `all_inner()` / `dst_point()` / `dst_points()` / `usable_dice()` / `disable_unusable()` / `dice_for_move()` |
 | `judge.js` | `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()` |
-| `actions.js` | 操作ごとの判定と送る内容（`can_pick_checker()` / `decide_dst()` / `plan_move()` / `predict_moves()` / `plan_put_checker()` / `plan_roll()` / `plan_dice_click()` / `can_hold_cube()` / `plan_double()` / `plan_cube_drop()` / `plan_resign()` / `plan_score()`） |
+| `actions.js` | 操作ごとの判定と送る内容（`can_pick_checker()` / `decide_dst()` / `plan_move()` / `plan_put_checker()` / `plan_roll()` / `plan_dice_click()` / `can_hold_cube()` / `plan_double()` / `plan_cube_drop()` / `plan_resign()` / `plan_score()`） |
 
 `rules/actions.js` の `plan_*()` は、成り立たなければ `null`、成り立てば
 `{message: {type, data}}` と、要るときだけ `predicted`（予測した `gameinfo`）を返す。
 表示の指示は返さない。判定の無い操作（`end_turn`、`take`、`cancel_double`、名前・
 履歴・時計の設定）には plan の関数を作らない。`take` / `cancel_double` と、ダイスを
 使い切ったあとの `end_turn` は、判定のある `plan_cube_drop()` / `plan_dice_click()` が
-返す。パスのバナーの `end_turn` と、名前・履歴・時計の設定は `actions.js` が直接送る。
-乱数（ダイスの位置と目）は `actions.js` が作って `plan_roll()` に渡す。
+返す。パスのバナーの `end_turn` と、名前・履歴・時計の設定は `BoardController` が直接送る。
+乱数（ダイスの位置と目）は `BoardController` が作って `plan_roll()` に渡す。
 
-表示の更新は `Board` の側で行う。
-`Board.position()` が `gameinfo` から `Position` を作って渡す。
+表示の更新は `BoardView` の側で行う。バナー・PIP・名前の強調は、`render()` が
+snapshot の `gameinfo` から `Position` を作り、`rules/` の判定で決める。
 
 **この層だけが `node --test tests/js/` で単体テストできる。**
 DOM を触るクラスは単体テストせず、ブラウザでの確認で見る。
@@ -398,34 +439,37 @@ DOM を触るクラスは単体テストせず、ブラウザでの確認で見�
 
 ```mermaid
 graph TD
-    BgBase["BgBase<br/>(座標・マウス操作)"] --> BgText
+    BgBase["BgBase<br/>(座標・移動・回転)"] --> BgText
     BgBase --> BgImage
-    BgBase --> BoardPoint
     BgText --> PlayerClock
     BgText --> PlayerName
     BgText --> PlayerPipCount
     BgText --> PlayerScore
-    BgImage --> Board
     BgImage --> Cube
     BgImage --> Checker
     BgImage --> Dice
-    BgImage --> InverseButton
-    BgImage --> ResignButton
-    BgImage --> EmitButton
     BgImage --> ScoreButton
     BgImage --> BannerButton
     BannerButton --> RollButton
 ```
 
-`board` と `player` は中間クラスを作らず、コンストラクタの options で渡す。
-表示部品のほかに、`Drag`（`drag.js`）と `Settings`（`settings.js`）がある。
+**表示部品は、盤面の状態・`Settings`・操作の関数を参照しない。** DOM の移動・
+回転・表示だけを受け持ち、渡された値を表示する。`player` は中間クラスを作らず、
+コンストラクタの options で渡す。入力の座標は、`BgBase.get_xy()` が
+`BoardView` から渡された変換（盤面の位置と向き）で盤面の座標に直す。
+押したときの処理を持つ部品は無く、`BoardView` がつなぐ。
+
+盤面の画像と、投了・戻す・進める・回転のボタンは、ただの `BgImage`。
+Roll ボタンはダイスを持たず、ダイスは `BoardView` が Roll ボタンの横に並べて持つ。
+`Dice.set()` は目の画像・不透明度・定位置を、`animate_roll()` は回転だけを受け持つ。
 
 部品の座標は `layout.js` が計算して返し（`point_geometry()` /
-`score_geometry()` / `label_geometry()`）、部品を作るのは `Board` の
-コンストラクタ。`layout.js` は何も import しない。
+`checker_geometry()` / `score_geometry()` / `label_geometry()`）、部品を作るのは
+`BoardView` のコンストラクタ。`layout.js` は何も import しない。
 
-**表示を変えるのは `Board.apply()` だけ。** サーバから届いた `gameinfo` も、
-先行実行の予測も、同じ入口を通る。
+**盤面を表示に反映するのは `BoardView.render()` だけ。** サーバから届いた
+`gameinfo` も、先行実行の予測も、同じ入口を通る（時計の毎回の更新と、押した直後に
+Roll ボタンやパスのバナーを隠す操作を除く。隠したものは次の描画で状態から決め直す）。
 
 ## テスト
 

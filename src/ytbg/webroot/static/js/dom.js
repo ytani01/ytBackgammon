@@ -7,7 +7,7 @@
 // ベタ書きされていた。ここで作る形 (id・親子の並び・<img> の src /
 // width / style) は、そのときの index.html と同じにしてある。
 //
-//  - build_dom() は作った要素を返し、main.js が Board へ渡す。
+//  - build_dom() は作った要素を返し、main.js が BoardView へ渡す。
 //    表示部品は id ではなく要素を受け取る (TODO-054)。id 属性は
 //    tests/browser/ が要素を探すのに使うので残してある
 //  - BgImage は el.children[0] を画像として読む
@@ -102,7 +102,7 @@ function create_name_input(player) {
  * @param {Object} els - 作った要素をここへ入れる
  */
 function build_board(dir, board_el, els) {
-    // 盤の下地。Board 自身が BgImage なので、children[0] はこれ
+    // 盤の下地。BoardView の盤面の BgImage が、children[0] としてこれを読む
     board_el.appendChild(create_img(dir, "board-base.png"));
 
     // クロック
@@ -230,9 +230,9 @@ function build_side(dir, body_el, els) {
  *
  * index.html にあるのは <header> と空の <div id="board"> だけ。
  *
- * 作った要素を返す (TODO-054)。キーは Board のフィールド名に近い名前にする
+ * 作った要素を返す (TODO-054)。キーは BoardView のフィールド名に近い名前にする
  * (name は player_name、clock は player_clock に渡す。name_input と clock_bg
- * は PlayerName と PlayerClock に、dice は RollButton に渡すもので、Board に
+ * は PlayerName と PlayerClock に渡すもので、BoardView に
  * 同じ名前のフィールドは無い)。プレーヤーごとのものは [0 の分, 1 の分] の
  * 配列にする。
  *
@@ -268,7 +268,7 @@ export function build_dom() {
  * 画像がすべて読み込み終わるのを待つ。
  *
  * BgImage のコンストラクタは <img> の width / height を読んで大きさを
- * 決めるので、読み込み前に Board を組むと幅が 0 になって配置が崩れる。
+ * 決めるので、読み込み前に BoardView を組むと幅が 0 になって配置が崩れる。
  *
  * 読めない画像があっても止めない (allSettled)。
  *

@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: TODO-060。** これまでに 61 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-063` から。**
+**残っている項目: TODO-063。** これまでに 62 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-064` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -17,42 +17,18 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 **TODO-049 で決めた構成の見直し（第 3 弾）の実装（TODO-050〜055）も、
 2026-09-14 に全部終わった。** 設計は `archives/docs/design-3.md` に移した。
 
-**TODO-056 で決めた構成の見直し（第 4 弾）は、TODO-057〜060 で実装する。**
-設計は `docs/design-4.md` にあり、この順に進める（どれも前の項目のあとに行う）。
+**TODO-056 で決めた構成の見直し（第 4 弾）の実装（TODO-057〜060）も、
+2026-09-15 に全部終わった。** 設計は `archives/docs/design-4.md` に移した。
 
 ---
 
-## TODO-060. BoardController と BoardView を入れる
+## TODO-063. 複数サーバーの制御
 
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] `board_controller.js` / `board_view.js` を作り、状態・操作・時計の計算、入力・layout・演出を移す
-- [ ] `ui/` の部品から board・Settings・操作の関数への参照を無くす。`BoardPoint` を `layout.js` の座標計算にする
-- [ ] `log.js` がクエリを直接読むようにして、`settings.js` と `log.js` の循環を無くす
-- [ ] `actions.js` と今の `Board`、要らなくなった委譲を消す
-- [ ] **Clock のチェックボックスは `set_clock_switch` を送るだけにし、計算も表示も返事の `clock_state` で変える**
-- [ ] **履歴の返事でも `clock_state` を全部反映する**
-- [ ] **キューブを掴んでいる間に受信しても、手元に残す**
-- [ ] **サーバが返事に `history_flag` を載せるのをやめる**（`server.py`、`main.js`、`tests/test_on_json.py`、`tests/browser/clicks.test.mjs`）
-- [ ] `helper.mjs` の中を新しい構成に合わせる。`window.board` は `{controller, view}`
-- [ ] Developer.md を直す
-- [ ] `docs/design-4.md` を `archives/docs/design-4.md` へ移し、CLAUDE.md に現行仕様ではないことを書く
-
-設計は `docs/design-4.md` の「クライアントの構成」「変える挙動」「実装項目の分け方」の 4 にある。
-
-- **今の `Board` を Controller と並べて状態の持ち主として残す途中の段階は作らない**
-- **作らないもの:** `BoardModel`、`config.js`、`dispose()` と入力の解除用の関数、
-  `present()` の中間の値、判定の無い `plan_*` の関数（設計案の「設計確認で決めたこと」の 6）
-- 変える挙動は上の 4 つだけ。それぞれテストを足し、変える前のコードで落ちることを確かめる
-- **画像の読み込みを待ってから組み立てる順番（TODO-029）は変えない。**
-  テストでは守られないので、触れたら画像の応答を遅らせて配置を実測する
-- テスト本体は変えず、helper の中だけを直す（`history_flag` を見ている箇所は除く）。本体を変えたくなったら、
-  その理由を報告に書く
-- サーバの構成は変えない（Session・protocol への分割と結果の型はやめた。TODO-061）
-- reviewer は、rules と Controller が DOM なしで動く、ui がゲームの状態や操作の関数を
-  参照しない、import の循環が無い、状態とタイマーの持ち主が 1 つずつ、の 4 つを見る
+ytbgの複数のサーバーを立ち上げ、すべてのボードを一覧できるサービスサイト(サーバー)を作る。
+- 複数サーバーの起動・停止を制御できる。
+- ytbgのサブコマンドとして作る。
+- 1ページに複数ボードを並べて表示する。(iframeなどを使う)
+- 個々のボードは個々のサーバーが制御する。
 
 ---
 
@@ -61,6 +37,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-060.** BoardController と BoardView を入れる](archives/todo/TODO-060.%20BoardController%20と%20BoardView%20を入れる.md)
 - [**TODO-059.** 盤面の参照と操作の予測を純粋関数へ移す](archives/todo/TODO-059.%20盤面の参照と操作の予測を純粋関数へ移す.md)
 - [**TODO-062.** ブラウザテストで画面を表示するモードに切り替えられるようにする](archives/todo/TODO-062.%20ブラウザテストで画面を表示するモードに切り替えられるようにする.md)
 - [**TODO-058.** ブラウザテストが `board` を触る箇所を `helper.mjs` に集める](archives/todo/TODO-058.%20ブラウザテストが%20%60board%60%20を触る箇所を%20%60helper.mjs%60%20に集める.md)

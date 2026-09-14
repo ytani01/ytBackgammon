@@ -1,16 +1,17 @@
 //
 // (c) Yoichi Tanibayashi
 //
-// Board がルール層 (rules/) を呼んでいることの確認 (TODO-027)。
+// ページの中の gameinfo と、ルール層 (rules/) の結果が合っているかの確認
+// (TODO-027)。
 //
 //   node --test tests/browser/
 //
-// rules/ そのもののテストは tests/js/ にある。ここで見るのは
-// 「Board が rules/ につながっているか」だけ。
-//
-// 既存の board.test.mjs / clicks.test.mjs はドラッグを free move で
-// 行うので、ルール判定を通らない。つなぎ間違えても気づけないため、
-// 判定を呼ぶ経路をここで押さえる。
+// rules/ そのもののテストは tests/js/ にある。ここで見るのは、ページで
+// 読み込んだ rules/ に BoardController の gameinfo を渡した結果
+// (枚数・PIP・勝ち・クローズアウト・行き先) と、PIP の表示が、
+// 盤面と合っているか。helper の judge() などは rules/ を直接呼ぶので、
+// BoardView がルール層を呼ぶ経路 (バナーの判定など) はここでは見ていない。
+// PIP の表示だけは BoardView.render() が書いた値を読む。
 //
 // **it の順番に依存しない。** ページは 1 つを使い回すが、盤面を変える
 // it は自分で元に戻し、beforeEach が初期配置であることを確かめてから
@@ -20,15 +21,15 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
 import {
-    dst_points, gameinfo, judge, launch_browser, open_board, pip_count,
-    put_checker_local, start_server,
+    apply_gameinfo, dst_points, gameinfo, judge, launch_browser, open_board,
+    pip_count, put_checker_local, shown_banners, start_server,
 } from './helper.mjs';
 
 /** プレーヤー 0 の PIP の表示 (要素の中身) */
 const pip_text = page => page.evaluate(
     () => document.getElementById('p0pip').innerHTML);
 
-describe('Board とルール層のつながり', () => {
+describe('gameinfo とルール層の結果', () => {
     let server = undefined;
     let browser = undefined;
     let page = undefined;
@@ -121,6 +122,57 @@ describe('Board とルール層のつながり', () => {
         const co = (await judge(page)).closeout;
         assert.deepEqual(co, [false, false]);
     });
+
+    it('相手に閉め出されている手番では、パスのバナーが出る', async () => {
+        // プレーヤー 1 がインナー (19〜24) に 2 枚ずつ、残りはゴール。
+        // プレーヤー 0 は 1 枚がバー (26)、残りは 6 に積む。手番は 0
+        const orig = await gameinfo(page);
+        const gi = structuredClone(orig);
+        gi.turn = 0;
+        gi.resign = -1;
+        gi.board.dice = [[0, 0, 0, 0], [0, 0, 0, 0]];
+        gi.board.checker[1] = Array.from({ length: 15 }, (_, i) => (
+            i < 12 ? [19 + Math.floor(i / 2), i % 2] : [25, i - 12]));
+        gi.board.checker[0] = Array.from({ length: 15 }, (_, i) => (
+            i === 0 ? [26, 0] : [6, i - 1]));
+        try {
+            await apply_gameinfo(page, gi);
+            const closed = await shown_banners(page);
+
+            gi.board.checker[0][0] = [13, 0];
+            await apply_gameinfo(page, gi);
+            const open = await shown_banners(page);
+
+            assert.deepEqual(closed.pass, [true, false],
+                             '閉め出されているのにパスのバナーが出ない');
+            assert.deepEqual(open.pass, [false, false],
+                             '閉め出されていないのにパスのバナーが出る');
+        } finally {
+            await apply_gameinfo(page, orig);
+        }
+    });
+
+    it('上がった盤面では、勝った側に勝ちのバナーが出て名前が強調される',
+       async () => {
+           // 勝ちの点数は表示に出ない (バナーを出すかの判定だけに使う)。
+           // プレーヤー 0 が全部ゴール、turn は -1
+           const orig = await gameinfo(page);
+           const gi = structuredClone(orig);
+           gi.turn = -1;
+           gi.resign = -1;
+           gi.board.dice = [[0, 0, 0, 0], [0, 0, 0, 0]];
+           gi.board.checker[0] = Array.from(
+               { length: 15 }, (_, i) => [0, i]);
+           try {
+               await apply_gameinfo(page, gi);
+               const s = await shown_banners(page);
+               assert.deepEqual(
+                   { win: s.win, name_on: s.name_on },
+                   { win: [true, false], name_on: [true, false] });
+           } finally {
+               await apply_gameinfo(page, orig);
+           }
+       });
 
     it('行き先の計算が player ごとの向きになっている', async () => {
         const dst = { p0: await dst_points(page, 0, 24, [3]),

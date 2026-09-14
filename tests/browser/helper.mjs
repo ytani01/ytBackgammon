@@ -5,6 +5,8 @@
 //
 // サーバを実プロセスとして起動 → chromium でページを開く →
 // 操作する → ページの中の board を読む、という流れを組み立てる。
+// ページの中の board は main.js が公開する {controller, view}
+// (BoardController と BoardView)。
 //
 // **テスト本体はページの中の board を直接触らない。** 盤面を読む、
 // 受信を差し替える、予測を観測する、といった操作は下の関数を通す。
@@ -239,6 +241,22 @@ export async function center_of(page, selector) {
 }
 
 /**
+ * 要素の CSS の transition が終わるまで待つ。
+ *
+ * 描画で位置が変わる部品 (キューブは 0.3 秒かけて動く) は、動いている
+ * 途中で center_of() を読むと、マウスを下ろしたときにはもう別の場所にある。
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} selector
+ * @return {Promise<void>}
+ */
+export async function wait_still(page, selector) {
+    await page.waitForFunction(
+        sel => document.querySelector(sel).getAnimations().length === 0,
+        selector);
+}
+
+/**
  * 条件が成り立つまで待つ。成り立った時点の値を返す。
  *
  * @param {function(): Promise<any>} get - 値を取る
@@ -309,7 +327,7 @@ export function send_msg(page, type, data) {
  * @param {number} turn
  */
 export async function set_turn(page, turn) {
-    const cur = await page.evaluate(() => board.gameinfo.turn);
+    const cur = await page.evaluate(() => board.controller.gameinfo.turn);
     if (cur === turn) {
         return;
     }
@@ -325,14 +343,14 @@ export async function set_turn(page, turn) {
         throw new Error(`set_turn: ${cur} -> ${turn} はできない`);
     }
     await wait_for(
-        () => page.evaluate(() => board.gameinfo.turn),
+        () => page.evaluate(() => board.controller.gameinfo.turn),
         t => t === turn, { msg: `set_turn(${turn})` });
 }
 
 /**
  * 画面に出ているダイスの目を、表示から読む (TODO-052)。
  *
- * ダイスは目を持たない (表示は apply() が gameinfo から作る) ので、
+ * ダイスは目を持たない (表示は BoardView.render() が gameinfo から作る) ので、
  * 要素の状態から戻す。隠れている (z が負) なら 0、暗い (opacity 0.5) なら
  * 11〜16、それ以外は画像のファイル名の数字。gameinfo.board.dice と
  * 比べれば、表示まで届いたかが分かる。
@@ -342,10 +360,22 @@ export async function set_turn(page, turn) {
  * @return {Promise<number[]>}
  */
 export async function shown_dice(page, player) {
-    const els = await page.evaluate(p => board.roll_btn[p].dice.map(
+    const els = await page.evaluate(p => board.view.dice[p].map(
         d => ({ z: d.z, src: d.image_el.src,
                 opacity: d.image_el.style.opacity })), player);
     return dice_from_els(els);
+}
+
+/**
+ * ダイスの要素の回転 (style.transform) を読む。隠れているものも含めて 4 個
+ *
+ * @param {import('playwright').Page} page
+ * @param {number} player
+ * @return {Promise<string[]>} - 例: "rotate(180deg)"
+ */
+export function dice_transforms(page, player) {
+    return page.evaluate(p => [0, 1, 2, 3].map(
+        i => document.getElementById(`dice${p}${i}`).style.transform), player);
 }
 
 /**
@@ -390,13 +420,13 @@ export async function wait_board(page, { received = true } = {}) {
     if (!received) {
         await page.waitForFunction(
             () => typeof board !== 'undefined' && board !== undefined
-                && board.cube !== undefined);
+                && board.view !== undefined);
         return;
     }
     await page.waitForFunction(
         () => typeof board !== 'undefined' && board !== undefined
-            && board.checker !== undefined
-            && board.checker[0][0].cur_point !== undefined);
+            && board.view !== undefined
+            && board.view.checker[0][0].cur_point !== undefined);
 }
 
 // --- 盤面を読む ---
@@ -408,7 +438,7 @@ export async function wait_board(page, { received = true } = {}) {
  * @return {Promise<Object|undefined>}
  */
 export function gameinfo(page) {
-    return page.evaluate(() => board.gameinfo);
+    return page.evaluate(() => board.controller.gameinfo);
 }
 
 /**
@@ -420,20 +450,20 @@ export function gameinfo(page) {
  */
 export function settings(page) {
     return page.evaluate(() => {
-        const s = board.settings;
+        const s = board.controller.settings;
         return { player: s.player, sound: s.sound,
                  free_move: s.free_move, disp_pip: s.disp_pip };
     });
 }
 
 /**
- * サーバの ID (URL の ?board=N。cookie の名前に入る)
+ * サーバの ID (<body data-server-id>。cookie の名前に入る)
  *
  * @param {import('playwright').Page} page
- * @return {Promise<number>}
+ * @return {Promise<string>}
  */
 export function server_id(page) {
-    return page.evaluate(() => board.svr_id);
+    return page.evaluate(() => document.body.dataset.serverId);
 }
 
 /**
@@ -446,7 +476,7 @@ export function server_id(page) {
  *                   w: number, h: number}[][]>}
  */
 export function checkers(page) {
-    return page.evaluate(() => board.checker.map(p => p.map(ch => ({
+    return page.evaluate(() => board.view.checker.map(p => p.map(ch => ({
         id: ch.id, player: ch.player, num: ch.num, point: ch.cur_point,
         x: ch.x, y: ch.y, z: ch.z,
         w: ch.el.clientWidth, h: ch.el.clientHeight,
@@ -462,9 +492,11 @@ export function checkers(page) {
  */
 export function stack(page, point) {
     return page.evaluate(point => {
-        const at = board.checkers_at(point);
+        const at = board.controller.checkers_at(point)
+              .filter(id => id % 100 < 15)
+              .map(id => board.view.checker[Math.floor(id / 100)][id % 100]);
         return { ids: at.map(c => c.id), z: at.map(c => c.z),
-                 tip: board.top_checker(point)?.id };
+                 tip: board.view.top_checker(point)?.id };
     }, point);
 }
 
@@ -478,12 +510,13 @@ export function stack(page, point) {
  */
 export function dragging(page) {
     return page.evaluate(() => {
-        const ch = board.drag.checker;
+        const drag = board.view.drag;
+        const ch = drag.checker;
         if (ch === undefined) {
             return undefined;
         }
         return { id: ch.id, point: ch.cur_point, x: ch.x, y: ch.y,
-                 src: board.drag.checker_src };
+                 src: drag.checker_src };
     });
 }
 
@@ -503,14 +536,15 @@ export function dragging(page) {
 export function shown_parts(page) {
     return page.evaluate(() => {
         const both = f => [0, 1].map(f);
+        const { controller, view } = board;
         return {
-            roll_active: both(p => board.roll_btn[p].active),
-            clock_active: both(p => board.player_clock[p].active),
-            clock_limit: board.clock_limit.limit.slice(),
-            player_name: both(p => board.player_name[p].name),
-            cube_y1: board.cube.y1.slice(),
-            pip: both(p => ({ count: board.pip[p].pip_count,
-                              opacity: board.pip[p].el.style.opacity })),
+            roll_active: both(p => view.roll_btn[p].active),
+            clock_active: controller.clock.active.slice(),
+            clock_limit: controller.clock.limit.slice(),
+            player_name: both(p => view.player_name[p].name),
+            cube_y1: view.cube.y1.slice(),
+            pip: both(p => ({ count: view.pip[p].pip_count,
+                              opacity: view.pip[p].el.style.opacity })),
         };
     });
 }
@@ -526,33 +560,37 @@ export function part_el_ids(page) {
     return page.evaluate(() => {
         const both = f => [0, 1].map(f);
         const id = obj => obj.el?.id;
+        const v = board.view;
         return {
-            board: id(board), cube: id(board.cube),
-            button_resign: id(board.button_resign),
-            button_inverse: id(board.button_inverse),
-            button_fwd: id(board.button_fwd),
-            button_back: id(board.button_back),
-            checker: board.checker.map(p => p.map(ch => ({
+            board: id(v.board), cube: id(v.cube),
+            button_resign: id(v.button_resign),
+            button_inverse: id(v.button_inverse),
+            button_fwd: id(v.button_fwd),
+            button_back: id(v.button_back),
+            checker: v.checker.map(p => p.map(ch => ({
                 el_id: id(ch), player: ch.player, num: ch.num }))),
-            dice: both(p => board.roll_btn[p].dice.map(id)),
-            roll_btn: both(p => id(board.roll_btn[p])),
-            pass_btn: both(p => id(board.pass_btn[p])),
-            win_btn: both(p => id(board.win_btn[p])),
-            resign_banner_btn: both(p => id(board.resign_banner_btn[p])),
-            score: both(p => id(board.score[p])),
-            score_up: both(p => id(board.score_btn[p].up)),
-            score_down: both(p => id(board.score_btn[p].down)),
-            player_name: both(p => id(board.player_name[p])),
-            player_name_input: both(p => board.player_name[p].el_input?.id),
-            player_clock: both(p => id(board.player_clock[p])),
-            player_clock_bg: both(p => board.player_clock[p].el_bg?.id),
-            pip: both(p => id(board.pip[p])),
+            dice: both(p => v.dice[p].map(id)),
+            roll_btn: both(p => id(v.roll_btn[p])),
+            pass_btn: both(p => id(v.pass_btn[p])),
+            win_btn: both(p => id(v.win_btn[p])),
+            resign_banner_btn: both(p => id(v.resign_banner_btn[p])),
+            score: both(p => id(v.score[p])),
+            score_up: both(p => id(v.score_btn[p].up)),
+            score_down: both(p => id(v.score_btn[p].down)),
+            player_name: both(p => id(v.player_name[p])),
+            player_name_input: both(p => v.player_name[p].el_input?.id),
+            player_clock: both(p => id(v.player_clock[p])),
+            player_clock_bg: both(p => v.player_clock[p].el_bg?.id),
+            pip: both(p => id(v.pip[p])),
         };
     });
 }
 
 /**
  * 今の盤面からのルールの判定 (2 人ぶんのものは [0, 1] の配列)。
+ *
+ * ページの中で rules/ を import し、BoardController の gameinfo で呼ぶ
+ * (main.js が読んだものと同じモジュール)。
  *
  * patch を渡すと、gameinfo のその項目を判定の間だけ書き換え、
  * 判定のあとに戻す。resign は、判定したあと・戻す前の値
@@ -569,41 +607,56 @@ export function part_el_ids(page) {
  *                   resign: number}>}
  */
 export function judge(page, patch = {}) {
-    return page.evaluate(patch => {
+    return page.evaluate(async patch => {
+        const { Position, active_dice, has_dice } = await import(
+            '/static/js/rules/position.js');
+        const { closeout, winner_is } = await import(
+            '/static/js/rules/judge.js');
+        const gi = board.controller.gameinfo;
         const save = {};
         for (const k of Object.keys(patch)) {
-            save[k] = board.gameinfo[k];
-            board.gameinfo[k] = patch[k];
+            save[k] = gi[k];
+            gi[k] = patch[k];
         }
         try {
             const both = f => [0, 1].map(f);
-            const pos = board.position();
+            const pos = Position.from_gameinfo(gi);
             const points = Array.from({ length: 28 }, (_, i) => i);
             return {
                 count: points.map(i => pos.count(i)),
                 owner: points.map(i => pos.owner(i)),
-                winner: both(p => board.winner_is(p)),
-                closeout: both(p => board.closeout(p)),
-                active_dice: both(p => board.get_active_dice(p)),
-                has_dice: both(p => board.has_dice(p)),
-                resign: board.gameinfo?.resign,
+                winner: both(p => winner_is(pos, p, {
+                    resign: gi.resign,
+                    cube_value: gi.board.cube.value,
+                    cube_accepted: gi.board.cube.accepted,
+                }).score),
+                closeout: both(p => closeout(pos, p)),
+                active_dice: both(p => active_dice(gi, p)),
+                has_dice: both(p => has_dice(gi, p)),
+                resign: gi.resign,
             };
         } finally {
             for (const k of Object.keys(save)) {
-                board.gameinfo[k] = save[k];
+                gi[k] = save[k];
             }
         }
     }, patch);
 }
 
 /**
- * PIP を計算し直す [プレーヤー 0, 1]。**表示も更新する** (Board と同じ)
+ * 今の盤面の PIP [プレーヤー 0, 1]。計算するだけで、表示は変えない
+ * (表示は BoardView.render() が変える)
  *
  * @param {import('playwright').Page} page
  * @return {Promise<number[]>}
  */
 export function pip_count(page) {
-    return page.evaluate(() => [board.pip_count(0), board.pip_count(1)]);
+    return page.evaluate(async () => {
+        const { Position } = await import('/static/js/rules/position.js');
+        const { pip_count } = await import('/static/js/rules/judge.js');
+        const pos = Position.from_gameinfo(board.controller.gameinfo);
+        return [pip_count(pos, 0), pip_count(pos, 1)];
+    });
 }
 
 /**
@@ -616,15 +669,20 @@ export function pip_count(page) {
  * @return {Promise<number[]>}
  */
 export function dst_points(page, player, src, dice) {
-    return page.evaluate(([player, src, dice]) => board.get_dst_points(
-        player, src, dice), [player, src, dice]);
+    return page.evaluate(async ([player, src, dice]) => {
+        const { Position } = await import('/static/js/rules/position.js');
+        const { dst_points } = await import('/static/js/rules/move.js');
+        return dst_points(Position.from_gameinfo(board.controller.gameinfo),
+                          player, src, dice);
+    }, [player, src, dice]);
 }
 
 // --- 受信を差し替える ---
 
 /**
  * サーバから届いたことにして、gameinfo を盤面に反映する。
- * サーバへは何も送らない。opts は sec (既定 0) と last_op
+ * サーバへは何も送らない。opts は sec (既定 0) と last_op。
+ * clock_state は渡さない (クロックは変えない)
  *
  * @param {import('playwright').Page} page
  * @param {Object} gi
@@ -633,7 +691,7 @@ export function dst_points(page, player, src, dice) {
  */
 export function apply_gameinfo(page, gi, opts = {}) {
     return page.evaluate(([gi, opts]) => {
-        board.apply(gi, { sec: 0, ...opts });
+        board.controller.receive({ gameinfo: gi, sec: 0, ...opts });
     }, [gi, opts]);
 }
 
@@ -649,32 +707,26 @@ export function apply_gameinfo(page, gi, opts = {}) {
  */
 export function effects_of_apply(page, gi, last_op) {
     return page.evaluate(([gi, last_op]) => {
+        const view = board.view;
         const sound = [];
         const roll = [];
         const names = ['sound_roll', 'sound_put', 'sound_hit',
                        'sound_turn_change'];
         for (const name of names) {
-            board[name].play = () => { sound.push(name); };
+            view[name].play = () => { sound.push(name); };
         }
-        for (let p = 0; p < 2; p++) {
-            const btn = board.roll_btn[p];
-            btn.set = function (dice, roll_flag = false) {
-                if (roll_flag) {
-                    roll.push(p);
-                }
-                return Object.getPrototypeOf(this).set.call(
-                    this, dice, roll_flag);
-            };
-        }
+        view.roll_dice = function (player) {
+            roll.push(player);
+            return Object.getPrototypeOf(this).roll_dice.call(this, player);
+        };
         try {
-            board.apply(gi, { sec: 0, last_op: last_op });
+            board.controller.receive({ gameinfo: gi, sec: 0,
+                                       last_op: last_op });
         } finally {
             for (const name of names) {
-                delete board[name].play;
+                delete view[name].play;
             }
-            for (let p = 0; p < 2; p++) {
-                delete board.roll_btn[p].set;
-            }
+            delete view.roll_dice;
         }
         return { sound, roll };
     }, [gi, last_op]);
@@ -689,14 +741,13 @@ export function effects_of_apply(page, gi, last_op) {
 export function record_received_src(page) {
     return page.evaluate(() => {
         window.__seen_src = [];
-        // load_gameinfo(gameinfo, sec, history_flag, clock_state, last_op)
-        const orig_load = board.load_gameinfo;
-        board.load_gameinfo = function (...args) {
-            const last_op = args[4];
-            if ( last_op ) {
-                window.__seen_src.push(last_op.src);
+        const c = board.controller;
+        const orig_receive = c.receive;
+        c.receive = function (data) {
+            if ( data.last_op ) {
+                window.__seen_src.push(data.last_op.src);
             }
-            return orig_load.apply(this, args);
+            return orig_receive.call(this, data);
         };
     });
 }
@@ -716,20 +767,31 @@ export function record_received_src(page) {
 export function record_apply(page) {
     return page.evaluate(() => {
         window.__applied = [];
-        // 包みを重ねない (重ねると 1 回の apply() で何度も貯まる)
-        if (window.__orig_apply === undefined) {
-            window.__orig_apply = board.apply;
+        const c = board.controller;
+        // 包みを重ねない (重ねると 1 回の反映で何度も貯まる)
+        if (window.__orig_receive === undefined) {
+            window.__orig_receive = c.receive;
+            window.__orig_predict = c.predict;
         }
-        const orig = window.__orig_apply;
-        board.apply = function (gameinfo, opts = {}) {
-            const ret = orig.call(this, gameinfo, opts);
+        const push = (gameinfo, has_last_op, has_clock_state) => {
             window.__applied.push({
                 // 予測には last_op も clock_state も付かない
-                has_last_op: Boolean(opts.last_op),
-                has_clock_state: Boolean(opts.clock_state),
+                has_last_op: has_last_op,
+                has_clock_state: has_clock_state,
                 sn: gameinfo.sn,
-                point: board.checker.map(p => p.map(ch => ch.cur_point)),
+                point: board.view.checker.map(
+                    p => p.map(ch => ch.cur_point)),
             });
+        };
+        c.receive = function (data) {
+            const ret = window.__orig_receive.call(this, data);
+            push(data.gameinfo, Boolean(data.last_op),
+                 Boolean(data.clock_state));
+            return ret;
+        };
+        c.predict = function (gameinfo, opts) {
+            const ret = window.__orig_predict.call(this, gameinfo, opts);
+            push(gameinfo, false, false);
             return ret;
         };
     });
@@ -757,8 +819,9 @@ export function take_applied(page) {
  */
 export function corrupt_prediction(page, point) {
     return page.evaluate(point => {
-        const orig = Object.getPrototypeOf(board).plan_move;
-        board.plan_move = function (...args) {
+        const c = board.controller;
+        const orig = Object.getPrototypeOf(c).plan_move;
+        c.plan_move = function (...args) {
             const plan = orig.apply(this, args);
             if ( plan === null ) {
                 return plan;
@@ -780,7 +843,7 @@ export function corrupt_prediction(page, point) {
  */
 export function fail_prediction(page) {
     return page.evaluate(() => {
-        board.plan_move = function () {
+        board.controller.plan_move = function () {
             throw new Error('predict failed (test)');
         };
     });
@@ -793,7 +856,7 @@ export function fail_prediction(page) {
  * @return {Promise<void>}
  */
 export function restore_prediction(page) {
-    return page.evaluate(() => { delete board.plan_move; });
+    return page.evaluate(() => { delete board.controller.plan_move; });
 }
 
 // --- 操作する ---
@@ -808,15 +871,14 @@ export function restore_prediction(page) {
  * @return {Promise<void>}
  */
 export function send_put_checker(page, player, num, point) {
-    return page.evaluate(async ([player, num, point]) => {
-        const { put_checker } = await import('/static/js/actions.js');
-        put_checker(board, board.checker[player][num], point);
+    return page.evaluate(([player, num, point]) => {
+        board.controller.put_checker(player * 100 + num, point);
     }, [player, num, point]);
 }
 
 /**
  * 駒を手元の盤面だけで point へ置く (サーバへは送らない)。
- * 置く前の表示位置を返す
+ * idx はそのポイントに既にある枚数。置く前の表示位置を返す
  *
  * @param {import('playwright').Page} page
  * @param {number} player
@@ -826,15 +888,18 @@ export function send_put_checker(page, player, num, point) {
  */
 export function put_checker_local(page, player, num, point) {
     return page.evaluate(([player, num, point]) => {
-        const ch = board.checker[player][num];
-        const src = ch.cur_point;
-        board.put_checker(ch, point);
+        const { controller, view } = board;
+        const src = view.checker[player][num].cur_point;
+        const gi = structuredClone(controller.gameinfo);
+        gi.board.checker[player][num] = [
+            point, controller.checkers_at(point).length];
+        controller.predict(gi, { sec: 0 });
         return src;
     }, [player, num, point]);
 }
 
 /**
- * 部品の押したときの処理を、座標を経ずに直接呼ぶ。
+ * 部品を押したときの操作を、座標を経ずに直接呼ぶ。
  * name は 'roll' (player の Roll ボタン) か 'resign' (投了ボタン)
  *
  * @param {import('playwright').Page} page
@@ -844,9 +909,9 @@ export function put_checker_local(page, player, num, point) {
  */
 export function press_part(page, name, player = 0) {
     return page.evaluate(([name, player]) => {
-        const part = { roll: () => board.roll_btn[player],
-                       resign: () => board.button_resign }[name]();
-        part.on_mouse_down_xy(0, 0);
+        const c = board.controller;
+        ({ roll: () => c.roll(player),
+           resign: () => c.resign() })[name]();
     }, [name, player]);
 }
 
@@ -860,16 +925,16 @@ export function press_part(page, name, player = 0) {
 export function set_free_move(page, on) {
     return page.evaluate(v => {
         document.getElementById('free-move').checked = v;
-        board.settings.apply_free_move();
+        board.controller.settings.apply_free_move();
     }, on);
 }
 
 /**
  * パスのバナー (プレーヤー 0) を出して押し、押した直後の状態を返す。
  *
- * 押したのと同じタスクの中で読む。サーバの返事の load_gameinfo() →
- * set_turn() もバナーを全部 off() にするので、返事が届いてから見ると
- * on_pass の off() を確かめたことにならない。
+ * 押したのと同じタスクの中で読む。サーバの返事の描画もバナーを
+ * 全部 off() にするので、返事が届いてから見ると、押したときに
+ * 隠したことを確かめたことにならない。
  *
  * @param {import('playwright').Page} page
  * @param {'click'|'space'} how - バナーを押すか、スペースキーか
@@ -877,11 +942,12 @@ export function set_free_move(page, on) {
  */
 export function press_pass_banner(page, how) {
     return page.evaluate(how => {
-        const btn = board.pass_btn[0];
+        const view = board.view;
+        const btn = view.pass_btn[0];
 
         if (how === 'space') {
             // Roll ボタンが出ているとスペースキーはそちらへ行く
-            board.roll_btn[0].off();
+            view.roll_btn[0].off();
         }
         btn.on();
         const shown = btn.active;
@@ -916,6 +982,7 @@ export function press_pass_banner(page, how) {
  */
 export function press_n(page, id, n) {
     return page.evaluate(([id, n]) => {
+        const { controller, view } = board;
         const el = document.getElementById(id);
         for (let i = 0; i < n; i++) {
             const r = el.getBoundingClientRect();
@@ -924,10 +991,10 @@ export function press_n(page, id, n) {
                 clientX: r.x + r.width / 2, clientY: r.y + r.height / 2,
             }));
         }
-        return { score: board.gameinfo.score.slice(),
-                 shown: board.score[0].el.innerHTML,
-                 dice: board.gameinfo.board.dice[0].slice(),
-                 dice_els: board.roll_btn[0].dice.map(
+        return { score: controller.gameinfo.score.slice(),
+                 shown: view.score[0].el.innerHTML,
+                 dice: controller.gameinfo.board.dice[0].slice(),
+                 dice_els: view.dice[0].map(
                      d => ({ z: d.z, src: d.image_el.src,
                              opacity: d.image_el.style.opacity })) };
     }, [id, n]).then(({ dice_els, ...r }) => (
@@ -945,8 +1012,8 @@ export function press_n(page, id, n) {
  */
 export function show_banner(page, name) {
     return page.evaluate(name => {
-        const b = { resign: board.resign_banner_btn,
-                    win: board.win_btn }[name][0];
+        const v = board.view;
+        const b = { resign: v.resign_banner_btn, win: v.win_btn }[name][0];
         const orig = b.on_click;
         window.__clicked = undefined;
         b.on_click = btn => {
@@ -967,8 +1034,8 @@ export function show_banner(page, name) {
  */
 export function hide_banner(page, name) {
     return page.evaluate(name => {
-        ({ resign: board.resign_banner_btn,
-           win: board.win_btn })[name][0].off();
+        const v = board.view;
+        ({ resign: v.resign_banner_btn, win: v.win_btn })[name][0].off();
     }, name);
 }
 
@@ -990,16 +1057,103 @@ export function drop_cube_while_holding_checker(page, dy) {
             return orig.call(this, d);
         };
         try {
-            const cube = board.cube;
-            board.drag.hold_cube(cube.x, cube.y);
-            const ch = board.checker[0][0];
-            board.drag.pick_checker(ch, ch.x, ch.y);
-            board.drag.move_cube(cube.x, cube.y0 + dy);
-            board.drag.drop_cube(cube.x, cube.y0 + dy);
-            board.drag.drop_checker(ch.x, ch.y);
+            const { view } = board;
+            const drag = view.drag;
+            const cube = view.cube;
+            drag.hold_cube(cube.x, cube.y);
+            const ch = view.checker[0][0];
+            drag.pick_checker(ch, ch.x, ch.y);
+            drag.move_cube(cube.x, cube.y0 + dy);
+            drag.drop_cube(cube.x, cube.y0 + dy);
+            drag.drop_checker(ch.x, ch.y);
         } finally {
             WebSocket.prototype.send = orig;
         }
         return sent.map(m => m.type);
     }, dy);
+}
+
+// --- クロックと受信の保留 ---
+
+/**
+ * 時計の表示を要素から読む (2 人ぶん)。checked は Clock のチェックボックス
+ *
+ * @param {import('playwright').Page} page
+ * @return {Promise<{clock: {text: string, color: string, opacity: string}[],
+ *                   checked: boolean}>}
+ */
+export function shown_clock(page) {
+    return page.evaluate(() => ({
+        clock: [0, 1].map(p => ({
+            text: document.getElementById(`p${p}clock`).innerHTML,
+            color: document.getElementById(`p${p}clock-bg`)
+                .style.backgroundColor,
+            opacity: document.getElementById(`p${p}clock`).style.opacity,
+        })),
+        checked: document.getElementById('clock_sw').checked,
+    }));
+}
+
+/**
+ * サーバから届いた gameinfo を、release_received() まで捨てる
+ *
+ * @param {import('playwright').Page} page
+ * @return {Promise<void>}
+ */
+export function hold_received(page) {
+    return page.evaluate(() => {
+        board.controller.receive = function () {};
+    });
+}
+
+/**
+ * hold_received() を戻す。捨てたものは届け直さない
+ *
+ * @param {import('playwright').Page} page
+ * @return {Promise<void>}
+ */
+export function release_received(page) {
+    return page.evaluate(() => { delete board.controller.receive; });
+}
+
+/**
+ * バナーが出ているか (要素の hidden から読む。2 人ぶん [0, 1])。
+ * name_on は名前が強調されている (色が明るい) か
+ *
+ * @param {import('playwright').Page} page
+ * @return {Promise<{pass: boolean[], win: boolean[], resign: boolean[],
+ *                   name_on: boolean[]}>}
+ */
+export function shown_banners(page) {
+    return page.evaluate(() => {
+        const both = f => [0, 1].map(f);
+        const shown = id => !document.getElementById(id).hidden;
+        return {
+            pass: both(p => shown(`passbutton${p}`)),
+            win: both(p => shown(`winbutton${p}`)),
+            resign: both(p => shown(`resignbutton${p}`)),
+            name_on: both(p => document.getElementById(`p${p}name`)
+                          .style.color === 'rgba(255, 255, 128, 0.8)'),
+        };
+    });
+}
+
+/**
+ * 掴んでいるキューブの座標と z。掴んでいなければ undefined。
+ * z_index / left / top は要素の style の値
+ *
+ * @param {import('playwright').Page} page
+ * @return {Promise<{x: number, y: number, z: number|undefined,
+ *                   z_index: string, left: string,
+ *                   top: string}|undefined>}
+ */
+export function holding_cube(page) {
+    return page.evaluate(() => {
+        if (!board.view.drag.cube) {
+            return undefined;
+        }
+        const c = board.view.cube;
+        return { x: c.x, y: c.y, z: c.z, z_index: c.el.style.zIndex,
+                 left: c.el.style.left, top: c.el.style.top };
+    });
 }

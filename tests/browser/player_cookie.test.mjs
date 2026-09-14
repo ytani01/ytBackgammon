@@ -6,7 +6,7 @@
 //   node --test tests/browser/
 //
 // Settings.load_player() は cookie の値 (文字列) を読む。数に直さないと、
-// プレーヤー 0 の画面を開き直したときに board.settings.player が "0" のまま残り、
+// プレーヤー 0 の画面を開き直したときに Settings の player が "0" のまま残り、
 // 投了ボタンが resign の player に文字列を送る。サーバは data の型を
 // 確かめるので、それを弾いて投了が効かなくなる。
 //

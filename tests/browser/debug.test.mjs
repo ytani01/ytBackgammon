@@ -6,7 +6,7 @@
 //   node --test tests/browser/
 //
 // log.js の log() は、?debug を付けて開いたときだけ console.log へ出す。
-// Board のコンストラクタは起動時に必ず log() を呼ぶので、ページを
+// BoardView のコンストラクタは起動時に必ず log() を呼ぶので、ページを
 // 開いて盤面ができるまでに console.log が 1 件でも出たかを見る。
 //
 // helper.mjs の open_board() も goto() の前に console をつなぐが、

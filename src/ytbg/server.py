@@ -139,7 +139,7 @@ class BackgammonServer:
         self._gameinfo = hist_ent.copy()
 
     async def emit_gameinfo(
-            self, sec: float = 0, history_flag=False, last_op=None):
+            self, sec: float = 0, last_op=None):
         """
         send game information to all clients
 
@@ -161,7 +161,6 @@ class BackgammonServer:
                     'sec': sec,
                     'hist_i': len(self._hist),
                     'hist_n': self._hist.total(),
-                    'history_flag': history_flag,
                     'last_op': last_op,
                     # クロックは gameinfo の外にあるので、
                     # clock_state として添えて送る (TODO-016、TODO-024)。
@@ -199,7 +198,7 @@ class BackgammonServer:
 
                 self._load_hist_ent(hist_ent)
 
-                await self.emit_gameinfo(sec, history_flag=True)
+                await self.emit_gameinfo(sec)
 
                 count += 1
                 if n > 0 and count >= n:
@@ -358,7 +357,7 @@ class BackgammonServer:
     async def _on_new(self, m: Message) -> float | None:
         """New game"""
         self.new_game()
-        await self.emit_gameinfo(3, False)
+        await self.emit_gameinfo(3)
         return None
 
     async def _on_put_checker(self, m: Message) -> float | None:
@@ -588,7 +587,7 @@ class BackgammonServer:
         # 直前の操作を添えて返す (TODO-015)。クライアントは gameinfo で
         # 盤面を作り直し、音と dice の回転だけを last_op から出す。
         # チェッカーが動くときだけアニメーションの時間を渡す
-        await self.emit_gameinfo(sec, history_flag=False, last_op=m.raw)
+        await self.emit_gameinfo(sec, last_op=m.raw)
 
 
 @dataclass(frozen=True)

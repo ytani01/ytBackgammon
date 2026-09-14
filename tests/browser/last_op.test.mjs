@@ -5,9 +5,9 @@
 //
 //   node --test tests/browser/
 //
-// Board.apply() に gameinfo と last_op を渡し、鳴らした音 (SoundBase.play())
-// と、ダイスを回したか (RollButton.set() の roll_flag) を数える。
-// apply() はサーバへ何も送らないので、ページの中だけで確かめる。
+// BoardController.receive() に gameinfo と last_op を渡し、鳴らした音
+// (SoundBase.play()) と、ダイスを回したか (BoardView.roll_dice()) を数える。
+// receive() はサーバへ何も送らないので、ページの中だけで確かめる。
 //
 //   - roll: 振ったプレーヤーのダイスを回して、振る音を鳴らす
 //   - move: turn を見ずに駒を置く音を鳴らす。moves にバー (26 以上) への
@@ -19,12 +19,13 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    apply_gameinfo, console_errors, effects_of_apply, gameinfo,
+    apply_gameinfo, console_errors, dice_transforms, effects_of_apply,
+    gameinfo,
     launch_browser, open_board, start_server,
 } from './helper.mjs';
 
 /**
- * 今の gameinfo を turn だけ変えて apply() し、鳴った音と回したダイスを返す。
+ * 今の gameinfo を turn だけ変えて受け取らせ、鳴った音と回したダイスを返す。
  *
  * @param {import('playwright').Page} page
  * @param {number} turn
@@ -128,7 +129,7 @@ describe('last_op からの音とダイスの回転', () => {
                                 ['end_turn', { player: 1 }]]) {
         it(`${type} → turn が変わっていなくても、手番が変わる音`,
            async () => {
-               // 同じ turn で 2 回 apply() しても、2 回とも鳴る
+               // 同じ turn で 2 回受け取っても、2 回とも鳴る
                for (let i = 0; i < 2; i++) {
                    const r = await apply_with(page, 0, op(type, data));
                    assert.deepEqual(r, { sound: ['sound_turn_change'],
@@ -142,6 +143,40 @@ describe('last_op からの音とダイスの回転', () => {
            const r = await apply_with(
                page, 0, op('set_score', { player: 0, score: 1 }));
            assert.deepEqual(r, { sound: [], roll: [] });
+       });
+
+    it('振ったダイスが傾くのは振った直後だけで、次の描画でまっすぐに戻る',
+       async () => {
+           const orig = await gameinfo(page);
+           const gi = structuredClone(orig);
+           gi.turn = 0;
+           gi.board.dice = [[3, 4, 0, 0], [5, 6, 0, 0]];
+           try {
+               for (const p of [0, 1]) {
+                   await apply_gameinfo(page, gi, {
+                       last_op: op('roll', { player: p,
+                                             dice: gi.board.dice[p] }) });
+               }
+               const rolled = [await dice_transforms(page, 0),
+                               await dice_transforms(page, 1)];
+               const after = [];
+               for (let i = 0; i < 2; i++) {
+                   await apply_gameinfo(page, gi);
+                   after.push([await dice_transforms(page, 0),
+                               await dice_transforms(page, 1)]);
+               }
+               const straight = [
+                   ['rotate(0deg)', 'rotate(0deg)',
+                    'rotate(0deg)', 'rotate(0deg)'],
+                   ['rotate(180deg)', 'rotate(180deg)',
+                    'rotate(0deg)', 'rotate(0deg)'],
+               ];
+               assert.notDeepEqual(rolled, straight, '振った直後に傾いていない');
+               assert.deepEqual(after, [straight, straight],
+                                `振った傾きが残っている: ${JSON.stringify(rolled)}`);
+           } finally {
+               await apply_gameinfo(page, orig);
+           }
        });
 
     it('コンソールエラーが出ていない', async () => {
