@@ -1,0 +1,25 @@
+# ytbg lobby の設定 (ytbg lobby -c ytbg.toml)
+#
+# ボードごとに [[board]] を書く。server_id は整数でも文字列でもよい。
+# url は省略可で、省くと一覧ページを開いたホスト名にボードのポートを
+# 付けたものになる。書くときは http:// か https:// で始める。
+
+[[board]]
+server_id = 1
+port = 5001
+image_dir = "images2"
+
+[[board]]
+server_id = 2
+port = 5002
+image_dir = "images0a"
+
+[[board]]
+server_id = 3
+port = 5003
+image_dir = "images1a"
+
+[[board]]
+server_id = 4
+port = 5004
+image_dir = "images3"

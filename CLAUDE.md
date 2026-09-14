@@ -31,11 +31,11 @@ clone で起きることは `docs/Admin.md` にある。
 uv sync          # .venv を作って依存を入れる
 
 # サーバ起動
-./ytbg.sh -d -p 5001 -i images1a 1     # 引数は server_id、-i は static/ 以下の画像ディレクトリ
-uv run ytbg --help                     # ytbg.sh は uv run ytbg を呼ぶだけ
+./ytbg.sh board -d -p 5001 -i images1a 1   # ボード 1 面。引数は server_id、-i は static/ 以下の画像ディレクトリ
+uv run ytbg --help                         # ytbg.sh は uv run ytbg を呼ぶだけ
 
-./ytbg-boot.sh   # ポート 5001〜5004 で 4 サーバを同時起動
-./ytbg-stop.sh   # ps + grep で kill
+./ytbg.sh lobby -c ytbg.toml   # 設定のボードを子プロセスで全部起動し、一覧ページを出す（TODO-063）
+                               # Ctrl+C か kill で lobby を止めると、ボードも止まる
 
 uv run pytest              # Python のテスト
 uv run ruff check .
@@ -120,6 +120,10 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   **ファイル全体で走らせる**。前のテストが作るキューブの状態を使う）
 - `clock.test.mjs` — Clock のチェックボックスは返事が届くまで計算も表示も
   変えないか、履歴の返事でも `clock_state` を全部反映するか（TODO-060）
+- `lobby.test.mjs` — lobby の一覧ページ（TODO-063）。lobby を実プロセスで起動し、
+  iframe の URL（設定の `url` の有無）、大きく出すボードの切り替え、起動・停止のボタンで
+  状態の表示が変わるかを見る。lobby の子プロセスそのもの（lobby を止めたらボードも
+  止まるか）は `tests/test_lobby.py` が見る
 - `settings.test.mjs` — 音の ON/OFF を cookie に保存して開き直しても残るか、
   PIP の最初の表示が Pip のチェックボックスに合うか（TODO-053）。
   チェックが入った状態は `addInitScript()` の `DOMContentLoaded` で作る
@@ -162,6 +166,13 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   404 は出ない（TODO-022）
 - **ここでも、通ることだけを見ない。** `src/` をわざと壊して、狙った
   テストが落ちることを確かめる（TODO-021 で 4 通り試した）
+- **テストを走らせるのは 1 回。** Python・JS・ブラウザのどれでも同じ。
+  続けて何回も走らせるのは、壊した版で狙ったテストが確実に落ちるかを
+  見るとき（10 回）だけ。**3 回連続にはしない**（揺れを捕まえるには足りず、
+  時間だけかかる）。「タイミングで落ちるかもしれない」と思っただけでは
+  回数を増やさず、テストの読み方を直して、落ちる余地そのものを無くす。
+  報告に「N 回連続では走らせていない」を懸念として書かない。
+  書くのは、実際に落ちた回の出力があるときだけ（TODO-063）
 
 テストを足すときの注意:
 

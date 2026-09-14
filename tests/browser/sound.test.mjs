@@ -10,8 +10,9 @@
 // 判定そのものは sound.js の GlobalSoundSwitch === undefined で、
 // undefined のときだけ鳴る。
 //
-// ytbg.html が組み立てるのは ?sound=off と ?board=N&sound=off の
-// 2 つなので、その 2 つと、値の無い ?sound を見る。
+// lobby の一覧ページ (lobby.js) が iframe に付けるのは ?sound=off。
+// 以前の ytbg.html は ?board=N&sound=off も組み立てていたので、
+// その 2 つと、値の無い ?sound を見る。
 //
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';

@@ -2,7 +2,8 @@
 #
 # (c) Yoichi Tanibayashi
 #
-# usage: ytbg.sh [-d] [-p port] [-i image_dir] server_id
+# usage: ytbg.sh board [-d] [-p port] [-i image_dir] server_id
+#        ytbg.sh lobby [-d] [-p port] [-c ytbg.toml]
 #
 MYDIR=`dirname $0`
 

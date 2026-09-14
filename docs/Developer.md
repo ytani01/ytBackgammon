@@ -36,7 +36,18 @@ graph LR
     S2 --- F2["~/ytbg-2.jsonl"]
 ```
 
-`ytbg.html` は、複数のボードを iframe で並べるだけの静的なページ。
+`ytbg lobby` は、設定ファイル（`ytbg.toml`）のボードを子プロセスとして起動し、
+iframe で並べる一覧ページを出す別のサーバ。**ボードの中身には関わらず**、
+子プロセスの起動・停止と状態の表示だけを受け持つ。
+
+```mermaid
+graph LR
+    L["ytbg lobby<br/>:5000"] -->|"子プロセス"| S1["ytbg board 1<br/>:5001"]
+    L -->|"子プロセス"| S2["ytbg board 2<br/>:5002"]
+    B["ブラウザ（一覧ページ）"] -->|"GET /api/boards など"| L
+    B -->|"iframe"| S1
+    B -->|"iframe"| S2
+```
 
 ## サーバ側（`src/ytbg/`）
 
@@ -45,7 +56,7 @@ graph LR
 | モジュール | 含むもの |
 |------------|----------|
 | `__init__.py` | パッケージの定数。`webroot/` の絶対パスもここ |
-| `__main__.py` | エントリポイント。click の `main()` だけ |
+| `__main__.py` | エントリポイント。click の group `main()` と、サブコマンド `board`・`lobby` |
 | `app.py` | `create_app()`。ルーティングと WebSocket の受信ループ |
 | `server.py` | `BackgammonServer`。メッセージの分岐と、全体のとりまとめ。`parse()` と登録表もここ |
 | `message.py` | 届いたメッセージの `data` の型（dataclass）と例外 |
@@ -56,6 +67,7 @@ graph LR
 | `replay.py` | `Replayer`。連続再生の Task を 1 本だけ持つ |
 | `storage.py` | `Storage`。JSON Lines での保存・読み込み |
 | `mylog.py` | ログ（loguru） |
+| `lobby.py` | 一覧サーバ。設定の読み込み `load_config()`、子プロセス 1 つぶんの `BoardProcess`、`create_lobby_app()` |
 
 ```mermaid
 graph TD
@@ -99,6 +111,30 @@ graph TD
   読まれてしまう。dict でないもの（`"board": null` など）も入口で `KeyError` に
   する。読み込みで拾う例外（`storage.py` の `LOAD_ERRORS`）に `TypeError` は
   入っていないので、`TypeError` のまま出るとサーバが起動しない
+
+### 一覧サーバ（`lobby.py`）
+
+ボードは `sys.executable -m ytbg board ...` で子プロセスとして起動する
+（`asyncio.create_subprocess_exec`）。API は `GET /api/boards`（状態の一覧）と
+`POST /api/boards/{server_id}/start`・`/stop`。一覧ページ（`templates/lobby.html` と
+`static/js/lobby.js`）は 3 秒ごとに `/api/boards` を読み直す。
+
+- **子プロセスの面倒を見る範囲は狭い。** 起動時に全部起動し、lobby が止まるとき
+  （Starlette の lifespan の終わり）に全部止める。落ちたボードは起動し直さず、
+  lobby の外で動いているボードも探さない。lobby を SIGKILL で殺すと子が残る
+- 停止は SIGTERM を送り、5 秒で終わらなければ SIGKILL
+- 子の stdout と stderr は lobby のものをそのまま使う。起動できない理由はそこに出て、
+  lobby は終了コードだけをログに出す
+- API の状態は `running`（プロセスがある）と `listening`（lobby がボードのポートへ
+  `127.0.0.1` で接続できた）の 2 つ。一覧ページは両方偽を「停止中」、`running` だけを
+  「起動中」、両方真を「動作中」と出す。**接続できるかしか見ない**ので、lobby の外の
+  プロセスが同じポートを塞いでいると、子が起動に失敗して終わるまでの一瞬は「動作中」になる
+- 子は lobby と同じプロセスグループにいる。端末の Ctrl+C はボードにも直接届くので、
+  lobby が止めに行く前にボードが終わっていることがある
+- 一覧ページは iframe を作り直さない（作り直すと読み込み直しになる）。大きく出す
+  ボードは class と CSS の `order` だけで入れ替える。iframe の `src` は、`listening` が
+  偽から真に変わったときだけ入れる（最初の読み込みも同じ）。**listen する前に入れると、
+  iframe が接続エラーの画面のまま戻らない**
 
 ## 状態の持ち方
 

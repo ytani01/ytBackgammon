@@ -49,7 +49,7 @@ const SLOWMO = Number(process.env.YTBG_TEST_SLOWMO) || 0;
 /**
  * 空いている TCP ポートを 1 つ取る。
  *
- * ytbg-boot.sh が使う 5001〜5004 や、他の作業とぶつからないように、
+ * ytbg.toml の 5001〜5004 や、他の作業とぶつからないように、
  * 固定のポートではなく OS に選ばせる。
  *
  * @return {Promise<number>}
@@ -87,7 +87,8 @@ export async function start_server(opts = {}) {
     // uv だけを kill すると python が残る。pkill は使わない
     // (パターンが自分のシェルにも当たる)
     const child = spawn(
-        'uv', ['run', 'ytbg', '-p', String(port), '-i', image_dir, server_id],
+        'uv', ['run', 'ytbg', 'board', '-p', String(port), '-i', image_dir,
+               server_id],
         {
             cwd: REPO_ROOT,
             env: { ...process.env, YTBG_DATA_DIR: data_dir },

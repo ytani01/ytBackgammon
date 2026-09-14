@@ -121,10 +121,12 @@ uv sync
 リポジトリのディレクトリの中で実行します。
 
 ```bash
-./ytbg.sh -d -p 5001 -i images1a 1     # ポート 5001、サーバID 1
-./ytbg-boot.sh                         # 4 面まとめて起動 (5001〜5004)
-./ytbg-stop.sh                         # 停止
+./ytbg.sh board -d -p 5001 -i images1a 1   # ボード 1 面 (ポート 5001、サーバID 1)
+./ytbg.sh lobby -c ytbg.toml               # ytbg.toml のボードをまとめて起動し、
+                                           # 一覧ページを http://<ホスト>:5000/ に出す
 ```
+
+lobby は Ctrl+C で止めます (ボードも止まります)。
 
 オプションの意味、複数ボードの立て方、状態ファイルの置き場所、
 困ったときの対処は **[docs/Admin.md](docs/Admin.md)** にあります。

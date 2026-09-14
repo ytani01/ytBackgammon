@@ -1,0 +1,31 @@
+<!DOCTYPE HTML>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=0.4, minimum-scale=0.05, maximum-scale=3">
+    <title>ytBackgammon lobby</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <style>
+      body { background-image: url(/static/images1a/bg.png); color: #222;
+             width: 920px; }
+      #boards { display: flex; flex-wrap: wrap; gap: 8px; }
+      .board { background: rgba(255, 255, 255, 0.6); padding: 4px; }
+      .board.main { order: -1; flex-basis: 100%; }
+      .board h3 { margin: 4px 0; }
+      .board .status.running { color: #080; }
+      .board .status.starting { color: #c80; }
+      .board .status.stopped { color: #c00; }
+      .frame { width: 450px; height: 270px; overflow: hidden; }
+      .frame iframe { width: 1030px; height: 650px; border: 0;
+                      transform: scale(0.4); transform-origin: left top; }
+      .main .frame { width: 880px; height: 560px; }
+      .main .frame iframe { transform: scale(0.835); }
+    </style>
+    <script type="module" src="/static/js/lobby.js"></script>
+  </head>
+  <body>
+    <h1>ytBackgammon</h1>
+    <div id="boards"></div>
+  </body>
+</html>
