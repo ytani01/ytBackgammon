@@ -8,7 +8,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { N_POINT, Position, bar_point, get_pip, goal_point } from
+import { N_POINT, Position, bar_point, copy_gameinfo, get_pip,
+         goal_point } from
     '../../src/ytbg/webroot/static/js/rules/position.js';
 import { init_checker, make_gameinfo, make_position, stack } from
     './helper.mjs';
@@ -233,5 +234,18 @@ describe('Position.with_move()', () => {
         pos2 = pos2.with_move(bar_point(0), goal_point(0), 0);
         assert.equal(count_all(pos2, 0), 15);
         assert.equal(count_all(pos2, 1), 15);
+    });
+});
+
+describe('copy_gameinfo()', () => {
+    it('中身は同じで、書き換えても元に響かない', () => {
+        const gi = make_gameinfo();
+        const copy = copy_gameinfo(gi);
+        assert.deepEqual(copy, gi);
+
+        copy.board.checker[0][0] = [5, 0];
+        copy.board.dice[0][1] = 3;
+        copy.score[1] = 7;
+        assert.deepEqual(gi, make_gameinfo());
     });
 });

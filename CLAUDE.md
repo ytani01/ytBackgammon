@@ -85,8 +85,9 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   コンソールエラー
 - `rules.test.mjs` — **`Board` がルール層につながっているか**（TODO-027）。
   `board.position()` / `pip_count()` / `winner_is()` / `closeout()` /
-  `get_dst_points()` をページの中で呼ぶ。ほかの 2 つはドラッグを
-  free move で行うので、ルール判定を通らない
+  `get_dst_points()` をページの中で呼ぶ。`board.test.mjs` と
+  `drag.test.mjs` はチェッカーのドラッグを free move で行うので、ルール判定を
+  通らない（ルール判定を通るドラッグは `predict.test.mjs`）
 - `clicks.test.mjs` — メニュー・ヘッダのチェックボックスと入力・盤面の
   ボタン・バナー・キューブ・クロックを実際に押し、**送られたメッセージの
   `type` / `data`** と、変わった `board` の属性を見る（TODO-028）。
@@ -116,6 +117,13 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 - `opening.test.mjs` — オープニングロールで先手が決まるか（TODO-041）
 - `player_cookie.test.mjs` — cookie から読んだプレーヤー番号が数になって
   いるか（TODO-050）。文字列のままだと、サーバが型の合わない値として弾く
+- `drag.test.mjs` — 駒を掴んでいる間に `gameinfo` が届いても、掴んでいる駒が
+  手元の座標に残るか（TODO-053）。別のタブから `set_playername` を送って届かせる。
+  キューブとチェッカーを同時に掴んでも、キューブを離せば take を送るか
+- `settings.test.mjs` — 音の ON/OFF を cookie に保存して開き直しても残るか、
+  PIP の最初の表示が Pip のチェックボックスに合うか（TODO-053）。
+  チェックが入った状態は `addInitScript()` の `DOMContentLoaded` で作る
+  （`page.route()` で `index.html` を書き換えると `/ws` への接続が弾かれる）
 
 **テスト専用の type は無い**（TODO-051）。盤面の用意は残っている type で
 行う。`helper.mjs` の `send_msg()` がページの中で `ws.js` の `emit_msg()` を
@@ -301,22 +309,46 @@ Python は `src/ytbg/` にある（パッケージ名は `ytbg`）。`templates/
     この順序を変えるときは、画像の応答を遅らせて配置を実測すること
   - `actions.js` — サーバへ送る操作（TODO-051）。**`emit_msg` を import
     するのはここだけ。** ゲームを進める処理（`roll()` / `click_dice()` /
-    `end_turn()` / `drop_checker()` / `move()` / `double()` / `take()` /
-    `cancel_double()` / `resign()`）と「押してよいか」の判定
+    `end_turn()` / `drop_checker()` / `move()` / `drop_cube()` / `double()` /
+    `take()` / `cancel_double()` / `resign()`）と「押してよいか」の判定
     （`can_pick_checker()` / `can_hold_cube()`）、名前・得点・クロック・
     設定・履歴の操作の送信を並べる。どれも `board` を受け取り、
-    送る値は数に直す。`ui/` の表示部品と `main.js` / `board.js` はここを呼ぶ
+    送る値は数に直す。`drag.js` と `ui/` の表示部品、`main.js` / `board.js` は
+    ここを呼ぶ。キューブを離したときに `double` / `take` / `cancel_double` の
+    どれを送るかも、ここの `drop_cube()` が決める
+  - `drag.js` — `Drag`（TODO-053）。チェッカーとキューブを「掴む・動かす・
+    離す」だけを受け持ち、掴んでいるもの（`checker` / `cube`）と掴んだ
+    位置はここだけが持つ。**掴んだ位置はチェッカー用（`checker_src`）と
+    キューブ用（`cube_src_y`）で別に持つ**（free move ならマルチタッチで
+    両方を同時に掴める。1 組にするとキューブを離したときに take /
+    redouble が送られない）。動かすのも、`Checker` は `move_checker()`、
+    `Cube` は `move_cube()`、`Board` は両方の `move()`。`Board` が `board.drag` として
+    持ち、`Checker` / `Cube` のマウスの処理はこれを呼ぶだけ。行き先の判定と
+    送信は `actions.js` に任せる。**チェッカーを離すときは、`actions.js` を
+    呼ぶ前に `checker` を外す**（`apply()` は掴んでいる駒を手元の座標へ
+    戻すので、先行実行の表示で駒が動かなくなる）。**この順番はテストでは
+    守られない**（後にしても `tests/browser/` は通る）
   - `ws.js`（接続・再接続・送信。`emit_msg(type, data)`）、`log.js`（**`?debug` を付けて開いたとき
     だけ `console.log` へ出す**。TODO-048）、`layout.js`（盤面の座標）、
-    `settings.js`（`CookieBase`、クエリ文字列から `sound` を読む
+    `settings.js`（`Settings`、`CookieBase`、クエリ文字列から `sound` を読む
     `get_sound_query()` と `debug` の有無を見る `get_debug_query()`、
     `<body>` の `data-*` から読む
-    `get_image_dir()` / `get_server_id()`）、`sound.js`
+    `get_image_dir()` / `get_server_id()`）、`sound.js`。
+    `Settings`（TODO-053）は音の ON/OFF・free move・PIP を表示するか・
+    cookie に保存するプレーヤー番号を持ち、`Board` が `board.settings` として
+    持つ。**プレーヤー番号は `board.settings.player` で、`Board` 自身は
+    持たない。** クロックの ON/OFF と持ち時間は `Board` に残す。
+    **`log.js` と `settings.js` は互いに import している**ので、
+    `settings.js` のトップレベルで `log()` を呼ばないこと（評価の順に
+    よっては ReferenceError になる）。`?sound` を読み直して
+    `set_global_sound_switch()` を呼ぶのは `main.js` の `sound-switch` の
+    ハンドラで、`settings.js` は `sound.js` を import しない
   - `board.js` — `Board`
   - `rules/` — ルール層（TODO-027）。`position.js` に `Position` と
-    `goal_point()` / `bar_point()` / `get_pip()`、`move.js` に
+    `goal_point()` / `bar_point()` / `get_pip()` / `copy_gameinfo()`、`move.js` に
     `calc_dst_point()` / `all_inner()` / `dst_point()` / `dst_points()` /
-    `usable_dice()` / `dice_for_move()`（TODO-043）、`judge.js` に
+    `usable_dice()` / `dice_for_move()`（TODO-043）/ `disable_unusable()`
+    （使えなくなった目を 11〜16 にした新しい配列を返す。TODO-053）、`judge.js` に
     `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()`。
     **DOM も `Board` も見ず、値を返すだけ**で、
     import してよいのは `rules/` の中だけ。表示の更新
@@ -419,14 +451,15 @@ last_op})` だけ**（TODO-030）。サーバから届いた `gameinfo` は
 `Checker.cur_point` だけは残してあり、`apply()` が `gameinfo` と一緒に書き直す。
 
 ドラッグを離した瞬間の反応（**先行実行**）も同じ経路を通る。
-`Checker.on_mouse_up_xy()` は `actions.js` の `drop_checker()` を呼ぶだけで、
+`Checker.on_mouse_up_xy()` は `Drag.drop_checker()` を呼ぶだけで、それが
+`actions.js` の `drop_checker()` を呼ぶ。
 `drop_checker()` が `decide_dst()`（行き先とヒットの判定）→ `move()`
 （予測・送信・表示）の順に呼ぶ（TODO-045、TODO-051）。`move()` が
 `Board.predict_gameinfo()` で**動かしたあとの `gameinfo` を予測して作り**、
 そこから `idx`・ダイス・勝ちの点数を求めて `move` を 1 通送り、`apply()` に渡す
 （共有ボードなので、サーバの応答を待つと操作感が悪い）。
 **`drop_checker()` が `false` を返したら（`decide_dst()` がキャンセルしたか、
-予測に失敗した）、何も送らずに `Checker` が元の位置へ戻す。**
+予測に失敗した）、何も送らずに `Drag` が元の位置へ戻す。**
 
 - 予測は `this.gameinfo` を土台に、動かしたチェッカーの `[point, idx]` と、
   動かしたプレーヤーのダイスを書き換える。**`sn` は進めない。** 動かせるかは

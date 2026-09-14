@@ -104,7 +104,7 @@ export class PlayerPipCount extends BgText {
         this.pip_count = 167;
         this.set(this.pip_count);
 
-        if ( document.getElementById("disp-pip").checked ) {
+        if ( this.board.settings.disp_pip ) {
             this.on();
         } else {
             this.off();

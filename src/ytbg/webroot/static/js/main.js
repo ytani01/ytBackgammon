@@ -63,7 +63,7 @@ const on_key_down = (e, board) => {
     log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
     log(`e.keyCode=${e.keyCode}`);
 
-    const player = board.player;
+    const player = board.settings.player;
     const roll_btn = board.roll_btn[player];
     const pass_btn = board.pass_btn[player];
 
@@ -180,8 +180,12 @@ for (const [id, handler] of [
 } // for(id, handler)
 
 for (const [id, handler] of [
-    ["sound-switch", () => board.apply_sound_switch()],
-    ["free-move", () => board.apply_free_move()],
+    ["sound-switch", () => {
+        // ?sound をここで読み直す (TODO-053 より前は apply_sound_switch() の中)
+        set_global_sound_switch(get_sound_query());
+        board.settings.apply_sound_switch();
+    }],
+    ["free-move", () => board.settings.apply_free_move()],
     ["disp-pip", () => board.apply_disp_pip()],
     ["clock_sw", () => board.apply_clock_sw()],
     ["clock_limit0", () => board.apply_clock_limit(0)],

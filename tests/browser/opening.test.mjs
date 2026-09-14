@@ -71,9 +71,9 @@ async function set_opening(page, dice0, dice1) {
 async function set_free_move(page, on) {
     await page.evaluate(v => {
         document.getElementById('free-move').checked = v;
-        board.apply_free_move();
+        board.settings.apply_free_move();
     }, on);
-    assert.equal(await page.evaluate(() => board.free_move), on);
+    assert.equal(await page.evaluate(() => board.settings.free_move), on);
 }
 
 describe('先手決め (opening roll)', () => {

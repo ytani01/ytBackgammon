@@ -143,7 +143,7 @@ describe('ブラウザでの基本の動作確認', () => {
     it('チェッカーをドラッグできる', async () => {
         // ルールに縛られずに動かせるように free move にする
         await page1.locator('#free-move').check();
-        assert.equal(await page1.evaluate(() => board.free_move), true);
+        assert.equal(await page1.evaluate(() => board.settings.free_move), true);
 
         // 移動先は、別の point に乗っているチェッカーの位置にする
         const dst = await page1.evaluate(() => {
@@ -152,7 +152,7 @@ describe('ブラウザでの基本の動作確認', () => {
         });
 
         // #p000 を掴むと、掴めるのは「その point の先端のチェッカー」で、
-        // p000 そのものではない。Checker.on_mouse_down_xy() の意図どおりで、
+        // p000 そのものではない。Drag.pick_checker() の意図どおりで、
         // 正しい挙動。新しい盤面では p000 は point 6 に 5 枚積まれた
         // いちばん下なので、先端は p004 になる
         const tip = await page1.evaluate(() => {
@@ -166,8 +166,8 @@ describe('ブラウザでの基本の動作確認', () => {
         await page1.mouse.down();
 
         const moving = await page1.evaluate(() => ({
-            id: board.moving_checker.id,
-            point: board.moving_checker.cur_point,
+            id: board.drag.checker.id,
+            point: board.drag.checker.cur_point,
         }));
         assert.equal(moving.id, tip);
         assert.notEqual(moving.point, dst.point,
@@ -179,8 +179,9 @@ describe('ブラウザでの基本の動作確認', () => {
         // 掴んだままカーソルに付いてきている。
         // point 6 と point 19 は同じ列なので x だけでは判定できない
         const dragging = await page1.evaluate(() => {
-            const ch = board.moving_checker;
-            return { pos: [ch.x, ch.y], src: [ch.src_x, ch.src_y] };
+            const ch = board.drag.checker;
+            return { pos: [ch.x, ch.y],
+                     src: board.drag.checker_src };
         });
         assert.notDeepEqual(dragging.pos, dragging.src,
                             'ドラッグ中に動いていない');
@@ -196,8 +197,8 @@ describe('ブラウザでの基本の動作確認', () => {
             { msg: 'drag' });
 
         assert.equal(
-            await page1.evaluate(() => board.moving_checker === undefined),
-            true, 'moving_checker が残っている');
+            await page1.evaluate(() => board.drag.checker === undefined),
+            true, 'drag.checker が残っている');
 
         moved = { checker_index: tip_i, point: dst.point };
     });

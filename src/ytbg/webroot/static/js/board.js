@@ -1,17 +1,17 @@
 import { log } from "./log.js";
-import { disable_unusable,
-         end_turn as action_end_turn,
+import { end_turn as action_end_turn,
          set_clock_switch as action_set_clock_switch,
          set_clock_limit as action_set_clock_limit } from "./actions.js";
 import { BX, BY, label_geometry, point_geometry,
          score_geometry } from "./layout.js";
-import { CookieBase, get_sound_query, get_server_id } from "./settings.js";
-import { SoundBase, GlobalSoundSwitch, set_global_sound_switch,
-         SOUND_ROLL, SOUND_PUT, SOUND_HIT,
+import { Drag } from "./drag.js";
+import { Settings, get_server_id } from "./settings.js";
+import { SoundBase, SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
 import { BgImage } from "./ui/base.js";
-import { Position, N_POINT } from "./rules/position.js";
+import { Position, N_POINT, copy_gameinfo } from "./rules/position.js";
 import { all_inner as rule_all_inner,
+         disable_unusable as rule_disable_unusable,
          dst_point as rule_dst_point,
          dst_points as rule_dst_points } from "./rules/move.js";
 import { closeout as rule_closeout,
@@ -65,9 +65,6 @@ export class Board extends BgImage {
         log(`Board(id=${id},x=${x},y=${y})`);
         super(id, x, y, 0);
 
-        this.free_move = false;
-        this.disp_pip = false;
-        
         // 座標は layout.js にある (書き換えても元は汚さないよう複製する)
         this.bx = [...BX];
         this.by = [...BY];
@@ -76,24 +73,17 @@ export class Board extends BgImage {
         this.svr_id = get_server_id();
         log(`Board> svr_id=${this.svr_id}`);
 
-        // Cookie
-        this.cookie = new CookieBase();
-        this.cookie_board_player = `board${this.svr_id}_player`;
-        this.cookie_sound = `board${this.svr_id}_sound`;
+        // 音・free move・PIP・プレーヤー番号 (TODO-053)
+        this.settings = new Settings(this.svr_id);
+
+        // 掴んでいるチェッカーとキューブ (TODO-053)
+        this.drag = new Drag(this);
 
         // sound setup
-        this.el_sound = document.getElementById("sound-switch");
-        this.sound = true;
-        this.load_sound_switch();
         this.sound_turn_change = new SoundBase(this, SOUND_TURN_CHANGE);
         this.sound_roll = new SoundBase(this, SOUND_ROLL);
         this.sound_put = new SoundBase(this, SOUND_PUT);
         this.sound_hit = new SoundBase(this, SOUND_HIT);
-
-        // Player
-        if ( this.load_player() === undefined ) {
-            this.set_player(0);
-        }
 
         // 盤面の状態はこれだけ。判定もここを読む (TODO-052)。
         // サーバから届くまでは undefined で、何も操作できない
@@ -201,8 +191,6 @@ export class Board extends BgImage {
             } // for(i)
         } // for(player)
 
-        this.moving_checker = undefined;
-
         // Cube
         this.cube = new Cube("cube", this);
 
@@ -263,73 +251,22 @@ export class Board extends BgImage {
             "winbutton1", this, 1, this.bx[3] - bx1, this.h / 2 - dy1,
             0, on_win));
 
-        if ( this.player == 1 ) {
-            this.player = 0;
+        if ( this.settings.player == 1 ) {
+            this.settings.player = 0;
             this.inverse(0);
         }
     } // Board.constructor()
 
     /**
-     * @return {boolean} sound
-     */
-    load_sound_switch() {
-        log("Board.load_sound_switch>"
-                    + `cookie_sound=${this.cookie_sound}`);
-
-        const s = this.cookie.get(this.cookie_sound);
-        // log(`Board.load_sound_switch>s=${s}`);
-        if ( s === undefined ) {
-            this.sound = true;
-        } else {
-            this.sound = JSON.parse(s);
-        }
-        log(`Board.load_sound_switch>sound=${this.sound}`);
-        this.el_sound.checked = this.sound;
-        //this.apply_sound_switch();
-
-        return this.sound;
-    } // Board.load_sound_switch()
-        
-    /**
-     * @return {boolean} sound
-     */
-    apply_sound_switch() {
-        log("Board.apply_sound_switch>"
-                    + `cookie_sound=${this.cookie_sound}`);
-
-        set_global_sound_switch(get_sound_query());
-        log(`GlobalSoundSwitch=${GlobalSoundSwitch}`);
-
-        this.sound = document.getElementById("sound-switch").checked;
-        this.cookie.set(this.cookie_sound, this.sound);
-        this.el_sound.checked = this.sound;
-
-        log(`Board.apply_sound_switch>sound=${this.sound}`);
-        return this.sound;
-    } // Board.apply_sound_switch()
-
-    /**
-     * @return {boolean} free_move
-     */
-    apply_free_move() {
-        log(`Board.apply_free_move()`);
-
-        this.free_move = document.getElementById("free-move").checked;
-        log(`Board.apply_free_move>free_move=${this.free_move}`);
-
-        return this.free_move;
-    } // Board.apply_free_move()
-
-    /**
+     * ヘッダの Pip を切り替えたとき。値は Settings に持たせ、
+     * 表示はここで切り替える (TODO-053)
+     *
      * @return {boolean} disp_pip
      */
     apply_disp_pip() {
-        log(`Board.apply_disp_pip()`);
+        const disp_pip = this.settings.apply_disp_pip();
 
-        this.disp_pip = document.getElementById("disp-pip").checked;
-        log(`Board.apply_disp_pip>disp_pip=${this.disp_pip}`);
-
-        if ( this.disp_pip ) {
+        if ( disp_pip ) {
             this.pip[0].on();
             this.pip[1].on();
         } else {
@@ -337,7 +274,7 @@ export class Board extends BgImage {
             this.pip[1].off();
         }
 
-        return this.disp_pip;
+        return disp_pip;
     } // Board.apply_disp_pip()
 
     /**
@@ -382,29 +319,6 @@ export class Board extends BgImage {
         // 両方のクロックはサーバが止める (TODO-050)
         action_set_clock_limit(this, index, limit);
     } // Board.apply_clock_limit()
-
-    /**
-     * load player number from cookie
-     *
-     * cookie の値は文字列なので数に直す (TODO-050)。直さないと "0" の
-     * まま残り、投了で resign の player に文字列を送ってしまう
-     * (サーバは data の型を確かめて弾く)。値が無ければ undefined のまま
-     */
-    load_player() {
-        const player = this.cookie.get(this.cookie_board_player);
-        this.player = player === undefined ? undefined : parseInt(player);
-        return this.player;
-    } // Board.load_player()
-
-    /**
-     * set player number and save to cookie
-     *
-     * @param {number} player
-     */
-    set_player(player) {
-        this.player = player;
-        this.cookie.set(this.cookie_board_player, this.player);
-    } // board.set_player()
 
     /**
      * search checker object by checker id
@@ -756,7 +670,7 @@ export class Board extends BgImage {
         // 名前を変えただけでも掴んでいる駒が一瞬戻ってしまう。
         // 積み順と cur_point は gameinfo どおりに作らせたまま、
         // 見えている位置と重なり順だけを戻す
-        const mv_ch = this.moving_checker;
+        const mv_ch = this.drag.checker;
         let mv_pos = undefined;
         if ( mv_ch !== undefined ) {
             mv_pos = { x: mv_ch.x, y: mv_ch.y, z: mv_ch.z };
@@ -917,7 +831,7 @@ export class Board extends BgImage {
             throw new Error("Board.predict_gameinfo: gameinfo が無い");
         }
 
-        const gameinfo = JSON.parse(JSON.stringify(this.gameinfo));
+        const gameinfo = copy_gameinfo(this.gameinfo);
         let pos = Position.from_gameinfo(gameinfo);
 
         for (let mv of moves) {
@@ -939,7 +853,8 @@ export class Board extends BgImage {
                     dice[i] += 10;
                 }
             } // for (d1)
-            disable_unusable(pos, player, dice);
+            gameinfo.board.dice[player] = rule_disable_unusable(
+                pos, player, dice);
         }
 
         return gameinfo;
@@ -951,9 +866,9 @@ export class Board extends BgImage {
     inverse(sec) {
         log(`Board.inverse(sec=${sec})`);
         
-        this.set_player(1 - this.player);
-        
-        if ( this.player == 0 ) {
+        this.settings.set_player(1 - this.settings.player);
+
+        if ( this.settings.player == 0 ) {
             this.rotate(0, true, sec);
         } else {
             this.rotate(180, true, sec);
@@ -1007,11 +922,6 @@ export class Board extends BgImage {
      * @param {number} y
      */
     on_mouse_move_xy(x, y) {
-        if ( this.moving_checker !== undefined ) {
-            this.moving_checker.move(x, y, true);
-        }
-        if ( this.cube.moving ) {
-            this.cube.move(x, y, true);
-        }
+        this.drag.move(x, y);
     } // Board.on_mouse_move_xy()
 } // class Board

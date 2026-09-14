@@ -5,8 +5,8 @@
 //
 //   node --test tests/browser/
 //
-// Board.load_player() は cookie の値 (文字列) を読む。数に直さないと、
-// プレーヤー 0 の画面を開き直したときに board.player が "0" のまま残り、
+// Settings.load_player() は cookie の値 (文字列) を読む。数に直さないと、
+// プレーヤー 0 の画面を開き直したときに board.settings.player が "0" のまま残り、
 // 投了ボタンが resign の player に文字列を送る。サーバは data の型を
 // 確かめるので、それを弾いて投了が効かなくなる。
 //
@@ -56,7 +56,7 @@ describe('cookie のプレーヤー番号', () => {
                    return orig.call(this, d);
                };
                const cookie = document.cookie;
-               const player = board.player;
+               const player = board.settings.player;
                board.button_resign.on_mouse_down_xy(0, 0);
                WebSocket.prototype.send = orig;
                return { cookie, player, sent };

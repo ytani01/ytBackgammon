@@ -1,8 +1,8 @@
 /**
  * 盤面を単純なデータで表す Position と、ポイント番号の計算 (TODO-027)。
  *
- * **ここは DOM も Board も見ない。** 受け取るのは Position と player と
- * 出目のような単純な値だけ。import してよいのは rules/ の中だけ。
+ * **ここは DOM も Board も見ない。** 受け取るのは gameinfo・Position・
+ * player・出目のような単純な値だけ。import してよいのは rules/ の中だけ。
  */
 
 /**
@@ -59,6 +59,16 @@ export const get_pip = (player, point) => {
     // player == 1
     return (25 - point);
 }; // get_pip()
+
+/**
+ * gameinfo の複製 (TODO-053)
+ *
+ * 予測した盤面を作るときに、届いた gameinfo を汚さないために使う。
+ *
+ * @param {Object} gameinfo
+ * @return {Object}
+ */
+export const copy_gameinfo = (gameinfo) => JSON.parse(JSON.stringify(gameinfo));
 
 /**
  * 盤面 (チェッカーの配置) だけを持つ型。

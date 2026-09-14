@@ -30,6 +30,8 @@ import { get_image_dir } from "../settings.js";
  *    |
  *    +- BoardPoint                                          ui/point.js
  *
+ * Drag .. 掴む・動かす・離す (チェッカーとキューブ)         drag.js
+ * Settings .. 音・free move・PIP・プレーヤー番号            settings.js
  * CookieBase .. cookie                                      settings.js
  * SoundBase .. sound                                        sound.js
  *=====================================================
@@ -204,9 +206,12 @@ export class BgBase {
         
         let [x, y] = [e.pageX - origin_x, e.pageY - origin_y];
 
+        // 画面の向きはプレーヤー番号で決まる (Settings が持つ。TODO-053)
         let player = this.player;
-        if ( this.board) {
-            player = this.board.player;
+        if ( this.board ) {
+            player = this.board.settings.player;
+        } else if ( this.settings ) {
+            player = this.settings.player;   // Board 自身
         }
         if ( player == 1 ) {
             [x, y] = this.inverse_xy(e);

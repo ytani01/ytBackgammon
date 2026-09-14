@@ -1,5 +1,3 @@
-import { log } from "../log.js";
-import { can_hold_cube, cancel_double, double, take } from "../actions.js";
 import { BgImage } from "./base.js";
 
 /**
@@ -35,7 +33,6 @@ export class Cube extends BgImage {
         // gameinfo から毎回作り、判定は gameinfo を読む (TODO-052)
 
         this.move_sec = 0.3;
-        this.moving = false;
         
         this.x0 = (this.board.bx[0] + this.board.bx[1]) / 2;
         this.x1 = [(this.board.bx[4] + this.board.bx[5]) / 2,
@@ -46,8 +43,6 @@ export class Cube extends BgImage {
         this.y1 = [(this.y2[0] + this.board.h / 2) / 2,
                    (this.y2[1] + this.board.h / 2) / 2];
 
-        [this.src_x, this.src_y] = [undefined, undefined];
-        
         this.file_prefix = this.image_dir + "cube";
 
         this.el.style.cursor = "pointer";
@@ -97,80 +92,28 @@ export class Cube extends BgImage {
     } // Cube.set()
 
     /**
+     * 掴む・動かす・離すは drag.js (TODO-053)
+     *
      * @param {number} x
      * @param {number} y
      */
     on_mouse_down_xy(x, y) {
-        log(`Cube.on_mouse_down_xy():this.board.plyaer=${this.board.player}`);
-        // 触れてよいかの判定は actions.js (TODO-051)
-        if ( ! can_hold_cube(this.board) ) {
-            return false;
-        }
-
-        this.moving = true;
-        [this.src_x, this.src_y] = [this.x, this.y];
-        this.move(x, y, true);
-        return false;
-    }
+        this.board.drag.hold_cube(x, y);
+    } // Cube.on_mouse_down_xy()
 
     /**
      * @param {number} x
      * @param {number} y
      */
     on_mouse_move_xy(x, y) {
-        if ( this.moving ) {
-            this.move(x, y, true);
-        }
-    }
+        this.board.drag.move_cube(x, y);
+    } // Cube.on_mouse_move_xy()
 
     /**
      * @param {number} x
      * @param {number} y
      */
     on_mouse_up_xy(x, y) {
-        log(`Cube.on_mouse_up_xy>this.board.player=${this.board.player}`);
-
-        if ( this.moving ) {
-            this.moving = false;
-        } else {
-            return false;
-        }
-
-        // 掴めたなら gameinfo は届いている (can_hold_cube())
-        const cube = this.board.gameinfo.board.cube;
-        const side = cube.side;   // -1 なら中央
-
-        if ( ! cube.accepted ) {
-            // ダブルが掛けられた状態
-            if ( side == this.board.player ) {
-                if ( this.src_y == this.y1[0] ) {
-                    if ( this.y >= this.y0 ) {
-                        take(this.board, side);
-                    } else {
-                        // redouble
-                        double(this.board, 0, true);
-                    }
-                }
-                if ( this.src_y == this.y1[1] ) {
-                    if ( this.y <= this.y0 ) {
-                        take(this.board, side);
-                    } else {
-                        // redouble
-                        double(this.board, 1, true);
-                    }
-                }
-                
-                return false;
-            }
-            // 掛けた側 (キューブの反対側) が取り消す
-            cancel_double(this.board, 1 - side);
-            return false;
-        }
-
-        // cube.accepted == true
-        if ( side < 0 || side == this.board.player ) {
-            double(this.board, this.board.player);
-        }
-        return false;
-    } // Cube.on_mouse_down_xy()
+        this.board.drag.drop_cube(x, y);
+    } // Cube.on_mouse_up_xy()
 } // class Cube

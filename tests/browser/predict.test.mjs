@@ -404,7 +404,7 @@ describe('ドラッグの先行実行 (予測)', () => {
 
     it('行けない場所で離すと、元に戻って何も送らない', async () => {
         // decide_dst() がキャンセルしたら undefined を返し、
-        // on_mouse_up_xy() はそこで終わる (TODO-045)。
+        // Drag.drop_checker() はそこで終わる (TODO-045、TODO-053)。
         // 分けたことで、この返り値がキャンセルとの唯一のつなぎになった。
         // 取り違えると、行けない場所への move がサーバへ飛ぶ
         await set_turn_dice(page, [3, 0, 0, 0]);
@@ -425,7 +425,7 @@ describe('ドラッグの先行実行 (予測)', () => {
 
         const state = await page.evaluate(i => ({
             point: board.checker[0][i].cur_point,
-            moving: board.moving_checker !== undefined,
+            moving: board.drag.checker !== undefined,
         }), tip);
         state.dice = await shown_dice(page, 0);
 
@@ -458,7 +458,7 @@ describe('ドラッグの先行実行 (予測)', () => {
 
             const state = await page.evaluate(i => ({
                 point: board.checker[0][i].cur_point,
-                moving: board.moving_checker !== undefined,
+                moving: board.drag.checker !== undefined,
             }), tip);
             state.dice = await shown_dice(page, 0);
             assert.equal(state.point, 6, '元のポイントに戻っていない');

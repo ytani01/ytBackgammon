@@ -216,7 +216,9 @@ describe('クリックでの操作', () => {
         }
     });
 
-    const board_attr = name => page.evaluate(n => board[n], name);
+    // 画面ごとの設定は board.settings にある (TODO-053)
+    const settings_attr = name => page.evaluate(
+        n => board.settings[n], name);
     const turn = () => page.evaluate(() => board.gameinfo.turn);
 
     /**
@@ -231,18 +233,18 @@ describe('クリックでの操作', () => {
     };
 
     /**
-     * board.player が want になるまで待つ (回転は 0.5 秒かけて動く)
+     * board.settings.player が want になるまで待つ (回転は 0.5 秒かけて動く)
      *
      * @param {number} want
      */
     const wait_player = want => wait_for(
-        () => board_attr('player'), p => p === want, { msg: 'player' });
+        () => settings_attr('player'), p => p === want, { msg: 'player' });
 
     // --- メニュー ---
 
-    it('メニュー「ボード回転」→ board.player が反転し、メニューが閉じる',
+    it('メニュー「ボード回転」→ board.settings.player が反転し、メニューが閉じる',
        async () => {
-           const p0 = await board_attr('player');
+           const p0 = await settings_attr('player');
            await menu('ボード回転');
            await wait_player(1 - p0);
            assert.equal(
@@ -294,26 +296,26 @@ describe('クリックでの操作', () => {
 
     // --- ヘッダ ---
 
-    it('ヘッダ Sound → board.sound が反転する', async () => {
-        const s0 = await board_attr('sound');
+    it('ヘッダ Sound → board.settings.sound が反転する', async () => {
+        const s0 = await settings_attr('sound');
         await page.locator('#sound-switch').click();
-        assert.equal(await board_attr('sound'), !s0);
+        assert.equal(await settings_attr('sound'), !s0);
         await page.locator('#sound-switch').click();
-        assert.equal(await board_attr('sound'), s0);
+        assert.equal(await settings_attr('sound'), s0);
     });
 
-    it('ヘッダ Free → board.free_move が true になる', async () => {
+    it('ヘッダ Free → board.settings.free_move が true になる', async () => {
         await page.locator('#free-move').click();
-        assert.equal(await board_attr('free_move'), true);
+        assert.equal(await settings_attr('free_move'), true);
         await page.locator('#free-move').click();
-        assert.equal(await board_attr('free_move'), false);
+        assert.equal(await settings_attr('free_move'), false);
     });
 
-    it('ヘッダ Pip → board.disp_pip が true になる', async () => {
+    it('ヘッダ Pip → board.settings.disp_pip が true になる', async () => {
         await page.locator('#disp-pip').click();
-        assert.equal(await board_attr('disp_pip'), true);
+        assert.equal(await settings_attr('disp_pip'), true);
         await page.locator('#disp-pip').click();
-        assert.equal(await board_attr('disp_pip'), false);
+        assert.equal(await settings_attr('disp_pip'), false);
     });
 
     it('ヘッダ Clock → set_clock_switch {switch: false} だけを送る',
@@ -432,8 +434,8 @@ describe('クリックでの操作', () => {
         await assert_sent(page, 'fwd', { n: 1 });
     });
 
-    it('盤面の回転ボタン → board.player が反転する', async () => {
-        const p0 = await board_attr('player');
+    it('盤面の回転ボタン → board.settings.player が反転する', async () => {
+        const p0 = await settings_attr('player');
         await page.locator('#button-inverse').click({ force: true });
         await wait_player(1 - p0);
         await page.locator('#button-inverse').click({ force: true });

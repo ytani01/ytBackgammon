@@ -11,8 +11,8 @@
  */
 import { log } from "./log.js";
 import { emit_msg } from "./ws.js";
-import { Position, bar_point } from "./rules/position.js";
-import { dice_for_move, usable_dice } from "./rules/move.js";
+import { Position, bar_point, copy_gameinfo } from "./rules/position.js";
+import { dice_for_move, disable_unusable } from "./rules/move.js";
 import { winner_is } from "./rules/judge.js";
 
 /** キューブの値と得点の上限 (サーバの CUBE_MAX / SCORE_MAX と同じ) */
@@ -26,33 +26,6 @@ const SCORE_MAX = 99;
  * @return {number}
  */
 const checker_id = (ch) => parseInt(ch.id.slice(1));
-
-/**
- * gameinfo の複製 (予測した盤面を作るとき、届いた gameinfo を汚さない)
- *
- * @param {Object} gameinfo
- * @return {Object}
- */
-const copy_gameinfo = (gameinfo) => JSON.parse(JSON.stringify(gameinfo));
-
-/**
- * 使えない目を 11〜16 にする
- *
- * @param {Position} position
- * @param {number} player
- * @param {number[]} dice - 書き換える
- * @return {number[]} dice
- */
-export const disable_unusable = (position, player, dice) => {
-    const usable = usable_dice(position, player, dice);
-    log(`disable_unusable>usable=${JSON.stringify(usable)}`);
-    for (let i=0; i < usable.length; i++) {
-        if ( ! usable[i] ) {
-            dice[i] = dice[i] % 10 + 10;
-        }
-    }
-    return dice;
-}; // disable_unusable()
 
 // -----------------------------------------------------------------
 // ダイス
@@ -93,7 +66,7 @@ export const roll = (board, player) => {
     } else {
         dice = [value1, value1, value1, value1];
     }
-    disable_unusable(board.position(), player, dice);
+    dice = disable_unusable(board.position(), player, dice);
 
     emit_msg("roll", { player: player, dice: dice });
     return true;
@@ -117,7 +90,7 @@ export const click_dice = (board, player, i) => {
         return;
     }
 
-    if ( board.free_move ) {
+    if ( board.settings.free_move ) {
         const cur = gi.board.dice[player][i];
         if ( cur < 1 ) {
             return;
@@ -193,7 +166,7 @@ export const can_pick_checker = (board, ch) => {
     if ( gi === undefined ) {
         return false;
     }
-    if ( board.free_move ) {
+    if ( board.settings.free_move ) {
         return true;
     }
 
@@ -236,7 +209,7 @@ export const can_pick_checker = (board, ch) => {
  * @return {boolean} - false なら何も送っていない (呼んだ側が元の位置へ戻す)
  */
 export const drop_checker = (board, ch, drop_p) => {
-    if ( board.free_move ) {
+    if ( board.settings.free_move ) {
         put_checker(board, ch, drop_p);
         return true;
     }
@@ -361,9 +334,8 @@ export const move = (board, ch, dst_p, hit_ch, active_dice) => {
     });
 
     // 予測を表示する。音は鳴らさない (last_op を渡さない)。
-    // apply() は掴んでいるチェッカーを手元の座標に戻すので、
-    // その前に moving_checker を外す
-    board.moving_checker = undefined;
+    // apply() は掴んでいるチェッカーを手元の座標に戻すが、
+    // drag.js が離したときに外してから呼んでいる (TODO-053)
     board.apply(predicted, { sec: 0.2 });
     return true;
 }; // move()
@@ -389,11 +361,11 @@ export const can_hold_cube = (board) => {
         // ゲーム開始時、終了時は、触れない
         return false;
     }
-    if ( cube.side >= 0 && cube.side != board.player ) {
+    if ( cube.side >= 0 && cube.side != board.settings.player ) {
         // 相手側にあるキューブは、触れない
         return false;
     }
-    if ( cube.accepted && gi.turn != board.player ) {
+    if ( cube.accepted && gi.turn != board.settings.player ) {
         // 自分の番にしかダブルを掛けられない
         return false;
     }
@@ -405,6 +377,54 @@ export const can_hold_cube = (board) => {
     }
     return true;
 }; // can_hold_cube()
+
+/**
+ * 掴んでいたキューブを離したとき。掴んだ位置と離した位置で、
+ * ダブル・テイク・取り消しのどれを送るかを決める
+ *
+ * @param {Board} board
+ * @param {number} src_y - 掴んだときのキューブの y
+ * @param {number} y - 離したときのキューブの y
+ */
+export const drop_cube = (board, src_y, y) => {
+    const cube_ui = board.cube;
+    const player = board.settings.player;
+
+    // 掴めたなら gameinfo は届いている (can_hold_cube())
+    const cube = board.gameinfo.board.cube;
+    const side = cube.side;   // -1 なら中央
+
+    if ( ! cube.accepted ) {
+        // ダブルが掛けられた状態
+        if ( side == player ) {
+            if ( src_y == cube_ui.y1[0] ) {
+                if ( y >= cube_ui.y0 ) {
+                    take(board, side);
+                } else {
+                    // redouble
+                    double(board, 0, true);
+                }
+            }
+            if ( src_y == cube_ui.y1[1] ) {
+                if ( y <= cube_ui.y0 ) {
+                    take(board, side);
+                } else {
+                    // redouble
+                    double(board, 1, true);
+                }
+            }
+            return;
+        }
+        // 掛けた側 (キューブの反対側) が取り消す
+        cancel_double(board, 1 - side);
+        return;
+    }
+
+    // cube.accepted == true
+    if ( side < 0 || side == player ) {
+        double(board, player);
+    }
+}; // drop_cube()
 
 /**
  * ダブル
@@ -470,7 +490,7 @@ export const resign = (board) => {
         score = cube.value * 3;
     }
     log(`resign>score=${score}`);
-    emit_msg("resign", { player: parseInt(board.player),
+    emit_msg("resign", { player: parseInt(board.settings.player),
                          score: parseInt(score) });
 }; // resign()
 

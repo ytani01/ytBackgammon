@@ -264,6 +264,21 @@ export const usable_dice = (pos, player, dice_vals) => {
 }; // usable_dice()
 
 /**
+ * 使えない目を 11〜16 にした、新しいダイスの配列 (TODO-053)
+ *
+ * **渡した配列は書き換えない。** 判定は usable_dice()。
+ *
+ * @param {Position} pos
+ * @param {number} player - 0 or 1
+ * @param {number[]} dice_vals
+ * @return {number[]}
+ */
+export const disable_unusable = (pos, player, dice_vals) => {
+    const usable = usable_dice(pos, player, dice_vals);
+    return dice_vals.map((v, i) => usable[i] ? v : v % 10 + 10);
+}; // disable_unusable()
+
+/**
  * 移動に使用するダイスの目の組み合わせ (TODO-043)
  *
  * **盤面は見ない。** 移動できるかどうかは呼ぶ側が確かめ済みという前提。

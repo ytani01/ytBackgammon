@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-053〜055。** これまでに 52 件を決着させた。
+**残っている項目: TODO-054・055。** これまでに 53 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-056` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -14,35 +14,8 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 **TODO-042 で決めた構成の見直し（第 2 弾）の実装（TODO-043〜048）も、
 2026-09-13 に全部終わった。**
 
-**TODO-049 で決めた構成の見直し（第 3 弾）は、TODO-050〜055 で実装する（TODO-050〜052 は済んだ）。**
+**TODO-049 で決めた構成の見直し（第 3 弾）は、TODO-050〜055 で実装する（TODO-050〜053 は済んだ）。**
 設計は `docs/design.md` にある。
-
----
-
-## TODO-053. `Board` からドラッグと設定を切り出す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-- [ ] チェッカーとキューブの「掴む・動かす・離す」を `drag.js` へ移し、`moving_checker` と `Cube.moving` をそこで持つ
-- [ ] 音の ON/OFF・free move・PIP を表示するか・cookie に保存するプレーヤー番号を `settings.js` のクラスへ移す
-- [ ] `ui/base.js` のクラス階層図と `CLAUDE.md` の構成を直す
-
-設計は `docs/design.md` の「クライアント」の節の「`Board` を分ける」にある。
-
-- クロックの ON/OFF と持ち時間の表示は `Board` に残す
-- `PlayerPipCount` のコンストラクタ（`ui/label.js`）も PIP のチェックボックスを
-  直接読んでいるので、移したクラスから読むようにする
-- ルール層の関数を呼ぶだけの `Board` のメソッド（`get_dst_points()` など）は消さない。
-  `tests/browser/rules.test.mjs` が呼んでいる
-- TODO-051 で `actions.js` に置いた `disable_unusable()`（使えなくなった目を 11〜16 に
-  する）を `rules/move.js` へ移し、配列を書き換えずに新しい配列を返す形にする。
-  送信と関係ないのに、`board.js` の `predict_gameinfo()` が `actions.js` を
-  import しているため（TODO-051 のレビュー）。`tests/js/` にテストを足す
-- TODO-052 で `actions.js` に足した `copy_gameinfo()` は、`board.js` の `predict_gameinfo()` と
-  同じ複製を別に書いている。`disable_unusable()` を移すときにまとめる
-- **TODO-052 のあとに行う**
 
 ---
 
@@ -102,6 +75,7 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-053.** `Board` からドラッグと設定を切り出す](archives/todo/TODO-053.%20Board%20からドラッグと設定を切り出す.md)
 - [**TODO-052.** 表示部品が持つ状態の写しをなくし、判定では `gameinfo` を読む](archives/todo/TODO-052.%20表示部品が持つ状態の写しをなくし、判定では%20gameinfo%20を読む.md)
 - [**TODO-051.** 1 つの操作を 1 通で送り、送信を `actions.js` にまとめる](archives/todo/TODO-051.%201%20つの操作を%201%20通で送り、送信を%20actions.js%20にまとめる.md)
 - [**TODO-050.** サーバに名前付きの操作を足し、type の登録表を 1 つにする](archives/todo/TODO-050.%20サーバに名前付きの操作を足し、type%20の登録表を%201%20つにする.md)
