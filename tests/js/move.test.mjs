@@ -233,14 +233,14 @@ describe('usable_dice()', () => {
                          [true, true, true, true]);
     });
 
-    it('バーの駒が復帰できなければ、全部 false', () => {
+    it('バーの駒が復帰できなければ、1〜6 の目は全部 false', () => {
         let spec = {[bar_point(0)]: [0]};
         for (const p of [19, 20, 21, 22, 23, 24]) {
             spec[p] = stack(1, 2);
         }
         const pos = make_position(spec);
         assert.deepEqual(usable_dice(pos, 0, [3, 5, 0, 0]),
-                         [false, false, false, false]);
+                         [false, false, true, true]);
     });
 
     it('バーの駒が復帰できれば、全部 true', () => {
@@ -262,7 +262,7 @@ describe('usable_dice()', () => {
         }
         const pos = make_position(spec);
         assert.deepEqual(usable_dice(pos, 1, [3, 5, 0, 0]),
-                         [false, false, false, false]);
+                         [false, false, true, true]);
     });
 
     it('動かせる駒が 1 つも無ければ false', () => {
@@ -375,6 +375,20 @@ describe('disable_unusable()', () => {
                                    5: stack(1, 2)});
         assert.deepEqual(disable_unusable(pos, 0, [11, 5, 0, 0]),
                          [11, 15, 0, 0]);
+    });
+
+    it('バーの駒が復帰できなくても、目が 0 のダイスは 0 のまま', () => {
+        // 0 を使えない目にすると 0 % 10 + 10 = 10 になり、そのまま
+        // roll や move で送られて履歴に残っていた
+        let spec = {[bar_point(0)]: [0]};
+        for (const p of [19, 20, 21, 22, 23, 24]) {
+            spec[p] = stack(1, 2);
+        }
+        const pos = make_position(spec);
+        assert.deepEqual(disable_unusable(pos, 0, [3, 5, 0, 0]),
+                         [13, 15, 0, 0]);
+        assert.deepEqual(disable_unusable(pos, 0, [0, 3, 0, 0]),
+                         [0, 13, 0, 0]);
     });
 
     it('渡した配列は書き換えない', () => {

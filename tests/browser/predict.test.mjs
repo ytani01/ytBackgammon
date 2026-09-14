@@ -5,9 +5,9 @@
 //
 //   node --test tests/browser/
 //
-// ドラッグを離すと、actions.js の move() がサーバの応答を待たずに
-// 「動かしたあとの gameinfo」を予測して Board.apply() に渡し、
-// move を 1 通送る (TODO-051)。ここで見るのは次のとおり。
+// ドラッグを離すと、actions.js の drop_checker() が、rules/actions.js の
+// plan_move() で「動かしたあとの gameinfo」の予測と move を作り、
+// サーバの応答を待たずに move を 1 通送って予測を Board.apply() に渡す。ここで見るのは次のとおり。
 //
 //   1. 応答が無くても表示が変わる (先行実行)
 //   2. 予測した盤面に、使ったダイスと使えなくなったダイス (11〜16) が
@@ -353,7 +353,7 @@ describe('ドラッグの先行実行 (予測)', () => {
     });
 
     it('行けない場所で離すと、元に戻って何も送らない', async () => {
-        // decide_dst() がキャンセルしたら undefined を返し、
+        // decide_dst() がキャンセルしたら null を返し (plan_move() も null)、
         // Drag.drop_checker() はそこで終わる (TODO-045、TODO-053)。
         // 分けたことで、この返り値がキャンセルとの唯一のつなぎになった。
         // 取り違えると、行けない場所への move がサーバへ飛ぶ

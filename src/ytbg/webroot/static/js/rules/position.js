@@ -71,6 +71,69 @@ export const get_pip = (player, point) => {
 export const copy_gameinfo = (gameinfo) => JSON.parse(JSON.stringify(gameinfo));
 
 /**
+ * gameinfo のチェッカーを、積んだ順に並べる
+ *
+ * `gameinfo.board.checker[player][i] = [point, idx]` を idx の昇順に
+ * 並べる。Array.sort は安定なので、同じ idx の並びは (player, i) の順の
+ * まま。ID は `player * 100 + i`。
+ *
+ * **積み順を決めているのはここだけ**で、Position.from_gameinfo() も
+ * 表示の配り直しもこれを使う (2 か所にあるとずれる)。
+ *
+ * @param {Object} gameinfo
+ * @return {{id: number, player: number, point: number, idx: number}[]}
+ */
+export const checker_order = (gameinfo) => {
+    const ch_point = gameinfo.board.checker;
+
+    let ch_list = [];
+    for (let p=0; p < 2; p++) {
+        for (let i=0; i < ch_point[p].length; i++) {
+            ch_list.push({ id: p * 100 + i,
+                           player: p,
+                           point: ch_point[p][i][0],
+                           idx: ch_point[p][i][1] });
+        } // for (i)
+    } // for (p)
+
+    ch_list.sort((a, b) => a.idx - b.idx);
+    return ch_list;
+}; // checker_order()
+
+/**
+ * そのポイントのチェッカー (積んだ順、両プレーヤーぶん)
+ *
+ * @param {Object} gameinfo
+ * @param {number} point
+ * @return {{id: number, player: number, point: number, idx: number}[]}
+ */
+export const checkers_at = (gameinfo, point) => {
+    return checker_order(gameinfo).filter((e) => e.point == point);
+}; // checkers_at()
+
+/**
+ * 使えるダイス (1〜6) の目
+ *
+ * @param {Object} gameinfo
+ * @param {number} player
+ * @return {number[]}
+ */
+export const active_dice = (gameinfo, player) => {
+    return gameinfo.board.dice[player].filter((v) => v >= 1 && v <= 6);
+}; // active_dice()
+
+/**
+ * ダイスが出ているか (使い終わった 11〜16 も含む)
+ *
+ * @param {Object} gameinfo
+ * @param {number} player
+ * @return {boolean}
+ */
+export const has_dice = (gameinfo, player) => {
+    return gameinfo.board.dice[player].some((v) => v > 0);
+}; // has_dice()
+
+/**
  * 盤面 (チェッカーの配置) だけを持つ型。
  *
  * pt[p] には、そのポイントに積まれたチェッカーの **プレーヤー番号を
@@ -113,29 +176,14 @@ export class Position {
      * gameinfo から作る。
      *
      * `gameinfo.board.checker[player][i] = [point, idx]`。
-     * 積み順は `Board.apply()` と同じで、idx の昇順
-     * (同じ idx なら player, i の順) に積む。
+     * 積み順は checker_order() で決める。
      *
      * @param {Object} gameinfo
      * @return {Position}
      */
     static from_gameinfo(gameinfo) {
-        const ch_point = gameinfo.board.checker;
-
-        let ch_list = [];
-        for (let p=0; p < 2; p++) {
-            for (let i=0; i < ch_point[p].length; i++) {
-                ch_list.push({ player: p,
-                               point: ch_point[p][i][0],
-                               idx: ch_point[p][i][1] });
-            } // for (i)
-        } // for (p)
-
-        // Array.sort は安定なので、同じ idx の並びは積んだ順のまま
-        ch_list.sort((a, b) => a.idx - b.idx);
-
         let pt = Array.from({length: N_POINT}, () => []);
-        for (let e of ch_list) {
+        for (let e of checker_order(gameinfo)) {
             if ( ! Number.isInteger(e.point)
                  || e.point < 0 || e.point >= N_POINT ) {
                 throw new RangeError(
@@ -205,8 +253,8 @@ export class Position {
      * 「UI と同じ」と見なさないこと** (TODO-027 のレビューでの指摘)。
      *
      * **ヒットの処理はしない。** 相手のチェッカーをバーへ送るのは、
-     * 呼んだ側が別の `with_move()` として行う (`actions.js` の
-     * `move()` が `moves` に 2 手ぶん積む。TODO-030、TODO-051)。
+     * 呼んだ側が別の `with_move()` として行う (`rules/actions.js` の
+     * `plan_move()` が `moves` に 2 手ぶん積む)。
      *
      * **from_p に player の駒が無ければ例外を投げる。** 呼ぶ側は
      * 「掴んでいる駒」を渡す前提で、駒が無いことは起きない。黙って

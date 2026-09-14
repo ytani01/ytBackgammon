@@ -138,7 +138,7 @@ describe('ブラウザでの基本の動作確認', () => {
     });
 
     it('積み順は gameinfo の idx で決まる', async () => {
-        // 積み順を決めているのは Board.checker_order() だけで、
+        // 積み順を決めているのは rules/position.js の checker_order() だけで、
         // apply() の配り直しと checkers_at() の両方がこれを使う
         // (TODO-044)。初期配置では idx の順と (player, i) の順が
         // たまたま一致するので、入れ替えて確かめる。

@@ -9,9 +9,13 @@ import { Settings, get_server_id } from "./settings.js";
 import { SoundBase, SOUND_ROLL, SOUND_PUT, SOUND_HIT,
          SOUND_TURN_CHANGE } from "./sound.js";
 import { BgImage } from "./ui/base.js";
-import { Position, N_POINT, copy_gameinfo } from "./rules/position.js";
+import { Position, N_POINT,
+         active_dice as rule_active_dice,
+         checker_order as rule_checker_order,
+         has_dice as rule_has_dice } from "./rules/position.js";
+import { plan_move as rule_plan_move,
+         predict_moves as rule_predict_moves } from "./rules/actions.js";
 import { all_inner as rule_all_inner,
-         disable_unusable as rule_disable_unusable,
          dst_point as rule_dst_point,
          dst_points as rule_dst_points } from "./rules/move.js";
 import { closeout as rule_closeout,
@@ -410,14 +414,10 @@ export class Board extends BgImage {
     } // Board.position()
 
     /**
-     * gameinfo のチェッカーを、積んだ順に並べる (TODO-044)
+     * gameinfo のチェッカーを、積んだ順に並べて、表示の駒に直す
      *
-     * `gameinfo.board.checker[player][i] = [point, idx]` を idx の
-     * 昇順に並べる。Array.sort は安定なので、同じ idx の並びは
-     * (player, i) の順のまま。
-     *
-     * **積み順を決めているのはここだけ**で、apply() の配り直しと
-     * checkers_at() の両方がこれを使う (2 か所にあるとずれる)。
+     * 積み順を決めるのは rules/position.js の checker_order()。
+     * apply() の配り直しと checkers_at() の両方がこれを使う。
      *
      * @return {{ch: Checker, point: number, idx: number}[]}
      */
@@ -426,21 +426,13 @@ export class Board extends BgImage {
             return [];
         }
 
-        const ch_point = this.gameinfo.board.checker;
-        let ch_list = [];
-        for (let p=0; p < 2; p++) {
-            // 15 固定。gameinfo の checker[p] が 15 と違う長さでも、
-            // this.checker[p] は 15 枚しか無い (壊れた .jsonl を
-            // 読んだときに、盤面の更新が途中で止まらないように)
-            for (let c=0; c < 15; c++) {
-                ch_list.push({ ch: this.checker[p][c],
-                               point: ch_point[p][c][0],
-                               idx: ch_point[p][c][1] });
-            } // for (c)
-        } // for (p)
-
-        ch_list.sort((a, b) => a.idx - b.idx);
-        return ch_list;
+        // 16 枚目より後は捨てる。gameinfo の checker[p] が 15 より長くても、
+        // this.checker[p] は 15 枚しか無い (壊れた .jsonl を読んだときに、
+        // 盤面の更新が途中で止まらないように)
+        return rule_checker_order(this.gameinfo)
+            .filter((e) => e.id % 100 < 15)
+            .map((e) => ({ ch: this.checker[e.player][e.id % 100],
+                           point: e.point, idx: e.idx }));
     } // Board.checker_order()
 
     /**
@@ -525,7 +517,7 @@ export class Board extends BgImage {
     } // Board.closeout()
 
     /**
-     * 使えるダイス (1〜6) の目。gameinfo から求める (TODO-052)
+     * 使えるダイス (1〜6) の目 (rules/position.js の active_dice())
      *
      * @param {number} player
      * @return {number[]} - gameinfo がまだ無いときは空
@@ -534,8 +526,7 @@ export class Board extends BgImage {
         if ( this.gameinfo === undefined ) {
             return [];
         }
-        return this.gameinfo.board.dice[player].filter(
-            (v) => v >= 1 && v <= 6);
+        return rule_active_dice(this.gameinfo, player);
     } // Board.get_active_dice
 
     /**
@@ -549,7 +540,7 @@ export class Board extends BgImage {
         if ( this.gameinfo === undefined ) {
             return false;
         }
-        return this.gameinfo.board.dice[player].some((v) => v > 0);
+        return rule_has_dice(this.gameinfo, player);
     } // Board.has_dice()
 
     /**
@@ -585,7 +576,7 @@ export class Board extends BgImage {
      * gameinfo を表示に反映する。**表示を変えるのはここだけ** (TODO-030)。
      *
      * 渡すのは、サーバから届いた gameinfo か、
-     * predict_gameinfo() で作った予測のどちらか。
+     * rules/actions.js で作った予測のどちらか。
      *
      * 演出 (音と dice の回転) は last_op から出す (TODO-015)。
      * サーバから届くのは gameinfo だけになったので、盤面は gameinfo で
@@ -787,59 +778,25 @@ export class Board extends BgImage {
     } // Board.load_gameinfo()
 
     /**
-     * チェッカーを動かしたあとの gameinfo を予測して作る (TODO-030)。
+     * 駒を離したときの move と予測 (rules/actions.js の plan_move())。
      *
-     * サーバの応答を待たずに表示を変えるための「予測」。土台は
-     * this.gameinfo (apply() が最後に受け取ったもの) で、動かした
-     * チェッカーの [point, idx] を書き換える。
+     * 土台は this.gameinfo (apply() が最後に受け取ったもの)。
+     * actions.js の drop_checker() は、予測をここから受け取る。
+     * **予測の入口はこの 1 か所**で、ブラウザテストはここを差し替えて
+     * 予測を外す・失敗させる。
      *
-     * - **sn は書き換えない。** 予測はサーバの通し番号を進めない
-     * - **動かせるかを Position.with_move() で確かめる。**
-     *   駒が無ければ例外になる (TODO-027)
-     * - idx は、そのポイントに既にある枚数。move で送る idx も、
-     *   この予測から取る
-     * - player を渡すと、そのプレーヤーのダイスも書き換える (TODO-051)。
-     *   used_dice の目を 11〜16 にし、動かしたあとの盤面で使えなく
-     *   なった目も 11〜16 にする。move で送る dice はこれ
-     *
-     * @param {{ch: Checker, p: number}[]} moves - 動かす順に並べる
-     * @param {number} [player] - ダイスを書き換えるプレーヤー
-     * @param {number[]} [used_dice=[]] - 使ったダイスの目
-     * @return {Object} - 新しい gameinfo (this.gameinfo は変えない)
-     * @throws {Error} gameinfo がまだ無いとき、動かせないとき
+     * @param {number} id - 動かすチェッカーの ID
+     * @param {number|undefined} point - 離した場所のポイント
+     * @return {{message: {type: string, data: Object},
+     *           predicted: Object}|null} - 動かせないときは null
+     * @throws {Error} gameinfo がまだ無いとき、予測に失敗したとき
      */
-    predict_gameinfo(moves, player=undefined, used_dice=[]) {
+    plan_move(id, point) {
         if ( this.gameinfo === undefined ) {
-            throw new Error("Board.predict_gameinfo: gameinfo が無い");
+            throw new Error("Board.plan_move: gameinfo が無い");
         }
-
-        const gameinfo = copy_gameinfo(this.gameinfo);
-        let pos = Position.from_gameinfo(gameinfo);
-
-        for (let mv of moves) {
-            const ch = mv.ch;
-            const idx = pos.count(mv.p);
-
-            // 動かせるか確かめる (駒が無ければ例外)
-            pos = pos.with_move(ch.cur_point, mv.p, ch.player);
-
-            gameinfo.board.checker[ch.player][ch.num] = [mv.p, idx];
-        } // for (mv)
-
-        if ( player !== undefined ) {
-            const dice = gameinfo.board.dice[player];
-            for (let d1 of used_dice) {
-                const i = dice.indexOf(d1);
-                if ( i >= 0 ) {
-                    dice[i] += 10;
-                }
-            } // for (d1)
-            gameinfo.board.dice[player] = rule_disable_unusable(
-                pos, player, dice);
-        }
-
-        return gameinfo;
-    } // Board.predict_gameinfo()
+        return rule_plan_move(this.gameinfo, id, point);
+    } // Board.plan_move()
 
     /**
      * @param {number} sec
@@ -877,8 +834,8 @@ export class Board extends BgImage {
     /**
      * チェッカーを 1 枚動かして、表示を更新する。
      *
-     * 予測した gameinfo を作って apply() に渡すだけ (TODO-030)。
-     * **配置・pip・バナーの更新は apply() にしかない。**
+     * 予測した gameinfo (rules/actions.js の predict_moves()) を作って
+     * apply() に渡すだけ。**配置・pip・バナーの更新は apply() にしかない。**
      *
      * @param {Checker} ch - Checker
      * @param {number} p - point index
@@ -886,7 +843,11 @@ export class Board extends BgImage {
      * @param {boolean} [sound=true]
      */
     put_checker(ch, p, sec=0, sound=true) {
-        const gameinfo = this.predict_gameinfo([{ch: ch, p: p}]);
+        if ( this.gameinfo === undefined ) {
+            throw new Error("Board.put_checker: gameinfo が無い");
+        }
+        const gameinfo = rule_predict_moves(
+            this.gameinfo, [{ch: ch.player * 100 + ch.num, p: p}]);
 
         // 音は last_op から出る (apply() が put と hit を見分ける)
         let last_op = undefined;

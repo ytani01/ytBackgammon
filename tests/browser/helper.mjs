@@ -757,14 +757,17 @@ export function take_applied(page) {
  */
 export function corrupt_prediction(page, point) {
     return page.evaluate(point => {
-        const orig = Object.getPrototypeOf(board).predict_gameinfo;
-        board.predict_gameinfo = function (...args) {
-            const gameinfo = orig.apply(this, args);
-            const moves = args[0];
-            const ch = moves[moves.length - 1].ch;
-            const ch_i = parseInt(ch.id.slice(1)) % 100;
-            gameinfo.board.checker[ch.player][ch_i] = [point, 0];
-            return gameinfo;
+        const orig = Object.getPrototypeOf(board).plan_move;
+        board.plan_move = function (...args) {
+            const plan = orig.apply(this, args);
+            if ( plan === null ) {
+                return plan;
+            }
+            const moves = plan.message.data.moves;
+            const id = moves[moves.length - 1].ch;
+            plan.predicted.board.checker[Math.floor(id / 100)][id % 100] =
+                [point, 0];
+            return plan;
         };
     }, point);
 }
@@ -777,7 +780,7 @@ export function corrupt_prediction(page, point) {
  */
 export function fail_prediction(page) {
     return page.evaluate(() => {
-        board.predict_gameinfo = function () {
+        board.plan_move = function () {
             throw new Error('predict failed (test)');
         };
     });
@@ -790,7 +793,7 @@ export function fail_prediction(page) {
  * @return {Promise<void>}
  */
 export function restore_prediction(page) {
-    return page.evaluate(() => { delete board.predict_gameinfo; });
+    return page.evaluate(() => { delete board.plan_move; });
 }
 
 // --- 操作する ---

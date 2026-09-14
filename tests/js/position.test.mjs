@@ -8,8 +8,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { N_POINT, Position, bar_point, copy_gameinfo, get_pip,
-         goal_point } from
+import { N_POINT, Position, active_dice, bar_point, checker_order,
+         checkers_at, copy_gameinfo, get_pip, goal_point, has_dice } from
     '../../src/ytbg/webroot/static/js/rules/position.js';
 import { init_checker, make_gameinfo, make_position, stack } from
     './helper.mjs';
@@ -63,6 +63,69 @@ describe('get_pip()', () => {
     });
 });
 
+describe('checker_order() / checkers_at()', () => {
+    it('ID は player * 100 + 番号で、idx の昇順', () => {
+        const order = checker_order(make_gameinfo());
+        assert.equal(order.length, 30);
+        assert.deepEqual(order[0], { id: 0, player: 0, point: 6, idx: 0 });
+        assert.deepEqual(order.map((e) => e.idx),
+                         [...order.map((e) => e.idx)].sort((a, b) => a - b));
+        assert.deepEqual(new Set(order.map((e) => e.id)).size, 30);
+    });
+
+    it('同じ idx なら player、番号の順', () => {
+        const checker = init_checker();
+        checker[1][3] = [10, 0];
+        checker[0][9] = [10, 1];
+        checker[0][2] = [10, 0];
+        const at = checkers_at(make_gameinfo(checker), 10);
+        assert.deepEqual(at.map((e) => e.id), [2, 103, 9]);
+    });
+
+    it('checkers_at() は積んだ順で、両プレーヤーぶん', () => {
+        const gi = make_gameinfo();
+        assert.deepEqual(checkers_at(gi, 8).map((e) => e.id), [5, 6, 7]);
+        assert.deepEqual(checkers_at(gi, 7), []);
+    });
+
+    it('Position.from_gameinfo() と同じ積み順', () => {
+        const checker = init_checker();
+        checker[0][0] = [10, 1];
+        checker[1][0] = [10, 0];
+        const gi = make_gameinfo(checker);
+        const pos = Position.from_gameinfo(gi);
+        for (let p=0; p < N_POINT; p++) {
+            assert.deepEqual(checkers_at(gi, p).map((e) => e.player),
+                             pos.pt[p], `point ${p}`);
+        }
+    });
+
+    it('渡した gameinfo を書き換えない', () => {
+        const gi = make_gameinfo();
+        const before = copy_gameinfo(gi);
+        checker_order(gi);
+        assert.deepEqual(gi, before);
+    });
+});
+
+describe('active_dice()', () => {
+    it('1〜6 の目だけ (0 と使用済みの 11〜16 は除く)', () => {
+        const gi = make_gameinfo();
+        gi.board.dice = [[3, 0, 15, 10], [0, 0, 0, 0]];
+        assert.deepEqual(active_dice(gi, 0), [3]);
+        assert.deepEqual(active_dice(gi, 1), []);
+    });
+});
+
+describe('has_dice()', () => {
+    it('0 より大きい目が 1 つでもあれば true (使用済みも含む)', () => {
+        const gi = make_gameinfo();
+        gi.board.dice = [[0, 13, 0, 0], [0, 0, 0, 0]];
+        assert.equal(has_dice(gi, 0), true);
+        assert.equal(has_dice(gi, 1), false);
+    });
+});
+
 describe('Position.from_gameinfo()', () => {
     it('初期配置のポイントと枚数', () => {
         const pos = Position.from_gameinfo(make_gameinfo());
@@ -99,7 +162,7 @@ describe('Position.from_gameinfo()', () => {
         }
     });
 
-    it('idx の小さい順に積む (Board.load_gameinfo() と同じ)', () => {
+    it('idx の小さい順に積む (checker_order() と同じ)', () => {
         // 同じポイントに両プレーヤーが乗る (free move)。
         // idx が小さい player1 が下になる
         const checker = init_checker();

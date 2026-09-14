@@ -111,9 +111,10 @@ graph TD
   `Checker` はプレーヤーと通し番号を数値で持つ
 - **チェッカーの位置は、クライアントもこの `checker` でしか持たない。**
   ポイントの部品（`BoardPoint`）は座標の計算だけで、「そのポイントに
-  どの駒があるか」は毎回 `gameinfo` から引く（`Board.checkers_at()`）。
-  駒の積み順を決めているのは `Board.checker_order()` だけで、表示の配り直しも
-  これを使う
+  どの駒があるか」は毎回 `gameinfo` から引く（`rules/position.js` の
+  `checkers_at()`）。駒の積み順を決めているのは `rules/position.js` の
+  `checker_order()` だけで、`Position.from_gameinfo()` も表示の配り直し
+  （`Board.checker_order()`）もこれを使う
 - ポイント番号は 0〜25 が盤上（0 と 25 がゴール）、**26 と 27 がバー**。
   プレーヤー 0 は番号が減る方向、1 は増える方向へ進む
 
@@ -217,11 +218,13 @@ free move・名前・得点の操作は積む。クロックの操作は `GameIn
 ### 先行実行（予測）
 
 共有ボードなので、サーバの返事を待つと操作感が悪い。ドラッグを離した瞬間、
-`Board.predict_gameinfo()` が**動かしたあとの `gameinfo` を自分で作って**表示を変え、
-その予測から `move` の中身（駒の積み順、使ったダイス、勝ちの点数）を求めて送る。
+`rules/actions.js` の `plan_move()` が**動かしたあとの `gameinfo` を自分で作り**、
+その予測から `move` の中身（駒の積み順、使ったダイス、勝ちの点数）を求める。
+クライアントはそれを送ってから、予測で表示を変える。
 
+- `plan_move()` は渡された `gameinfo` を書き換えない。駒の移動元も `gameinfo` から読む
 - 予測は、動かしたチェッカーの `[point, idx]` と、そのプレーヤーのダイスを書き換える。
-  使った目と使えなくなった目は 11〜16 にする。`sn` は進めない
+  使った目と使えなくなった目は 11〜16 にする（目が 0 のダイスは 0 のまま）。`sn` は進めない
 - ヒットのときは 2 手ぶん（相手をバーへ、自分を移動先へ）
 - **予測が外れても、サーバから届く `gameinfo` で表示は戻る**
 - 予測に失敗したら何も送らない
@@ -243,8 +246,12 @@ free move での目の変更と、得点の ▲▼（free move に限らない�
   Roll ボタンがもう一度出ることがある（ダイスがまだ 0 のため）
 
 離したときの流れは、`Drag`（`drag.js`）が掴んでいたものを外し、`actions.js` の
-`drop_checker()` を呼ぶ。`drop_checker()` が `decide_dst()`（行き先とヒットの判定）→
-`move()`（予測・送信・表示）の順に呼ぶ。`false` が返ったら、`Drag` が駒を元の位置へ戻す。
+`drop_checker()` を呼ぶ。`drop_checker()` は `Board.plan_move()` を通して
+`rules/actions.js` の `plan_move()`（`decide_dst()` で行き先とヒットを決め、予測と
+送る `move` を作る）を呼び、`move` を送ってから予測を `apply()` する。
+`false` が返ったら（行けない、予測に失敗した）、`Drag` が駒を元の位置へ戻す。
+予測の入口は `Board.plan_move()` の 1 か所で、ブラウザテストはここを差し替えて
+予測を外す・失敗させる（ES Modules の export は外から差し替えられないため）。
 
 **掴んでいた駒を外してから `drop_checker()` を呼ぶ順番は変えないこと。**
 `apply()` は掴んでいる駒を手元の座標に残すので、逆にすると先行実行の表示で
@@ -314,7 +321,7 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 | `main.js` | エントリ。DOM を作り、`Board` を作り、WebSocket をつなぐ |
 | `dom.js` | 盤面の要素を作って返す（チェッカー 30 個、ダイス 8 個など） |
 | `board.js` | `Board`。表示部品を作り、`gameinfo` を表示に反映する |
-| `actions.js` | サーバへ送る操作と、「押してよいか」の判定 |
+| `actions.js` | サーバへ送る操作。判定と送る内容は `rules/actions.js` に任せ、返った内容を送り、予測を `apply()` する |
 | `drag.js` | `Drag`。チェッカーとキューブを掴む・動かす・離す |
 | `ws.js` | 接続・再接続・送信 |
 | `layout.js` | 盤面の座標 |
@@ -328,8 +335,8 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
 id で要素を探し直さず、渡された要素を使う。
 
 **サーバへ送るのは `actions.js` だけ。** 表示部品はマウスの処理と表示だけを受け持ち、
-`Board.apply()`（表示の更新）もサーバへは何も送らない。「押してよいか」の判定は、
-表示部品が持つ値ではなく `board.gameinfo` を読む。
+`Board.apply()`（表示の更新）もサーバへは何も送らない。「押してよいか」の判定は
+`rules/actions.js` が、表示部品が持つ値ではなく `board.gameinfo` とチェッカーの ID から行う。
 表示部品に残っている盤面の値は `Checker.cur_point` だけで、`apply()` が
 `gameinfo` と一緒に書き直す。
 `gameinfo` がまだ届いていないときは、盤面を読む操作（ロール、ダイス、チェッカー、
@@ -368,9 +375,18 @@ id で要素を探し直さず、渡された要素を使う。
 
 | ファイル | 中身 |
 |----------|------|
-| `position.js` | `Position` と `goal_point()` / `bar_point()` / `get_pip()` / `copy_gameinfo()` |
+| `position.js` | `Position` と `goal_point()` / `bar_point()` / `get_pip()` / `copy_gameinfo()` / `checker_order()` / `checkers_at()` / `active_dice()` / `has_dice()` |
 | `move.js` | `calc_dst_point()` / `all_inner()` / `dst_point()` / `dst_points()` / `usable_dice()` / `disable_unusable()` / `dice_for_move()` |
 | `judge.js` | `pip_count()` / `calc_gammon()` / `winner_is()` / `closeout()` |
+| `actions.js` | 操作ごとの判定と送る内容（`can_pick_checker()` / `decide_dst()` / `plan_move()` / `predict_moves()` / `plan_put_checker()` / `plan_roll()` / `plan_dice_click()` / `can_hold_cube()` / `plan_double()` / `plan_cube_drop()` / `plan_resign()` / `plan_score()`） |
+
+`rules/actions.js` の `plan_*()` は、成り立たなければ `null`、成り立てば
+`{message: {type, data}}` と、要るときだけ `predicted`（予測した `gameinfo`）を返す。
+表示の指示は返さない。判定の無い操作（`end_turn`、`take`、`cancel_double`、名前・
+履歴・時計の設定）には plan の関数を作らない。`take` / `cancel_double` と、ダイスを
+使い切ったあとの `end_turn` は、判定のある `plan_cube_drop()` / `plan_dice_click()` が
+返す。パスのバナーの `end_turn` と、名前・履歴・時計の設定は `actions.js` が直接送る。
+乱数（ダイスの位置と目）は `actions.js` が作って `plan_roll()` に渡す。
 
 表示の更新は `Board` の側で行う。
 `Board.position()` が `gameinfo` から `Position` を作って渡す。

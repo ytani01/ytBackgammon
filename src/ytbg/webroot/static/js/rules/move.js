@@ -180,7 +180,7 @@ export const dst_points = (pos, player, src_p, dice_vals) => {
  * dice_vals と同じ長さの配列を返す。値が 1〜6 でない要素は
  * 判定の対象外で true。
  *
- * バーに駒があって復帰できないときは、全て false。
+ * バーに駒があって復帰できないときは、1〜6 の目が全て false。
  *
  * @param {Position} pos
  * @param {number} player - 0 or 1
@@ -195,8 +195,8 @@ export const usable_dice = (pos, player, dice_vals) => {
         // ヒットされている場合は、復活できるか確認
         const dst_p = dst_points(pos, player, bar_p, active_d);
         if ( dst_p.length == 0 ) {
-            // 復活できない
-            return dice_vals.map(() => false);
+            // 復活できない。1〜6 でない目 (0 や使用済み) は対象外で true
+            return dice_vals.map((v) => v < 1 || v > 6);
         }
 
         // T.B.D. 復活できる場合、もう一つのダイスが使えるか確認?
