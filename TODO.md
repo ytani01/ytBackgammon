@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: なし。** これまでに 63 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-064` から。**
+**残っている項目: TODO-064。** これまでに 63 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-065` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -19,6 +19,36 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 **TODO-056 で決めた構成の見直し（第 4 弾）の実装（TODO-057〜060）も、
 2026-09-15 に全部終わった。** 設計は `archives/docs/design-4.md` に移した。
+
+---
+
+## TODO-064. board と lobby に URL のプレフィクスを指定できるようにする
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
+
+`http://server:port/foo` の `/foo` の部分を、board と lobby のどちらでも指定できるようにする。
+リバースプロキシで 1 つのホストのパスごとにボードを振り分けるため。
+
+- [ ] `ytbg board` と `ytbg lobby` に `--prefix` を足す
+- [ ] `ytbg.toml` の `[[board]]` に `prefix`（省略可）を足し、lobby が子プロセスへ `--prefix` で渡す
+- [ ] サーバのルート（`app.py`・`lobby.py`）を prefix の下に置く
+- [ ] テンプレート（`index.html`・`lobby.html`）と JS（`ws.js`・`sound.js`・`settings.js`・`lobby.js`）の `/` 始まりの URL に prefix を付ける
+- [ ] 設定の `url` にパスだけ（`/foo/`）も書けるようにする。省いたときは、一覧ページを開いたホスト名とボードのポートに prefix を付けた URL にする
+- [ ] テストを足す（pytest でルートと設定の検査、ブラウザテストで prefix 付きの盤面が開いて WebSocket がつながること、lobby の iframe の URL）
+- [ ] `ytbg.toml` のコメント、`docs/Admin.md`、`docs/Developer.md` を書き換える
+
+2026-09-15 に利用者と決めた。
+
+- **プレフィクス付きのパスは、そのままサーバに届く前提。** プロキシがパスを
+  外す構成は扱わない。サーバが `/foo` の下にルートを置くので、プロキシを通さず
+  直接開いても動く
+- `/foo` と `/foo/` はどちらもページを返す。prefix の末尾の `/` は取り除いて揃える。
+  prefix を指定したときは `/` では受けない
+- 分担: 実装は implementer（サーバ・テンプレート・JS・テスト・文書にまたがるので Opus）。
+  確認は verifier（prefix 付きで board と lobby を実際に起動して開く）。
+  ルートと URL の組み立てが変わるので、レビューを reviewer に分ける
 
 ---
 
