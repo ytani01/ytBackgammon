@@ -7,6 +7,9 @@
     <title>ytBackgammon lobby</title>
     <link rel="icon" type="image/png" href="{{ prefix }}/static/favicon.png">
     <style>
+      /* 縦のスクロールバーが出ても消えても幅を変えない (--main-scale の計算が
+         ずれるが、スクロールバーの出し入れでは resize が起きない) */
+      html { scrollbar-gutter: stable; }
       body { background-image: url({{ prefix }}/static/images1a/bg.png); color: #222; }
       #boards { display: flex; flex-wrap: wrap; gap: 8px; }
       .board { background: rgba(255, 255, 255, 0.6); padding: 4px; }
@@ -18,8 +21,11 @@
       .frame { width: 450px; height: 270px; overflow: hidden; }
       .frame iframe { width: 1030px; height: 650px; border: 0;
                       transform: scale(0.4); transform-origin: left top; }
-      .main .frame { width: 880px; height: 560px; }
-      .main .frame iframe { transform: scale(0.835); }
+      /* --main-scale は lobby.js がウィンドウの大きさから決める。
+         1030px と 650px は .frame iframe の大きさ */
+      .main .frame { width: calc(1030px * var(--main-scale, 0.835));
+                     height: calc(650px * var(--main-scale, 0.835)); }
+      .main .frame iframe { transform: scale(var(--main-scale, 0.835)); }
     </style>
     <script type="module" src="{{ prefix }}/static/js/lobby.js"></script>
   </head>

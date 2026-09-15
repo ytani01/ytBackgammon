@@ -44,6 +44,37 @@ function show_main() {
     for (const [id, c] of cards) {
         c.el.classList.toggle("main", id === main_id);
     }
+    fit_main();
+}
+
+/**
+ * 大きいボードの倍率を、見出しとボタンの行を含めたカードが
+ * ウィンドウの幅と高さの両方に収まる最大の値にする。
+ * ページを一番上までスクロールした状態で収まるように、カードより上の
+ * 見出し (h1) の分も引く
+ */
+function fit_main() {
+    const main = document.querySelector(".board.main");
+    if (main === null) {
+        return;
+    }
+    const frame = main.querySelector(".frame");
+    // transform の前の大きさ (lobby.html の .frame iframe)
+    const iframe = main.querySelector("iframe");
+    const root = document.documentElement;
+    const cs = getComputedStyle(main);
+    const avail_w = document.getElementById("boards").clientWidth
+          - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const avail_h = root.clientHeight
+          - (main.getBoundingClientRect().top + window.scrollY)
+          - (main.offsetHeight - frame.offsetHeight)
+          // ボードが 1 面だけのとき、body の下の余白でスクロールしないように
+          - parseFloat(getComputedStyle(document.body).marginBottom);
+    const scale = Math.min(avail_w / iframe.offsetWidth,
+                           avail_h / iframe.offsetHeight);
+    // 端数で 1px はみ出さないように切り捨てる。極端に狭くても潰さない
+    root.style.setProperty(
+        "--main-scale", String(Math.max(Math.floor(scale * 1000) / 1000, 0.1)));
 }
 
 function select_main(server_id) {
@@ -131,5 +162,6 @@ async function refresh() {
     }
 }
 
+window.addEventListener("resize", fit_main);
 await refresh();
 setInterval(refresh, POLL_MSEC);

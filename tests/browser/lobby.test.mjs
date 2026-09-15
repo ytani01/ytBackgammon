@@ -212,6 +212,68 @@ describe('lobby の一覧ページ', () => {
         assert.equal((await frame_of('b1')).url(),
                      `http://127.0.0.1:${ports[0]}/?sound=off`);
     });
+
+    it('大きいボードはウィンドウの幅と高さに収まる最大の大きさ (TODO-071)', async () => {
+        /** 一番上までスクロールした状態の、カードと枠とウィンドウの大きさ */
+        const measure = () => page.evaluate(() => {
+            window.scrollTo(0, 0);
+            const rect = el => el.getBoundingClientRect();
+            const main = document.querySelector('.board.main');
+            const small = document.querySelector('.board:not(.main) .frame');
+            return {
+                win_w: document.documentElement.clientWidth,
+                win_h: document.documentElement.clientHeight,
+                card: rect(main).toJSON(),
+                frame: rect(main.querySelector('.frame')).toJSON(),
+                iframe: rect(main.querySelector('iframe')).toJSON(),
+                small: rect(small).toJSON(),
+            };
+        });
+
+        // 高さで決まる大きさと、幅で決まる大きさ。resize で計算し直す
+        for (const [width, height, tight] of [
+            [1600, 700, 'h'], [700, 1000, 'w'], [1280, 720, 'h']]) {
+            await page.setViewportSize({ width, height });
+            // はみ出さず、決め手の側はウィンドウの端から数 px 以内 (余白を
+            // 残さない)。前の大きさのままでは両方を満たさないので、計算し
+            // 直すまで待つことになる
+            const m = await wait_for(measure, m => {
+                // カードは幅いっぱいに伸びるので、幅は枠の右端で見る
+                const gap = tight === 'h'
+                    ? m.win_h - m.card.bottom : m.card.right - m.frame.right;
+                return m.card.right <= m.win_w && m.card.bottom <= m.win_h
+                    && gap < 16;
+            }, { msg: `${width}x${height}` });
+            assert.ok(m.card.left >= 0 && m.card.top >= 0, JSON.stringify(m));
+            // 縮小した iframe が枠と揃う (枠の外は overflow で隠れる)
+            assert.ok(Math.abs(m.iframe.right - m.frame.right) <= 1
+                      && Math.abs(m.iframe.bottom - m.frame.bottom) <= 1,
+                      JSON.stringify(m));
+        }
+
+        // 開き直した直後 (resize は起きない) も、ウィンドウに合わせる
+        await page.reload();
+        await page.waitForSelector('.board.main');
+        const m = await measure();
+        assert.ok(m.card.bottom <= m.win_h && m.win_h - m.card.bottom < 16,
+                  JSON.stringify(m));
+
+        // 大きく出すボードを替えても、小さいボードの大きさは変わらず、
+        // 大きいボードの下に並ぶ
+        const before = await measure();
+        const other = await page.$eval('.board:not(.main)',
+                                       el => el.dataset.serverId);
+        await page.click(`${card(other)} .select`);
+        const after = await measure();
+        assert.equal(await is_main(other), true);
+        assert.deepEqual(
+            [after.small.width, after.small.height],
+            [before.small.width, before.small.height]);
+        assert.deepEqual(
+            [after.frame.width, after.frame.height],
+            [before.frame.width, before.frame.height]);
+        assert.ok(after.small.top >= after.card.bottom, JSON.stringify(after));
+    });
 });
 
 describe('URL のプレフィクス付きの lobby とボード (TODO-064)', () => {
