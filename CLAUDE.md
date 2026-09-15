@@ -123,10 +123,13 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 - `clock.test.mjs` — Clock のチェックボックスは返事が届くまで計算も表示も
   変えないか、履歴の返事でも `clock_state` を全部反映するか（TODO-060）
 - `lobby.test.mjs` — lobby の一覧ページ（TODO-063）。lobby を実プロセスで起動し、
-  iframe の URL（設定の `url` の有無）、大きく出すボードの切り替え、起動・停止のボタンで
-  状態の表示が変わるかを見る。プレフィクス付きの lobby で、iframe の URL に
-  ボードのプレフィクスが付くか（TODO-064）。lobby の子プロセスそのもの（lobby を止めたらボードも
-  止まるか）は `tests/test_lobby.py` が見る
+  iframe の URL、大きく出すボードの切り替え、起動・停止のボタンで状態の表示が
+  変わるかを見る。設定に `url` は無く、`prefix` のあるボードの iframe の `src` は
+  一覧ページと同じオリジンの `prefix` のパス（lobby が受けたらボード自身の
+  ポートへ 302 でリダイレクトする）、`prefix` の無いボードは開いたホスト名と
+  ボードのポート（TODO-069）。`src`（リダイレクト前）と `frame.url()`（リダイレクト後、
+  最終的にボードが開いた URL）は別物として確かめる。lobby の子プロセスそのもの
+  （lobby を止めたらボードも止まるか）は `tests/test_lobby.py` が見る
 - `settings.test.mjs` — 音の ON/OFF を cookie に保存して開き直しても残るか、
   PIP の最初の表示が Pip のチェックボックスに合うか（TODO-053）。
   チェックが入った状態は `addInitScript()` の `DOMContentLoaded` で作る

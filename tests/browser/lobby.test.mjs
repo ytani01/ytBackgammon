@@ -33,7 +33,6 @@ async function start_lobby(boards, prefix = '') {
         `server_id = "${b.server_id}"`,
         `port = ${b.port}`,
         'image_dir = "images1a"',
-        ...(b.url ? [`url = "${b.url}"`] : []),
         ...(b.prefix ? [`prefix = "${b.prefix}"`] : []),
         '',
     ].join('\n')).join('\n'));
@@ -123,8 +122,7 @@ describe('lobby の一覧ページ', () => {
         ports = [await free_port(), await free_port()];
         lobby = await start_lobby([
             { server_id: 'b1', port: ports[0] },
-            { server_id: 'b2', port: ports[1],
-              url: `http://localhost:${ports[1]}/` },
+            { server_id: 'b2', port: ports[1] },
         ]);
         browser = await launch_browser();
         page = await browser.newPage();
@@ -145,13 +143,13 @@ describe('lobby の一覧ページ', () => {
         }
     });
 
-    it('iframe の src は設定どおり (url が無ければ開いたホスト名とポート)', async () => {
+    it('iframe の src は、開いたホスト名とボードのポート', async () => {
         assert.equal(
             await page.getAttribute(`${card('b1')} iframe`, 'src'),
             `http://127.0.0.1:${ports[0]}/?sound=off`);
         assert.equal(
             await page.getAttribute(`${card('b2')} iframe`, 'src'),
-            `http://localhost:${ports[1]}/?sound=off`);
+            `http://127.0.0.1:${ports[1]}/?sound=off`);
         // ボード名は音ありで別タブに開く
         assert.equal(
             await page.getAttribute(`${card('b1')} a`, 'href'),
@@ -221,14 +219,16 @@ describe('URL のプレフィクス付きの lobby とボード (TODO-064)', () 
     let browser = undefined;
     let page = undefined;
     let port = undefined;
+    let p2_port = undefined;
 
     const card = id => `.board[data-server-id="${id}"]`;
 
     before(async () => {
         port = await free_port();
+        p2_port = await free_port();
         lobby = await start_lobby([
             { server_id: 'p1', port, prefix: 'board1/' },
-            { server_id: 'p2', port: await free_port(), url: '/board2/' },
+            { server_id: 'p2', port: p2_port },
         ], '/lobby');
         browser = await launch_browser();
         page = await browser.newPage();
@@ -247,16 +247,25 @@ describe('URL のプレフィクス付きの lobby とボード (TODO-064)', () 
     });
 
     it('一覧が出て、iframe の URL にボードのプレフィクスが付き、ボードが開く', async () => {
+        // iframe の src は、リダイレクト前の一覧ページと同じオリジンのパス
         assert.equal(
             await page.getAttribute(`${card('p1')} iframe`, 'src'),
-            `http://127.0.0.1:${port}/board1/?sound=off`);
-        // パスだけの url は、一覧ページと同じホストのそのパス
+            `${new URL(lobby.url).origin}/board1/?sound=off`);
+        // ボード名は音ありで別タブに開く。prefix のあるボードも
+        // 一覧ページと同じオリジンのパス (iframe の src と同じ組み立て)
+        assert.equal(
+            await page.getAttribute(`${card('p1')} a`, 'href'),
+            `${new URL(lobby.url).origin}/board1/`);
+        // prefix の無いボードは、今までどおり開いたホスト名とポート
         assert.equal(
             await page.getAttribute(`${card('p2')} a`, 'href'),
-            `${new URL(lobby.url).origin}/board2/`);
+            `http://127.0.0.1:${p2_port}/`);
 
         const frame = await (await page.$(`${card('p1')} iframe`)).contentFrame();
         // gameinfo が届くまで待つ (WebSocket が /board1/ws につながる)
         await wait_board(frame);
+        // lobby がリダイレクトを返し、最終的にはボード自身のポートへ届く
+        assert.equal(frame.url(),
+                     `http://127.0.0.1:${port}/board1/?sound=off`);
     });
 });

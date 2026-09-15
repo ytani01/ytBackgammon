@@ -26,10 +26,9 @@ import sys
 import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, RedirectResponse
 from starlette.routing import Mount, Route
 
 from . import WEBROOT
@@ -53,7 +52,6 @@ class BoardConfig:
     server_id: str
     port: int
     image_dir: str
-    url: str | None = None
     # normalize_prefix() で揃えた値 ('' か '/foo')
     prefix: str = ''
 
@@ -61,7 +59,7 @@ class BoardConfig:
 # server_id は整数も受け、文字列に直す
 _REQUIRED: dict[str, type | tuple[type, ...]] = {
     'server_id': (str, int), 'port': int, 'image_dir': str}
-_OPTIONAL: dict[str, type | tuple[type, ...]] = {'url': str, 'prefix': str}
+_OPTIONAL: dict[str, type | tuple[type, ...]] = {'prefix': str}
 
 
 def load_config(path: str | Path) -> list[BoardConfig]:
@@ -74,7 +72,6 @@ def load_config(path: str | Path) -> list[BoardConfig]:
         server_id = 1        # 整数でも文字列でもよい。文字列に直す
         port = 5001
         image_dir = "images2"
-        url = "https://ytbg1.example.net/"   # 省略可。"/board1/" のようにパスだけでもよい
         prefix = "/board1"   # 省略可。子プロセスへ --prefix で渡す
     """
     try:
@@ -126,32 +123,8 @@ def load_config(path: str | Path) -> list[BoardConfig]:
         except ValueError as e:
             raise ConfigError(f'{where}: "prefix": {e}') from e
 
-        # http(s) の URL か、'/' で始まるパスだけ (一覧ページと同じホスト)。
-        # ボードは自分の prefix の下で動くので、パスで分けても動く
-        url = ent.get('url')
-        if url is not None:
-            if any(c.isspace() for c in url):
-                raise ConfigError(f'{where}: "url" must not contain spaces')
-            # ブラウザは '/\\' も '//' と同じくホストの始まりとして読む
-            if url.startswith(('//', '/\\')):
-                raise ConfigError(
-                    f'{where}: "url" must start with http://, https:// '
-                    'or a single "/"')
-            if not url.startswith('/'):
-                try:
-                    parts = urlsplit(url)
-                    _ = parts.port   # ポートが数でない・範囲外なら ValueError
-                except ValueError as e:
-                    raise ConfigError(
-                        f'{where}: "url" is invalid: {e}') from e
-                if parts.scheme not in ('http', 'https') or not parts.netloc:
-                    raise ConfigError(
-                        f'{where}: "url" must start with http://, https:// '
-                        'or a single "/"')
-
         boards.append(
-            BoardConfig(server_id, ent['port'], ent['image_dir'], url,
-                        prefix))
+            BoardConfig(server_id, ent['port'], ent['image_dir'], prefix))
 
     for key in ('server_id', 'port'):
         seen = set()
@@ -262,6 +235,24 @@ class BoardProcess:
                 await watch
 
 
+def _board_redirect(conf: BoardConfig):
+    """
+    conf の prefix の下のどんなパスも、ボード自身のポートへ 302 で返す。
+
+    conf.prefix が '/static' や lobby 自身の --prefix と同じだと、
+    create_lobby_app() でこのルートより先に並ぶ既存のルートに一致してしまい、
+    このリダイレクトは効かない (prefix の重複チェックは無い。TODO-069)
+    """
+    async def endpoint(request):
+        sub = request.path_params.get('path', '')
+        url = f'{request.url.scheme}://{request.url.hostname}:' \
+              f'{conf.port}{conf.prefix}/{sub}'
+        if request.url.query:
+            url += f'?{request.url.query}'
+        return RedirectResponse(url, status_code=302)
+    return endpoint
+
+
 def create_lobby_app(boards: list[BoardConfig], debug: bool = False,
                      prefix: str = '') -> Starlette:
     """
@@ -299,6 +290,10 @@ def create_lobby_app(boards: list[BoardConfig], debug: bool = False,
             return JSONResponse(await p.status())
         return endpoint
 
+    board_routes = [
+        Mount(b.prefix, routes=[Route('/{path:path}', _board_redirect(b))])
+        for b in boards if b.prefix]
+
     return Starlette(
         routes=with_prefix([
             Route('/', index),
@@ -310,5 +305,5 @@ def create_lobby_app(boards: list[BoardConfig], debug: bool = False,
             Mount('/static',
                   app=NoCacheStaticFiles(directory=str(WEBROOT / 'static')),
                   name='static'),
-        ], prefix),
+        ], prefix) + board_routes,
         lifespan=lifespan)

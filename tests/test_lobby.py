@@ -46,7 +46,7 @@ image_dir = "images2"
 server_id = "2"
 port = 5002
 image_dir = "images0a"
-url = "https://ytbg2.example.net/"
+prefix = "/board2"
 '''
 
 
@@ -59,7 +59,7 @@ def write(tmp_path, text):
 def test_load_config(tmp_path):
     assert load_config(write(tmp_path, VALID)) == [
         BoardConfig('1', 5001, 'images2'),
-        BoardConfig('2', 5002, 'images0a', 'https://ytbg2.example.net/'),
+        BoardConfig('2', 5002, 'images0a', '/board2'),
     ]
 
 
@@ -95,27 +95,17 @@ BOARD = '[[board]]\nserver_id = "1"\nport = 5001\nimage_dir = "images2"\n'
      '"server_id" must not be empty'),
     ('[[board]]\nserver_id = "a/b"\nport = 5001\nimage_dir = "x"',
      'contain "/"'),
-    (BOARD + 'url = "//ytbg1.example.net/"', '"url" must start with http'),
-    (BOARD + "url = '/\\ytbg1.example.net/'", '"url" must start with http'),
-    (BOARD + 'url = "/a b/"', '"url" must not contain spaces'),
     (BOARD + 'prefix = "a//b"', '"prefix": invalid prefix'),
     (BOARD + 'prefix = "/a/../b"', '"prefix": invalid prefix'),
     (BOARD + 'prefix = 1', '"prefix" must be str'),
-    (BOARD + 'url = "ytbg1.example.net/"', '"url" must start with http'),
-    (BOARD + 'url = "ftp://ytbg1.example.net/"', '"url" must start with'),
-    (BOARD + 'url = "http://"', '"url" must start with http'),
-    (BOARD + 'url = "http://[::1"', '"url" is invalid'),
-    (BOARD + 'url = "http://h:99999/"', '"url" is invalid'),
-    (BOARD + 'url = "http://h:abc/"', '"url" is invalid'),
-    (BOARD + 'url = "http://exa mple/"', '"url" must not contain spaces'),
     ('[[board]]\nserver_id = "1"\nport = "5001"\nimage_dir = "x"',
      '"port" must be int'),
     ('[[board]]\nserver_id = "1"\nport = true\nimage_dir = "x"',
      '"port" must be int'),
     ('[[board]]\nserver_id = "1"\nport = 70000\nimage_dir = "x"',
      '"port" is out of range'),
-    (BOARD + 'url = 1', '"url" must be str'),
     (BOARD + 'imagedir = "x"', "unknown key ['imagedir']"),
+    (BOARD + 'url = "https://example.net/"', "unknown key ['url']"),
     (BOARD + BOARD.replace('5001', '5002'), 'duplicate server_id: 1'),
     (BOARD + BOARD.replace('5001', '5002').replace('"1"', '1'),
      'duplicate server_id: 1'),
@@ -128,12 +118,11 @@ def test_load_config_error(tmp_path, text, msg):
     assert msg in str(e.value)
 
 
-def test_load_config_prefix_and_path_url(tmp_path):
-    """prefix は揃えて持ち、url はパスだけでもよい (TODO-064)"""
+def test_load_config_prefix(tmp_path):
+    """prefix は揃えて持つ (TODO-064)"""
     boards = load_config(write(
-        tmp_path, BOARD + 'prefix = "board1/"\nurl = "/board1/"\n'))
-    assert boards == [
-        BoardConfig('1', 5001, 'images2', '/board1/', '/board1')]
+        tmp_path, BOARD + 'prefix = "board1/"\n'))
+    assert boards == [BoardConfig('1', 5001, 'images2', '/board1')]
     # 書かなければ prefix 無し
     assert load_config(write(tmp_path, BOARD))[0].prefix == ''
 
@@ -181,7 +170,7 @@ async def test_start_passes_prefix(monkeypatch, prefix, expected):
             await asyncio.Event().wait()
 
     monkeypatch.setattr(asyncio, 'create_subprocess_exec', fake_exec)
-    p = BoardProcess(BoardConfig('1', 5001, 'images2', None, prefix))
+    p = BoardProcess(BoardConfig('1', 5001, 'images2', prefix))
     await p.start()
     assert p._watch is not None
     p._watch.cancel()
@@ -194,7 +183,7 @@ def test_lobby_prefix_routes():
     """lobby 自身の prefix の下に一覧ページ・API・static を置く"""
     # with を使わないので lifespan は走らず、子プロセスは起動しない
     client = TestClient(create_lobby_app(
-        [BoardConfig('1', 5001, 'images2', None, '/board1')], prefix='/lb'))
+        [BoardConfig('1', 5001, 'images2', '/board1')], prefix='/lb'))
     page = client.get('/lb/')
     assert page.status_code == 200
     assert 'src="/lb/static/js/lobby.js"' in page.text
@@ -205,6 +194,22 @@ def test_lobby_prefix_routes():
     assert boards[0]['prefix'] == '/board1'
     for path in ('/', '/api/boards', '/static/js/lobby.js'):
         assert client.get(path).status_code == 404, path
+
+
+def test_board_redirect():
+    """prefix のあるボードへのパスは、ボード自身のポートへ 302 で飛ぶ
+    (lobby 自身の --prefix の外でも受ける)"""
+    client = TestClient(create_lobby_app(
+        [BoardConfig('1', 5001, 'images2', '/board1')], prefix='/lb'),
+        follow_redirects=False)
+    res = client.get('/board1/index.html?sound=off')
+    assert res.status_code == 302
+    assert res.headers['location'] == \
+        'http://testserver:5001/board1/index.html?sound=off'
+
+    res = client.get('/board1/')
+    assert res.status_code == 302
+    assert res.headers['location'] == 'http://testserver:5001/board1/'
 
 
 def test_load_config_no_file(tmp_path):

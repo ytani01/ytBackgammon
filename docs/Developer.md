@@ -149,10 +149,14 @@ graph TD
   プロセスが同じポートを塞いでいると、子が起動に失敗して終わるまでの一瞬は「動作中」になる
 - 子は lobby と同じプロセスグループにいる。端末の Ctrl+C はボードにも直接届くので、
   lobby が止めに行く前にボードが終わっていることがある
-- ボードの URL(`lobby.js` の `board_url()`)は、設定の `url` があればそれを一覧ページの
-  URL からの相対で解決し(`/board1/` のようなパスだけも書ける)、無ければ
+- ボードの URL(`lobby.js` の `board_url()`)は、`prefix` があれば一覧ページと
+  同じオリジン(プロトコル・ホスト名・ポート)のパス `{prefix}/`、無ければ
   `{protocol}//{hostname}:{port}{prefix}/`。`prefix` は API の状態に入っていて、
-  子プロセスには `--prefix` で渡す
+  子プロセスには `--prefix` で渡す。設定に `url` は無い(TODO-069)。
+  一覧ページを直接開いた場合、`{prefix}/` は lobby 自身のポートに届くので、
+  lobby はその `prefix` を受けたらボード自身のポートへ 302 で返す
+  (`_board_redirect()`)。nginx 越しなら `{prefix}/` は nginx がボードへ
+  直接振り分けるので、lobby には届かない
 - 一覧ページは iframe を作り直さない(作り直すと読み込み直しになる)。大きく出す
   ボードは class と CSS の `order` だけで入れ替える。iframe の `src` は、`listening` が
   偽から真に変わったときだけ入れる(最初の読み込みも同じ)。**listen する前に入れると、

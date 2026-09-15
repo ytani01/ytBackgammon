@@ -20,12 +20,13 @@ const cards = new Map();
 const api_url = (path) => new URL(`../../api/${path}`, import.meta.url);
 
 /**
- * ボードの URL。設定に url があればそれ (パスだけなら一覧ページと同じ
- * ホスト)、無ければ一覧ページを開いたホスト名にボードのポートと
- * ボードのプレフィクスを付ける
+ * ボードの URL。prefix があれば、一覧ページと同じホスト・ポートのパス
+ * (lobby がそのパスを受けたらボード自身のポートへリダイレクトする)。
+ * prefix が無ければ、一覧ページを開いたホスト名にボードのポートを付ける
  */
 function board_url(b) {
-    return b.url != null ? new URL(b.url, location.href).href
+    return b.prefix
+        ? new URL(`${b.prefix}/`, location.href).href
         : `${location.protocol}//${location.hostname}:${b.port}${b.prefix}/`;
 }
 
