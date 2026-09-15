@@ -366,15 +366,9 @@ export class BoardView {
         const dy1 = 200;
 
         // 投了・パス・勝ちのバナー。押したときの動作だけが違う
-        const on_resign_banner = (btn) => {
-            log(`resign banner.on_click>player=${btn.player}`);
-        };
         const on_pass = (btn) => {
             log(`pass banner.on_click>player=${btn.player}`);
             this.input.pass_turn(btn.player);
-        };
-        const on_win = (btn) => {
-            log(`win banner.on_click>player=${btn.player}`);
         };
         const banner = (key, on_click) => [
             new BannerButton(els[key][0], 0, this.bx[4] + bx1, bh / 2 + dy1,
@@ -383,9 +377,9 @@ export class BoardView {
                              0, on_click),
         ];
 
-        this.resign_banner_btn = banner("resign_banner_btn", on_resign_banner);
+        this.resign_banner_btn = banner("resign_banner_btn");
         this.pass_btn = banner("pass_btn", on_pass);
-        this.win_btn = banner("win_btn", on_win);
+        this.win_btn = banner("win_btn");
 
         if ( this.settings.player == 1 ) {
             this.settings.player = 0;

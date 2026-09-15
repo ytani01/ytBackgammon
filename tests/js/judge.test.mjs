@@ -111,13 +111,6 @@ describe('closeout()', () => {
         assert.equal(closeout(pos, 1), true);
     });
 
-    it('プレーヤー番号が 0/1 でなければ false', () => {
-        const pos = closeout_position(0);
-        for (const player of [-1, 2, undefined]) {
-            assert.equal(closeout(pos, player), false);
-        }
-    });
-
     it('自分のクローズアウトは、相手のクローズアウトではない', () => {
         assert.equal(closeout(closeout_position(0), 1), false);
     });

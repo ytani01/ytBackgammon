@@ -37,13 +37,9 @@ export const bar_point = (player) => {
  *
  * @param {number} player - 0 or 1
  * @param {number} point
- * @return {number|undefined} - pip count
+ * @return {number} - pip count
  */
 export const get_pip = (player, point) => {
-    if ( point === undefined ) {
-        return undefined;
-    }
-
     if ( point > 25 ) {
         return 25;
     }
@@ -153,19 +149,6 @@ export class Position {
         }
         this.pt = pt.map((players) => [...players]);
     } // Position.constructor()
-
-    /**
-     * ポイントごとのプレーヤー番号の配列から作る。
-     *
-     * ポイントごとの配列から作る入口。TODO-044 で `Board.position()` が
-     * `from_gameinfo()` に移ったので、本番では空の盤面を作るときだけ通る。
-     *
-     * @param {number[][]} points - points[p] = プレーヤー番号の配列
-     * @return {Position}
-     */
-    static from_points(points) {
-        return new Position(points);
-    } // Position.from_points()
 
     /**
      * gameinfo から作る。

@@ -33,8 +33,6 @@ export class Dice extends BgImage {
             this.y0 = this.h / 2 + offset0;
         }
 
-        this.image_el = this.el.firstElementChild;
-
         this.el.style.backgroundColor = "#000";
         this.el.style.cursor = "pointer";
 
@@ -59,7 +57,6 @@ export class Dice extends BgImage {
      *
      */
     get_filename(val) {
-        val %= 10;
         return this.image_dir + this.file_prefix + val + this.image_suffix;
     } // Dice.get_filename()
 

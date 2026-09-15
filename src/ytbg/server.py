@@ -129,15 +129,6 @@ class BackgammonServer:
         self._hist.clear(self._gameinfo)
         self.save_data()
 
-    def _load_hist_ent(self, hist_ent):
-        """
-        履歴のエントリを、いまの gameinfo にする。
-
-        クロックは gameinfo の外に出したので (TODO-024)、
-        「残り時間だけは引き継ぐ」という例外は要らなくなった。
-        """
-        self._gameinfo = hist_ent.copy()
-
     async def emit_gameinfo(
             self, sec: float = 0, last_op=None):
         """
@@ -196,7 +187,7 @@ class BackgammonServer:
                 if hist_ent is None:
                     break
 
-                self._load_hist_ent(hist_ent)
+                self._gameinfo = hist_ent.copy()
 
                 await self.emit_gameinfo(sec)
 
@@ -412,12 +403,6 @@ class BackgammonServer:
         self._clock.stop(player)
         self._clock.start(1 - player)
 
-    async def _on_roll(self, m: Message) -> float | None:
-        """ダイスを振った。使えない目はクライアントが 11〜16 にして送る"""
-        data: DiceData = m.data
-        self._gameinfo.dice(data)
-        return 0
-
     async def _on_opening(self, m: Message) -> float | None:
         """オープニングロールの結果。クロックは動かさない"""
         data: OpeningData = m.data
@@ -622,7 +607,7 @@ MESSAGE_TYPES: dict[str, MessageType] = {
     'clear_hist': MessageType(NoData.from_dict, _S._on_clear_hist, False),
     'new': MessageType(NoData.from_dict, _S._on_new, False),
     # 名前付きの操作
-    'roll': MessageType(DiceData.from_dict, _S._on_roll, True),
+    'roll': MessageType(DiceData.from_dict, _S._on_dice, True),
     'opening': MessageType(OpeningData.from_dict, _S._on_opening, True),
     'move': MessageType(MoveData.from_dict, _S._on_move, True),
     'end_turn': MessageType(PlayerData.from_dict, _S._on_end_turn, True),

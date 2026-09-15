@@ -52,11 +52,6 @@ describe('get_pip()', () => {
         }
     });
 
-    it('ポイントが undefined なら undefined', () => {
-        assert.equal(get_pip(0, undefined), undefined);
-        assert.equal(get_pip(1, undefined), undefined);
-    });
-
     it('ゴールにあるチェッカーは 0 pip', () => {
         assert.equal(get_pip(0, goal_point(0)), 0);
         assert.equal(get_pip(1, goal_point(1)), 0);

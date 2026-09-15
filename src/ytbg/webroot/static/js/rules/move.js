@@ -123,10 +123,6 @@ export const dst_point = (pos, player, src_p, dice_val) => {
 export const dst_points = (pos, player, src_p, dice_vals) => {
     let dst_p = [];
 
-    if ( dice_vals.length == 0 ) {
-        return [];
-    }
-
     for (let dice_val of dice_vals) {
         const dst_p1 = dst_point(pos, player, src_p, dice_val);
         if ( dst_p1 === undefined ) {

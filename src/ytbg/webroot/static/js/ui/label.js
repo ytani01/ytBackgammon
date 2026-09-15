@@ -114,8 +114,6 @@ export class PlayerPipCount extends BgText {
     set(pip_count) {
         this.pip_count = pip_count;
         super.set(`${this.prefix} ${this.pip_count}`);
-        this.move(this.x, this.y);
-        this.rotate(this.deg);
     } // PlayerPipCount.set()
 
     /**
@@ -165,12 +163,5 @@ export class PlayerScore extends BgText {
      */
     set(score) {
         super.set(`${score}`);
-    }
-
-    /**
-     * @return {number} score
-     */
-    get() {
-        return parseInt(super.get());
     }
 } // class PlayerScore

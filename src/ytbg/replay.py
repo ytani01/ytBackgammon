@@ -65,11 +65,6 @@ class Replayer:
         """
         try:
             await func(*args, **kwargs)
-        except asyncio.CancelledError:
-            # CancelledError は BaseException 側なので、下の
-            # except Exception には元々捕まらない。cancel を
-            # エラー扱いしないことを読んで分かるように書いてある
-            raise
         except Exception as e:  # noqa: BLE001
             self._on_error(e)
 

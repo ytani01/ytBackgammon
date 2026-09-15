@@ -28,7 +28,7 @@ const api_url = (path) => new URL(`../../api/${path}`, import.meta.url);
 function board_url(b) {
     return b.prefix
         ? new URL(`${b.prefix}/`, location.href).href
-        : `${location.protocol}//${location.hostname}:${b.port}${b.prefix}/`;
+        : `${location.protocol}//${location.hostname}:${b.port}/`;
 }
 
 /**

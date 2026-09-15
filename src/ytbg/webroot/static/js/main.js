@@ -65,7 +65,6 @@ const emit_playername = (player) => {
  */
 const on_key_down = (e) => {
     log(`e.key=${e.key},e.ctrlKey=${e.ctrlKey},e.shiftKey=${e.shiftKey}`);
-    log(`e.keyCode=${e.keyCode}`);
 
     const player = settings.player;
 
@@ -98,9 +97,6 @@ const on_key_down = (e) => {
  *
  */
 document.body.onkeydown = e => {
-    if ( e.key.length === undefined ) {
-        return;
-    }
     if ( e.key.length == 1 ) {
         on_key_down(e);
     }

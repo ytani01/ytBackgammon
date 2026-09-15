@@ -1023,7 +1023,9 @@ export function show_banner(page, name) {
         window.__clicked = undefined;
         b.on_click = btn => {
             window.__clicked = btn.id;
-            orig(btn);
+            if (orig) {
+                orig(btn);
+            }
         };
         b.on();
         return b.id;

@@ -12,15 +12,12 @@ import { bar_point, get_pip, goal_point } from "./position.js";
  *
  * @param {Position} position
  * @param {number} player - 0 or 1
- * @return {number|undefined} - pip count
+ * @return {number} - pip count
  */
 export const pip_count = (position, player) => {
     let count = 0;
     for (let point of position.points_of(player)) {
         count += get_pip(player, point);
-        if ( isNaN(count) ) {
-            return undefined;
-        }
     } // for (point)
     return count;
 }; // pip_count()
@@ -108,9 +105,6 @@ export const winner_is = (position, player,
  * @return {boolean}
  */
 export const closeout = (position, player) => {
-    if ( player != 0 && player != 1 ) {
-        return false;
-    }
     if ( position.count(bar_point(1 - player)) == 0 ) {
         return false;
     }

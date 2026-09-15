@@ -54,10 +54,10 @@ export class BgBase {
         this.el = el;
         this.player = player;
 
-        if ( w === undefined && this.el ) {
+        if ( w === undefined ) {
             this.w = this.el.clientWidth;
         }
-        if ( h === undefined && this.el ) {
+        if ( h === undefined ) {
             this.h = this.el.clientHeight;
         }
     } // BgBase.constructor()
@@ -65,10 +65,10 @@ export class BgBase {
     /**
      * 要素の id 属性。ログとブラウザのテストのためだけにある (TODO-054)
      *
-     * @return {string|undefined}
+     * @return {string}
      */
     get id() {
-        return this.el ? this.el.id : undefined;
+        return this.el.id;
     } // BgBase.id
 
     /**
@@ -162,37 +162,19 @@ export class BgText extends BgBase {
         // set text
         this.text = text;
 
-        if ( this.el ) {
-            this.el.innerHTML = this.text;
-            this.w = this.el.clientWidth;
-            this.h = this.el.clientHeight;
-            this.el.style.left = this.x + "px";
-            this.el.style.top = this.y + "px";
-            this.el.style.transformOrigin = "top left";
-            this.el.style.transform = `rotate(${this.deg}deg)`;
-        }
+        this.el.innerHTML = this.text;
+        this.w = this.el.clientWidth;
+        this.h = this.el.clientHeight;
+        this.el.style.left = this.x + "px";
+        this.el.style.top = this.y + "px";
+        this.el.style.transformOrigin = "top left";
+        this.el.style.transform = `rotate(${this.deg}deg)`;
     } // BgText.constructor()
 
-    /**
-     * @return {string} this.text
-     */
-    get() {
-        if ( this.el === undefined ) {
-            return "";
-        }
-
-        this.text = this.el.innerHTML;
-        return this.text;
-    } // BgText.get()
-    
     /**
      * @param {string} txt
      */
     set(txt) {
-        if ( this.el === undefined ) {
-            return;
-        }
-
         this.el.innerHTML = "";
         if ( txt.length > 0 ) {
             this.text = txt;
@@ -208,18 +190,14 @@ export class BgText extends BgBase {
      * 
      */
     on() {
-        if ( this.el ) {
-            this.el.style.opacity = 1;
-        }
+        this.el.style.opacity = 1;
     } // BgText.on()
 
     /**
-     * 
+     *
      */
     off() {
-        if ( this.el ) {
-            this.el.style.opacity = 0;
-        }
+        this.el.style.opacity = 0;
     } // BgText.off()
 } // class BgText
 

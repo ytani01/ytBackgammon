@@ -23,9 +23,6 @@ from .mylog import getLogger, loggerInit
 
 CONTEXT_SETTINGS = {'help_option_names': ['-h', '--help']}
 
-MY_NAME = __prog_name__
-VERSION = __version__
-
 _log = getLogger('main')
 
 
@@ -81,7 +78,7 @@ def board(server_id, port, image_dir, prefix, debug):
     _log.info('server_id={}, port={}, image_dir={}, prefix={}',
               server_id, port, image_dir, prefix)
 
-    _run(create_app(MY_NAME, VERSION, server_id, image_dir, prefix),
+    _run(create_app(__prog_name__, __version__, server_id, image_dir, prefix),
          port, debug)
 
 

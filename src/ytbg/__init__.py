@@ -12,13 +12,11 @@ from pathlib import Path
 # app.py が両方を使う (TODO-009、TODO-025)
 WEBROOT = Path(__file__).absolute().parent / 'webroot'
 
-if __package__:
-    try:
-        __version__ = version(__package__)
-    except PackageNotFoundError:
-        __version__ = '0.0.0'
-else:
-    __version__ = '_._._'
+assert __package__  # パッケージとして読まれるので通らない
+try:
+    __version__ = version(__package__)
+except PackageNotFoundError:
+    __version__ = '0.0.0'
 
 __prog_name__ = 'ytBackgammon Server'
 

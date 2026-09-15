@@ -21,20 +21,19 @@ export function get_sound_query() {
  */
 export class CookieBase {
     constructor() {
-        this.cookie = undefined;
         this.data = {};
         this.load();
     }
 
     /**
-     * @return {Object} data
+     *
      */
     load() {
         const allcookie = document.cookie;
         // log(`CookieBase.load>allcookie="${allcookie}"`);
 
         if ( allcookie.length == 0 ) {
-            return {};
+            return;
         }
 
         for (let ent of allcookie.split("; ")) {
@@ -42,8 +41,6 @@ export class CookieBase {
             // log(`CookieBase.load>k=${k},v=${v}`);
             this.data[k] = v;
         } // for(i)
-
-        return this.data;
     } // CookieBase.load()
 
     /**

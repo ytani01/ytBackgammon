@@ -60,7 +60,7 @@ export const make_position = (spec) => {
     for (const [p, players] of Object.entries(spec)) {
         pt[Number(p)] = [...players];
     }
-    return Position.from_points(pt);
+    return new Position(pt);
 };
 
 /**
