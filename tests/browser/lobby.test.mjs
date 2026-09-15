@@ -144,9 +144,10 @@ describe('lobby の一覧ページ', () => {
     });
 
     it('iframe の src は、開いたホスト名とボードのポート', async () => {
+        // 音を出すのは大きいボード (最初は先頭) だけ (TODO-072)
         assert.equal(
             await page.getAttribute(`${card('b1')} iframe`, 'src'),
-            `http://127.0.0.1:${ports[0]}/?sound=off`);
+            `http://127.0.0.1:${ports[0]}/`);
         assert.equal(
             await page.getAttribute(`${card('b2')} iframe`, 'src'),
             `http://127.0.0.1:${ports[1]}/?sound=off`);
@@ -156,6 +157,10 @@ describe('lobby の一覧ページ', () => {
             `http://127.0.0.1:${ports[0]}/`);
         assert.equal(
             await page.getAttribute(`${card('b1')} a`, 'target'), '_blank');
+        // 音を出させるには autoplay の許可が要る (iframe は別のオリジン)
+        assert.equal(
+            await page.getAttribute(`${card('b1')} iframe`, 'allow'),
+            'autoplay');
     });
 
     it('選んだボードが大きい枠になり、開き直しても残る', async () => {
@@ -165,11 +170,29 @@ describe('lobby の一覧ページ', () => {
         await page.click(`${card('b2')} .select`);
         assert.equal(await is_main('b1'), false);
         assert.equal(await is_main('b2'), true);
+        // 切り替わった 2 面を、音の有無を入れ替えて読み込み直す (TODO-072)
+        assert.equal(
+            await page.getAttribute(`${card('b1')} iframe`, 'src'),
+            `http://127.0.0.1:${ports[0]}/?sound=off`);
+        assert.equal(
+            await page.getAttribute(`${card('b2')} iframe`, 'src'),
+            `http://127.0.0.1:${ports[1]}/`);
+        await wait_for(async () => (await frame_of('b2')).url(),
+                       u => u === `http://127.0.0.1:${ports[1]}/`,
+                       { timeout: 15000 });
 
         await page.reload();
         await page.waitForSelector(card('b2'));
         assert.equal(await is_main('b2'), true);
         assert.equal(await is_main('b1'), false);
+        // 開き直したときも、覚えていた大きいボードだけ音あり
+        await wait_for(
+            () => page.getAttribute(`${card('b1')} iframe`, 'src'),
+            src => src === `http://127.0.0.1:${ports[0]}/?sound=off`,
+            { timeout: 15000 });
+        assert.equal(
+            await page.getAttribute(`${card('b2')} iframe`, 'src'),
+            `http://127.0.0.1:${ports[1]}/`);
 
         // 最初の読み込みで lobby に届かなくても、覚えていた選択は消えない
         await page.route('**/api/boards', route => route.abort());
@@ -209,6 +232,7 @@ describe('lobby の一覧ページ', () => {
                        { timeout: 15000 });
         await wait_for(() => board_loaded('b1'), ok => ok,
                        { timeout: 15000 });
+        // 前のテストで b2 を大きく出したので、b1 は音なしで読み直す
         assert.equal((await frame_of('b1')).url(),
                      `http://127.0.0.1:${ports[0]}/?sound=off`);
     });
@@ -309,10 +333,11 @@ describe('URL のプレフィクス付きの lobby とボード (TODO-064)', () 
     });
 
     it('一覧が出て、iframe の URL にボードのプレフィクスが付き、ボードが開く', async () => {
-        // iframe の src は、リダイレクト前の一覧ページと同じオリジンのパス
+        // iframe の src は、リダイレクト前の一覧ページと同じオリジンのパス。
+        // p1 は大きいボードなので ?sound=off は付かない (TODO-072)
         assert.equal(
             await page.getAttribute(`${card('p1')} iframe`, 'src'),
-            `${new URL(lobby.url).origin}/board1/?sound=off`);
+            `${new URL(lobby.url).origin}/board1/`);
         // ボード名は音ありで別タブに開く。prefix のあるボードも
         // 一覧ページと同じオリジンのパス (iframe の src と同じ組み立て)
         assert.equal(
@@ -328,6 +353,6 @@ describe('URL のプレフィクス付きの lobby とボード (TODO-064)', () 
         await wait_board(frame);
         // lobby がリダイレクトを返し、最終的にはボード自身のポートへ届く
         assert.equal(frame.url(),
-                     `http://127.0.0.1:${port}/board1/?sound=off`);
+                     `http://127.0.0.1:${port}/board1/`);
     });
 });

@@ -5,12 +5,13 @@
 // 状態は数秒おきに {prefix}/api/boards から読み直す。
 //
 // iframe は作り直さない (作り直すと読み込み直しになる)。大きく出す
-// ボードは class と CSS の order だけで入れ替える。
+// ボードは class と CSS の order だけで入れ替える。音を出すのは大きい
+// ボードだけなので、切り替わった 2 面だけは読み込み直す (TODO-072)。
 //
 const POLL_MSEC = 3000;
 const MAIN_KEY = "ytbg_lobby_main";
 
-/** server_id -> {el, iframe, status, start, stop, url, listening} */
+/** server_id -> {el, iframe, status, start, stop, board, listening} */
 const cards = new Map();
 
 /**
@@ -30,11 +31,16 @@ function board_url(b) {
         : `${location.protocol}//${location.hostname}:${b.port}${b.prefix}/`;
 }
 
-/** iframe に出す URL。全面の音が重ならないように ?sound=off を付ける */
-function frame_url(b) {
-    const u = new URL(board_url(b));
-    u.searchParams.set("sound", "off");
-    return u.href;
+/**
+ * iframe にボードを読み込む。音が重ならないように、大きいボード以外には
+ * ?sound=off を付ける
+ */
+function load(c) {
+    const u = new URL(board_url(c.board));
+    if (!c.el.classList.contains("main")) {
+        u.searchParams.set("sound", "off");
+    }
+    c.iframe.src = u.href;
 }
 
 /** 覚えている選択 (無ければ先頭) のボードを大きく出す */
@@ -42,7 +48,12 @@ function show_main() {
     const saved = localStorage.getItem(MAIN_KEY);
     const main_id = cards.has(saved) ? saved : cards.keys().next().value;
     for (const [id, c] of cards) {
+        const was_main = c.el.classList.contains("main");
         c.el.classList.toggle("main", id === main_id);
+        // listen する前は読み込まない (update() が listen し始めたら読む)
+        if (was_main !== (id === main_id) && c.listening) {
+            load(c);
+        }
     }
     fit_main();
 }
@@ -103,7 +114,7 @@ function make_card(b) {
         <button class="start">起動</button>
         <button class="stop">停止</button>
         <button class="select">大きく表示</button></h3>
-      <div class="frame"><iframe></iframe></div>`;
+      <div class="frame"><iframe allow="autoplay"></iframe></div>`;
 
     const a = el.querySelector("a");
     a.href = board_url(b);
@@ -115,7 +126,7 @@ function make_card(b) {
         status: el.querySelector(".status"),
         start: el.querySelector(".start"),
         stop: el.querySelector(".stop"),
-        url: frame_url(b),
+        board: b,
         listening: false,
     };
     c.start.onclick = () => post(b.server_id, "start");
@@ -134,7 +145,7 @@ function update(c, b) {
     // listen し始めたら読み込む (最初の読み込みも同じ)。listen する前に
     // 読みに行くと、iframe が接続エラーの画面のまま戻らない
     if (!c.listening && b.listening) {
-        c.iframe.src = c.url;
+        load(c);
     }
     c.listening = b.listening;
 }
@@ -154,12 +165,17 @@ async function refresh() {
             cards.set(b.server_id, c);
             root.append(c.el);
         }
-        update(cards.get(b.server_id), b);
     }
-    // 最初の読み込みに失敗しても、カードを作った読み直しで選ぶ
+    // 最初の読み込みに失敗しても、カードを作った読み直しで選ぶ。
+    // update() が iframe を読み込む前に選ぶ (音の有無を決めてから読む)
     if (!had_cards) {
         show_main();
     }
+    for (const b of boards) {
+        update(cards.get(b.server_id), b);
+    }
+    // 見出しの行の高さは状態の文字で変わるので、入れたあとで計算し直す
+    fit_main();
 }
 
 window.addEventListener("resize", fit_main);
