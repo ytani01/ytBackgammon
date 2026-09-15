@@ -44,12 +44,9 @@ export const calc_gammon = (position, player, cube_value, cube_accepted) => {
         return cube_val;
     }
 
-    let points = [];
-    if ( 1 - player == 0 ) {
-        points = [19, 20, 21, 22, 23, 24, bar_point(0)];
-    } else {
-        points = [1, 2, 3, 4, 5, 6, bar_point(1)];
-    }
+    const points = 1 - player == 0 ?
+          [19, 20, 21, 22, 23, 24, bar_point(0)] :
+          [1, 2, 3, 4, 5, 6, bar_point(1)];
     for (let p of points) {
         if ( position.count(p) > 0 && position.owner(p) == 1 - player ) {
             // backgammon !

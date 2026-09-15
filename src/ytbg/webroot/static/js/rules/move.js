@@ -142,29 +142,19 @@ export const dst_points = (pos, player, src_p, dice_vals) => {
     let dice_val = undefined;
 
     if ( dice_vals.length >= 2 ) {
-        // サイコロの目を足した場合も確認
+        // サイコロの目を足した場合も確認 (ぞろ目は 3, 4 個目も)
         dice_val = dice_vals[0] + dice_vals[1];
-        dst_p1 = dst_point(pos, player, src_p, dice_val);
-        if ( dst_p1 !== undefined ) {
-            dst_p.push(dst_p1);
-        }
-
-        if ( dice_vals.length >= 3 && dst_p1 !== undefined ) {
-            // ぞろ目の場合
-            dice_val += dice_vals[2];
+        for (let i=2; ; i++) {
             dst_p1 = dst_point(pos, player, src_p, dice_val);
-            if ( dst_p1 !== undefined ) {
-                dst_p.push(dst_p1);
+            if ( dst_p1 === undefined ) {
+                break;
             }
-
-            if ( dice_vals.length == 4 && dst_p1 !== undefined ) {
-                dice_val += dice_vals[3];
-                dst_p1 = dst_point(pos, player, src_p, dice_val);
-                if ( dst_p1 !== undefined ) {
-                    dst_p.push(dst_p1);
-                }
+            dst_p.push(dst_p1);
+            if ( i >= dice_vals.length ) {
+                break;
             }
-        }
+            dice_val += dice_vals[i];
+        } // for(i)
     }
 
     return dst_p;
@@ -312,17 +302,12 @@ export const dice_for_move = (player, active_dice, from_p, to_p) => {
     }
 
     if ( active_dice.length >= 3 ) {
-        let sum_d = active_dice[0] * 3;
-        if ( diff_p == sum_d ) {
-            dice_vals = [active_dice[0], active_dice[0], active_dice[0]];
-        }
-        if ( active_dice.length == 4 ) {
-            sum_d += active_dice[0];
-            if ( diff_p == sum_d ) {
-                dice_vals = [ active_dice[0], active_dice[0],
-                              active_dice[0], active_dice[0] ];
+        // ぞろ目 (3 個・4 個) の判定
+        for (let n=3; n <= active_dice.length; n++) {
+            if ( diff_p == active_dice[0] * n ) {
+                dice_vals = new Array(n).fill(active_dice[0]);
             }
-        }
+        } // for(n)
     }
 
     if ( dice_vals.length == 0 && to_p == 0 ) {

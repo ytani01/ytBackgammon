@@ -278,23 +278,19 @@ export class BoardView {
         // PlayerScore
         const score_at = (p) => score_geo[p].label;
         this.score = [];
-        this.score[1] = new PlayerScore(els.score[1], 1,
-                                        score_at(1).x, score_at(1).y,
-                                        score_at(1).deg);
-        this.score[0] = new PlayerScore(els.score[0], 0,
-                                        score_at(0).x, score_at(0).y,
-                                        score_at(0).deg);
-
         // Score buttons
         const score_btn = (p, key) => {
             const g = score_geo[p][key];
             return new ScoreButton(els.score_btn[p][key], g.x, g.y, g.w, g.h);
         };
         this.score_btn = [{}, {}];
-        this.score_btn[1].up   = score_btn(1, "up");
-        this.score_btn[1].down = score_btn(1, "down");
-        this.score_btn[0].up   = score_btn(0, "up");
-        this.score_btn[0].down = score_btn(0, "down");
+        for (const p of [1, 0]) {
+            this.score[p] = new PlayerScore(els.score[p], p,
+                                            score_at(p).x, score_at(p).y,
+                                            score_at(p).deg);
+            this.score_btn[p].up   = score_btn(p, "up");
+            this.score_btn[p].down = score_btn(p, "down");
+        } // for(p)
 
         // PlayerName
         const board_rect = { x: this.board.x, y: this.board.y, w: bw, h: bh };
@@ -304,9 +300,6 @@ export class BoardView {
             this.player_name.push(new PlayerName(
                 els.name[p], els.name_input[p], p, g.x, g.y, g.deg,
                 board_rect));
-        }
-
-        for (let p=0; p < 2; p++) {
             this.player_name[p].set("");
             this.player_name[p].on();
         }
@@ -624,16 +617,10 @@ export class BoardView {
 
         // Roll ボタンを出すか
         const update_roll = (player) => {
-            if ( gi.turn != player && gi.turn < 2 ) {
-                this.roll_btn[player].off();
-                return;
+            if ( (gi.turn == player || gi.turn >= 2) && ! has_dice(gi, player) ) {
+                this.pass_btn[1 - player].off();
+                this.roll_btn[player].on();
             }
-            if ( has_dice(gi, player) ) {
-                this.roll_btn[player].off();
-                return;
-            }
-            this.pass_btn[1 - player].off();
-            this.roll_btn[player].on();
         };
 
         if ( turn < 0 ) {
@@ -781,11 +768,7 @@ export class BoardView {
 
         this.settings.set_player(1 - this.settings.player);
 
-        if ( this.settings.player == 0 ) {
-            this.board.rotate(0, true, sec);
-        } else {
-            this.board.rotate(180, true, sec);
-        }
+        this.board.rotate(180 * this.settings.player, true, sec);
 
         this.player_name[0].inverse();
         this.player_name[1].inverse();

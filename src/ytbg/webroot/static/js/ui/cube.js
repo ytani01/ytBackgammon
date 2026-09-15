@@ -78,22 +78,15 @@ export class Cube extends BgImage {
         if ( side === undefined || side < 0 ) {
             this.rotate(0, true);
             this.move(this.x0, this.y0, true, this.move_sec);
-        } else if ( accepted ) {
-            if ( side == 0 ) {
-                this.rotate(90, true);
-            } else {
-                this.rotate(-90, true);
-            }
-            this.move(this.x0, this.y2[side], true, this.move_sec);
         } else {
-            this.set_z(100);
-            if ( side == 0 ) {
-                this.rotate(90, true);
+            this.rotate(side == 0 ? 90 : -90, true);
+            if ( accepted ) {
+                this.move(this.x0, this.y2[side], true, this.move_sec);
             } else {
-                this.rotate(-90, true);
+                this.set_z(100);
+                this.move(this.x1[side], this.y1[side],
+                          true, this.move_sec);
             }
-            this.move(this.x1[side], this.y1[side],
-                      true, this.move_sec);
         }
     } // Cube.set()
 } // class Cube
