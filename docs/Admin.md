@@ -92,6 +92,9 @@ location /board1/ {
 共通なので、デザインを足すときは同じ名前を揃える。足したあとは
 `uv tool install --reinstall .` を実行する。
 
+画像を作った元のファイル（GIMP の `*.xcf`、PowerPoint の `*.pptx` など）も、
+同じディレクトリに置いてコミットする。配布物には入らない（`pyproject.toml` の `exclude`）。
+
 ## 複数のボードを立てる
 
 **サーバ 1 プロセス ＝ ボード 1 面。** 複数のボードは、`server_id` を変えた
