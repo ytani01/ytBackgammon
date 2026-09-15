@@ -228,4 +228,48 @@ def test_unknown_type_keeps_connection(client):
         assert msg['data']['last_op']['type'] == 'put_checker'
         checker = msg['data']['gameinfo']['board']['checker']
         assert checker[0][3] == [7, 0]
+
+# --- URL のプレフィクス (TODO-064) --------------------------------------
+
+@pytest.fixture
+def prefix_client(tmp_path, monkeypatch):
+    """prefix '/foo' で作ったアプリの TestClient"""
+    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('HOME', str(tmp_path))
+
+    app = create_app('test', 'test', 'test', 'images1a', '/foo')
+    return TestClient(app)
+
+
+def test_prefix_routes(prefix_client):
+    """prefix の下でページ・static・WebSocket が応え、prefix 無しでは 404"""
+    for path in ('/foo/', '/foo/p1', '/foo/p2',
+                 '/foo/static/images1a/board-base.png',
+                 '/foo/static/js/main.js'):
+        res = prefix_client.get(path)
+        assert res.status_code == 200, path
+
+    for path in ('/', '/p1', '/static/js/main.js'):
+        assert prefix_client.get(path).status_code == 404, path
+
+    with prefix_client.websocket_connect('/foo/ws') as ws:
+        assert recv_json(ws)['type'] == 'gameinfo'
+
+
+def test_prefix_redirect(prefix_client):
+    """'/foo' は '/foo/' へリダイレクトする"""
+    res = prefix_client.get('/foo', follow_redirects=False)
+    assert res.is_redirect
+    assert res.headers['location'].endswith('/foo/')
+    assert prefix_client.get('/foo').status_code == 200
+
+
+def test_prefix_in_index(prefix_client):
+    """index.html の static の URL に prefix が付く"""
+    text = prefix_client.get('/foo/').text
+    assert 'src="/foo/static/js/main.js"' in text
+    assert 'href="/foo/static/ytbg.css"' in text
+    assert 'url(/foo/static/images1a/bg.png)' in text
+    assert '"/static/' not in text
+
 ##

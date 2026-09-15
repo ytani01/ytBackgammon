@@ -1,9 +1,12 @@
 import { log } from "./log.js";
 
-export const SOUND_ROLL = "/static/sounds/roll1.mp3";
-export const SOUND_PUT = "/static/sounds/put1.mp3";
-export const SOUND_HIT = "/static/sounds/hit1.mp3";
-export const SOUND_TURN_CHANGE = "/static/sounds/turn_change1.mp3";
+// このモジュールからの相対で組み立てる (URL のプレフィクスが付いても同じ)
+const sound_url = (name) => new URL(`../sounds/${name}`, import.meta.url).pathname;
+
+export const SOUND_ROLL = sound_url("roll1.mp3");
+export const SOUND_PUT = sound_url("put1.mp3");
+export const SOUND_HIT = sound_url("hit1.mp3");
+export const SOUND_TURN_CHANGE = sound_url("turn_change1.mp3");
 
 // QueryString の sound= が指定されていたら音を止める (undefined のときだけ鳴る)
 export let GlobalSoundSwitch = undefined;

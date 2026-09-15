@@ -248,3 +248,53 @@ describe('ブラウザでの基本の動作確認', () => {
         }
     });
 });
+
+describe('URL のプレフィクス付きで起動したボード (TODO-064)', () => {
+    let server = undefined;
+    let browser = undefined;
+    let page = undefined;
+
+    before(async () => {
+        server = await start_server({ prefix: '/pre/fix' });
+        browser = await launch_browser();
+        page = await open_board(browser, `${server.url}/`);
+    });
+
+    after(async () => {
+        if (browser !== undefined) {
+            await browser.close();
+        }
+        if (server !== undefined) {
+            await server.stop();
+        }
+    });
+
+    it('盤面が開き、WebSocket がつながり、読み込みがプレフィクスの下へ行く', async () => {
+        // open_board() は gameinfo が届くまで待つので、WebSocket はつながっている。
+        // サーバは /pre/fix の下でしか受けないので、つないだ先は /pre/fix/ws
+        assert.equal((await gameinfo(page)).board.checker.length, 2);
+
+        const origin = new URL(server.url).origin;
+        const urls = await page.evaluate(
+            () => performance.getEntriesByType('resource').map(e => e.name));
+        const ours = urls.filter(u => u.startsWith(origin));
+        const msg = ours.join('\n');
+        assert.ok(ours.some(u => u.includes('/pre/fix/static/js/main.js')), msg);
+        assert.ok(ours.some(u => u.includes('/pre/fix/static/images1a/')), msg);
+        assert.deepEqual(
+            ours.filter(u => !new URL(u).pathname.startsWith('/pre/fix/')), []);
+
+        // 音は鳴らすまで読まないことがあるので、sound.js が組み立てた URL を
+        // 見て、それを取ってみる
+        const sound = await page.evaluate(
+            async url => (await import(url)).SOUND_ROLL,
+            `${server.url}/static/js/sound.js`);
+        assert.equal(sound, '/pre/fix/static/sounds/roll1.mp3');
+        assert.equal((await fetch(`${origin}${sound}`)).status, 200);
+    });
+
+    it('コンソールエラーが出ていない', async () => {
+        const errors = console_errors(page, server.url);
+        assert.deepEqual(errors, [], JSON.stringify(errors, null, 2));
+    });
+});

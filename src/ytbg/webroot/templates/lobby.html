@@ -5,9 +5,9 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=0.4, minimum-scale=0.05, maximum-scale=3">
     <title>ytBackgammon lobby</title>
-    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="icon" type="image/png" href="{{ prefix }}/static/favicon.png">
     <style>
-      body { background-image: url(/static/images1a/bg.png); color: #222;
+      body { background-image: url({{ prefix }}/static/images1a/bg.png); color: #222;
              width: 920px; }
       #boards { display: flex; flex-wrap: wrap; gap: 8px; }
       .board { background: rgba(255, 255, 255, 0.6); padding: 4px; }
@@ -22,7 +22,7 @@
       .main .frame { width: 880px; height: 560px; }
       .main .frame iframe { transform: scale(0.835); }
     </style>
-    <script type="module" src="/static/js/lobby.js"></script>
+    <script type="module" src="{{ prefix }}/static/js/lobby.js"></script>
   </head>
   <body>
     <h1>ytBackgammon</h1>

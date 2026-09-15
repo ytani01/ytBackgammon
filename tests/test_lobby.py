@@ -9,6 +9,7 @@ lobby (TODO-063) の設定の読み込みと、子プロセスの起動・停止
 子プロセスのテストは lobby を実プロセスで起動し、HTTP の API で操作する。
 保存先は YTBG_DATA_DIR で tmp_path へ逃がし、ポートは OS に選ばせる。
 """
+import asyncio
 import contextlib
 import json
 import os
@@ -22,8 +23,18 @@ import urllib.error
 import urllib.request
 
 import pytest
+from click.testing import CliRunner
+from starlette.testclient import TestClient
 
-from ytbg.lobby import BoardConfig, ConfigError, load_config
+from ytbg.__main__ import main
+from ytbg.app import normalize_prefix
+from ytbg.lobby import (
+    BoardConfig,
+    BoardProcess,
+    ConfigError,
+    create_lobby_app,
+    load_config,
+)
 
 VALID = '''
 [[board]]
@@ -84,7 +95,12 @@ BOARD = '[[board]]\nserver_id = "1"\nport = 5001\nimage_dir = "images2"\n'
      '"server_id" must not be empty'),
     ('[[board]]\nserver_id = "a/b"\nport = 5001\nimage_dir = "x"',
      'contain "/"'),
-    (BOARD + 'url = "/board1/"', '"url" must start with http'),
+    (BOARD + 'url = "//ytbg1.example.net/"', '"url" must start with http'),
+    (BOARD + "url = '/\\ytbg1.example.net/'", '"url" must start with http'),
+    (BOARD + 'url = "/a b/"', '"url" must not contain spaces'),
+    (BOARD + 'prefix = "a//b"', '"prefix": invalid prefix'),
+    (BOARD + 'prefix = "/a/../b"', '"prefix": invalid prefix'),
+    (BOARD + 'prefix = 1', '"prefix" must be str'),
     (BOARD + 'url = "ytbg1.example.net/"', '"url" must start with http'),
     (BOARD + 'url = "ftp://ytbg1.example.net/"', '"url" must start with'),
     (BOARD + 'url = "http://"', '"url" must start with http'),
@@ -110,6 +126,85 @@ def test_load_config_error(tmp_path, text, msg):
     with pytest.raises(ConfigError) as e:
         load_config(write(tmp_path, text))
     assert msg in str(e.value)
+
+
+def test_load_config_prefix_and_path_url(tmp_path):
+    """prefix は揃えて持ち、url はパスだけでもよい (TODO-064)"""
+    boards = load_config(write(
+        tmp_path, BOARD + 'prefix = "board1/"\nurl = "/board1/"\n'))
+    assert boards == [
+        BoardConfig('1', 5001, 'images2', '/board1/', '/board1')]
+    # 書かなければ prefix 無し
+    assert load_config(write(tmp_path, BOARD))[0].prefix == ''
+
+
+@pytest.mark.parametrize(('value', 'expected'), [
+    ('', ''), ('/', ''), ('foo', '/foo'), ('/foo', '/foo'),
+    ('/foo/', '/foo'), ('a/b.c/d_e~-1', '/a/b.c/d_e~-1'), ('..a', '/..a'),
+])
+def test_normalize_prefix(value, expected):
+    assert normalize_prefix(value) == expected
+
+
+@pytest.mark.parametrize('value', [
+    'a//b', '/./', '/foo/..', 'a b', 'a"b', '<x>', 'a?b', 'a%20b', 'あ',
+])
+def test_normalize_prefix_error(value):
+    with pytest.raises(ValueError):
+        normalize_prefix(value)
+
+
+@pytest.mark.parametrize('cmd', [['board', 'x'], ['lobby']])
+def test_cli_bad_prefix(cmd):
+    """--prefix の誤りは click のエラー (起動する前に止まる)"""
+    res = CliRunner().invoke(main, [*cmd, '--prefix', 'a//b'])
+    assert res.exit_code == 2
+    assert 'invalid prefix' in res.output
+
+
+@pytest.mark.parametrize(('prefix', 'expected'), [
+    ('/board1', ['--prefix', '/board1']), ('', []),
+])
+async def test_start_passes_prefix(monkeypatch, prefix, expected):
+    """lobby は子プロセスへ --prefix を渡す (prefix が無ければ渡さない)"""
+    cmds = []
+
+    async def fake_exec(*cmd):
+        cmds.append(list(cmd))
+        return FakeProc()
+
+    class FakeProc:
+        pid = 1
+        returncode = None
+
+        async def wait(self):
+            await asyncio.Event().wait()
+
+    monkeypatch.setattr(asyncio, 'create_subprocess_exec', fake_exec)
+    p = BoardProcess(BoardConfig('1', 5001, 'images2', None, prefix))
+    await p.start()
+    assert p._watch is not None
+    p._watch.cancel()
+
+    args = cmds[0][cmds[0].index('board') + 1:]
+    assert args == ['-p', '5001', '-i', 'images2', *expected, '--', '1']
+
+
+def test_lobby_prefix_routes():
+    """lobby 自身の prefix の下に一覧ページ・API・static を置く"""
+    # with を使わないので lifespan は走らず、子プロセスは起動しない
+    client = TestClient(create_lobby_app(
+        [BoardConfig('1', 5001, 'images2', None, '/board1')], prefix='/lb'))
+    page = client.get('/lb/')
+    assert page.status_code == 200
+    assert 'src="/lb/static/js/lobby.js"' in page.text
+    assert 'url(/lb/static/images1a/bg.png)' in page.text
+    assert '"/static/' not in page.text
+    assert client.get('/lb/static/js/lobby.js').status_code == 200
+    boards = client.get('/lb/api/boards').json()
+    assert boards[0]['prefix'] == '/board1'
+    for path in ('/', '/api/boards', '/static/js/lobby.js'):
+        assert client.get(path).status_code == 404, path
 
 
 def test_load_config_no_file(tmp_path):

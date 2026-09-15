@@ -76,7 +76,8 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
 ページを開いて見る。
 
 - `board.test.mjs` — 盤面の描画・Roll・ドラッグ・2 枚目のタブへの同期・
-  コンソールエラー
+  コンソールエラー。URL のプレフィクス付きで起動したボードが開き、読み込みが
+  プレフィクスの下へ行くか（TODO-064。`start_server()` の `prefix`）
 - `rules.test.mjs` — ページの中の `gameinfo` とルール層の結果が合っているか
   （TODO-027）。helper の `judge()` / `pip_count()` / `dst_points()` が、ページの中で
   `rules/` を import して Controller の `gameinfo` で呼ぶ。`BoardView` がルールを
@@ -122,7 +123,8 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   変えないか、履歴の返事でも `clock_state` を全部反映するか（TODO-060）
 - `lobby.test.mjs` — lobby の一覧ページ（TODO-063）。lobby を実プロセスで起動し、
   iframe の URL（設定の `url` の有無）、大きく出すボードの切り替え、起動・停止のボタンで
-  状態の表示が変わるかを見る。lobby の子プロセスそのもの（lobby を止めたらボードも
+  状態の表示が変わるかを見る。プレフィクス付きの lobby で、iframe の URL に
+  ボードのプレフィクスが付くか（TODO-064）。lobby の子プロセスそのもの（lobby を止めたらボードも
   止まるか）は `tests/test_lobby.py` が見る
 - `settings.test.mjs` — 音の ON/OFF を cookie に保存して開き直しても残るか、
   PIP の最初の表示が Pip のチェックボックスに合うか（TODO-053）。

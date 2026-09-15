@@ -26,7 +26,7 @@ const N_DICE = 4;
 /**
  * <img src="${dir}${file}">
  *
- * @param {string} dir - 画像ディレクトリ ("/static/images1a/")
+ * @param {string} dir - 画像ディレクトリ ("/static/images1a/"。プレフィクスが付けば "/foo/static/images1a/")
  * @param {string} file - ファイル名
  * @param {Object} [opts]
  * @param {string} [opts.width] - width 属性 ("120px" など)

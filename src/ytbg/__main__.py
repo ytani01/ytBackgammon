@@ -17,7 +17,7 @@ import click
 import uvicorn
 
 from . import __prog_name__, __version__
-from .app import create_app
+from .app import create_app, normalize_prefix
 from .lobby import ConfigError, create_lobby_app, load_config
 from .mylog import getLogger, loggerInit
 
@@ -47,6 +47,19 @@ def _run(app, port, debug):
         _log.info('end')
 
 
+def _prefix_option(_ctx, _param, value):
+    """--prefix を normalize_prefix() で揃える。誤りは click のエラー"""
+    try:
+        return normalize_prefix(value)
+    except ValueError as e:
+        raise click.BadParameter(str(e)) from e
+
+
+PREFIX_OPTION = click.option(
+    '--prefix', 'prefix', type=str, default='', callback=_prefix_option,
+    help="URL prefix (e.g. '/foo'). Default: none")
+
+
 @click.group(context_settings=CONTEXT_SETTINGS)
 def main():
     """ytBackgammon: network shared backgammon board"""
@@ -59,15 +72,17 @@ def main():
 @click.option('--image_dir', '-i', 'image_dir', type=str,
               default="images1a",
               help="Images directory under '/static/'")
+@PREFIX_OPTION
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag')
-def board(server_id, port, image_dir, debug):
+def board(server_id, port, image_dir, prefix, debug):
     """ボード 1 面のサーバを起動する"""
     loggerInit(debug)
-    _log.info('server_id={}, port={}, image_dir={}',
-              server_id, port, image_dir)
+    _log.info('server_id={}, port={}, image_dir={}, prefix={}',
+              server_id, port, image_dir, prefix)
 
-    _run(create_app(MY_NAME, VERSION, server_id, image_dir), port, debug)
+    _run(create_app(MY_NAME, VERSION, server_id, image_dir, prefix),
+         port, debug)
 
 
 @main.command(context_settings=CONTEXT_SETTINGS)
@@ -76,19 +91,20 @@ def board(server_id, port, image_dir, debug):
               help='config file (TOML)')
 @click.option('--port', '-p', 'port', type=int, default=5000,
               show_default=True, help='port number')
+@PREFIX_OPTION
 @click.option('--debug', '-d', 'debug', is_flag=True, default=False,
               help='debug flag (also passed to the boards)')
-def lobby(config, port, debug):
+def lobby(config, port, prefix, debug):
     """設定のボードを全部起動し、一覧ページを出す"""
     loggerInit(debug)
-    _log.info('config={}, port={}', config, port)
+    _log.info('config={}, port={}, prefix={}', config, port, prefix)
 
     try:
         boards = load_config(config)
     except ConfigError as e:
         raise click.ClickException(str(e)) from e
 
-    _run(create_lobby_app(boards, debug), port, debug)
+    _run(create_lobby_app(boards, debug, prefix), port, debug)
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 from . import WEBROOT
-from .app import NoCacheStaticFiles, templates
+from .app import NoCacheStaticFiles, normalize_prefix, templates, with_prefix
 from .mylog import getLogger
 
 # SIGTERM を送ってから SIGKILL にするまでの秒数
@@ -54,12 +54,14 @@ class BoardConfig:
     port: int
     image_dir: str
     url: str | None = None
+    # normalize_prefix() で揃えた値 ('' か '/foo')
+    prefix: str = ''
 
 
 # server_id は整数も受け、文字列に直す
 _REQUIRED: dict[str, type | tuple[type, ...]] = {
     'server_id': (str, int), 'port': int, 'image_dir': str}
-_OPTIONAL: dict[str, type | tuple[type, ...]] = {'url': str}
+_OPTIONAL: dict[str, type | tuple[type, ...]] = {'url': str, 'prefix': str}
 
 
 def load_config(path: str | Path) -> list[BoardConfig]:
@@ -72,7 +74,8 @@ def load_config(path: str | Path) -> list[BoardConfig]:
         server_id = 1        # 整数でも文字列でもよい。文字列に直す
         port = 5001
         image_dir = "images2"
-        url = "https://ytbg1.example.net/"   # 省略可
+        url = "https://ytbg1.example.net/"   # 省略可。"/board1/" のようにパスだけでもよい
+        prefix = "/board1"   # 省略可。子プロセスへ --prefix で渡す
     """
     try:
         with Path(path).open('rb') as f:
@@ -118,22 +121,37 @@ def load_config(path: str | Path) -> list[BoardConfig]:
             raise ConfigError(
                 f'{where}: "server_id" must not be empty or contain "/"')
 
-        # ボードの WebSocket は /ws なので、パスで分けた相対 URL では動かない
+        try:
+            prefix = normalize_prefix(ent.get('prefix', ''))
+        except ValueError as e:
+            raise ConfigError(f'{where}: "prefix": {e}') from e
+
+        # http(s) の URL か、'/' で始まるパスだけ (一覧ページと同じホスト)。
+        # ボードは自分の prefix の下で動くので、パスで分けても動く
         url = ent.get('url')
         if url is not None:
-            try:
-                parts = urlsplit(url)
-                _ = parts.port   # ポートが数でない・範囲外なら ValueError
-            except ValueError as e:
-                raise ConfigError(f'{where}: "url" is invalid: {e}') from e
-            if parts.scheme not in ('http', 'https') or not parts.netloc:
-                raise ConfigError(
-                    f'{where}: "url" must start with http:// or https://')
             if any(c.isspace() for c in url):
                 raise ConfigError(f'{where}: "url" must not contain spaces')
+            # ブラウザは '/\\' も '//' と同じくホストの始まりとして読む
+            if url.startswith(('//', '/\\')):
+                raise ConfigError(
+                    f'{where}: "url" must start with http://, https:// '
+                    'or a single "/"')
+            if not url.startswith('/'):
+                try:
+                    parts = urlsplit(url)
+                    _ = parts.port   # ポートが数でない・範囲外なら ValueError
+                except ValueError as e:
+                    raise ConfigError(
+                        f'{where}: "url" is invalid: {e}') from e
+                if parts.scheme not in ('http', 'https') or not parts.netloc:
+                    raise ConfigError(
+                        f'{where}: "url" must start with http://, https:// '
+                        'or a single "/"')
 
         boards.append(
-            BoardConfig(server_id, ent['port'], ent['image_dir'], url))
+            BoardConfig(server_id, ent['port'], ent['image_dir'], url,
+                        prefix))
 
     for key in ('server_id', 'port'):
         seen = set()
@@ -203,6 +221,8 @@ class BoardProcess:
 
             cmd = [sys.executable, '-m', 'ytbg', 'board',
                    '-p', str(self.conf.port), '-i', self.conf.image_dir]
+            if self.conf.prefix:
+                cmd += ['--prefix', self.conf.prefix]
             if self.debug:
                 cmd.append('-d')
             # server_id が '-' で始まってもオプションと取られないように
@@ -242,9 +262,12 @@ class BoardProcess:
                 await watch
 
 
-def create_lobby_app(boards: list[BoardConfig],
-                     debug: bool = False) -> Starlette:
-    """一覧サーバの Starlette のアプリを作る"""
+def create_lobby_app(boards: list[BoardConfig], debug: bool = False,
+                     prefix: str = '') -> Starlette:
+    """
+    一覧サーバの Starlette のアプリを作る。prefix は lobby 自身の
+    URL のプレフィクス (normalize_prefix() で揃えた値)
+    """
     procs = {b.server_id: BoardProcess(b, debug) for b in boards}
 
     @contextlib.asynccontextmanager
@@ -257,7 +280,8 @@ def create_lobby_app(boards: list[BoardConfig],
             await asyncio.gather(*(p.stop() for p in procs.values()))
 
     async def index(request):
-        response = templates.TemplateResponse(request, 'lobby.html', {})
+        response = templates.TemplateResponse(
+            request, 'lobby.html', {'prefix': prefix})
         response.headers['Cache-Control'] = 'no-cache'
         return response
 
@@ -276,7 +300,7 @@ def create_lobby_app(boards: list[BoardConfig],
         return endpoint
 
     return Starlette(
-        routes=[
+        routes=with_prefix([
             Route('/', index),
             Route('/api/boards', list_boards),
             Route('/api/boards/{server_id}/start', action('start'),
@@ -286,5 +310,5 @@ def create_lobby_app(boards: list[BoardConfig],
             Mount('/static',
                   app=NoCacheStaticFiles(directory=str(WEBROOT / 'static')),
                   name='static'),
-        ],
+        ], prefix),
         lifespan=lifespan)

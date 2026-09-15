@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-064。** これまでに 63 件を決着させた。
+**残っている項目: なし。** これまでに 64 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-065` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -22,41 +22,12 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 ---
 
-## TODO-064. board と lobby に URL のプレフィクスを指定できるようにする
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | implementer + verifier + reviewer |
-
-`http://server:port/foo` の `/foo` の部分を、board と lobby のどちらでも指定できるようにする。
-リバースプロキシで 1 つのホストのパスごとにボードを振り分けるため。
-
-- [ ] `ytbg board` と `ytbg lobby` に `--prefix` を足す
-- [ ] `ytbg.toml` の `[[board]]` に `prefix`（省略可）を足し、lobby が子プロセスへ `--prefix` で渡す
-- [ ] サーバのルート（`app.py`・`lobby.py`）を prefix の下に置く
-- [ ] テンプレート（`index.html`・`lobby.html`）と JS（`ws.js`・`sound.js`・`settings.js`・`lobby.js`）の `/` 始まりの URL に prefix を付ける
-- [ ] 設定の `url` にパスだけ（`/foo/`）も書けるようにする。省いたときは、一覧ページを開いたホスト名とボードのポートに prefix を付けた URL にする
-- [ ] テストを足す（pytest でルートと設定の検査、ブラウザテストで prefix 付きの盤面が開いて WebSocket がつながること、lobby の iframe の URL）
-- [ ] `ytbg.toml` のコメント、`docs/Admin.md`、`docs/Developer.md` を書き換える
-
-2026-09-15 に利用者と決めた。
-
-- **プレフィクス付きのパスは、そのままサーバに届く前提。** プロキシがパスを
-  外す構成は扱わない。サーバが `/foo` の下にルートを置くので、プロキシを通さず
-  直接開いても動く
-- `/foo` と `/foo/` はどちらもページを返す。prefix の末尾の `/` は取り除いて揃える。
-  prefix を指定したときは `/` では受けない
-- 分担: 実装は implementer（サーバ・テンプレート・JS・テスト・文書にまたがるので Opus）。
-  確認は verifier（prefix 付きで board と lobby を実際に起動して開く）。
-  ルートと URL の組み立てが変わるので、レビューを reviewer に分ける
-
----
-
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-064.** board と lobby に URL のプレフィクスを指定できるようにする](archives/todo/TODO-064.%20board%20と%20lobby%20に%20URL%20のプレフィクスを指定できるようにする.md)
 - [**TODO-063.** 複数サーバーの制御](archives/todo/TODO-063.%20複数サーバーの制御.md)
 - [**TODO-060.** BoardController と BoardView を入れる](archives/todo/TODO-060.%20BoardController%20と%20BoardView%20を入れる.md)
 - [**TODO-059.** 盤面の参照と操作の予測を純粋関数へ移す](archives/todo/TODO-059.%20盤面の参照と操作の予測を純粋関数へ移す.md)

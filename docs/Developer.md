@@ -112,6 +112,24 @@ graph TD
   する。読み込みで拾う例外（`storage.py` の `LOAD_ERRORS`）に `TypeError` は
   入っていないので、`TypeError` のまま出るとサーバが起動しない
 
+### URL のプレフィクス
+
+`--prefix` の値は `app.py` の `normalize_prefix()` が `''` か `/foo` の形に揃え、
+各段を `[A-Za-z0-9._~-]` に限る（HTML と JS に埋め込むため）。CLI（`__main__.py`）と
+設定（`lobby.py`）の両方がこれを通す。
+
+- **サーバはルートを prefix の下に置く**（`with_prefix()` が `Mount` で包む）。
+  プロキシがパスを外す構成（uvicorn の `root_path`）は扱わない。prefix を付けると
+  `/` は 404 で、`/foo` は Starlette の Router（`redirect_slashes`）が `/foo/` へリダイレクトする
+- テンプレート（`index.html`・`lobby.html`）は `{{ prefix }}/static/...` と書く
+- **JS は prefix を受け取らない。** `ws.js`（`/ws`）・`sound.js`（音）・`settings.js`
+  （画像ディレクトリ）・`lobby.js`（API）は、`new URL("../../ws", import.meta.url)` の
+  ように**そのモジュールの URL からの相対**で組み立てる。モジュールは必ず
+  `{prefix}/static/js/` から読まれるので、そこから辿れば prefix が付く。
+  モジュールを別の深さへ動かすときは、この相対パスも直すこと
+- Cookie には path を付けていない。既定の path はページのディレクトリで、
+  `/foo/` も `/foo/p1` も `/foo` になるので、prefix ごとに分かれる
+
 ### 一覧サーバ（`lobby.py`）
 
 ボードは `sys.executable -m ytbg board ...` で子プロセスとして起動する
@@ -131,6 +149,10 @@ graph TD
   プロセスが同じポートを塞いでいると、子が起動に失敗して終わるまでの一瞬は「動作中」になる
 - 子は lobby と同じプロセスグループにいる。端末の Ctrl+C はボードにも直接届くので、
   lobby が止めに行く前にボードが終わっていることがある
+- ボードの URL（`lobby.js` の `board_url()`）は、設定の `url` があればそれを一覧ページの
+  URL からの相対で解決し（`/board1/` のようなパスだけも書ける）、無ければ
+  `{protocol}//{hostname}:{port}{prefix}/`。`prefix` は API の状態に入っていて、
+  子プロセスには `--prefix` で渡す
 - 一覧ページは iframe を作り直さない（作り直すと読み込み直しになる）。大きく出す
   ボードは class と CSS の `order` だけで入れ替える。iframe の `src` は、`listening` が
   偽から真に変わったときだけ入れる（最初の読み込みも同じ）。**listen する前に入れると、

@@ -17,14 +17,15 @@ import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    REPO_ROOT, free_port, launch_browser, wait_for,
+    REPO_ROOT, free_port, launch_browser, wait_board, wait_for,
 } from './helper.mjs';
 
 /**
  * lobby を起動する。helper.mjs の start_server() と同じく detached で
  * 起動し、止まらなければプロセスグループごと SIGKILL する。
+ * prefix を渡すと lobby 自身を --prefix で起動し、返す url にも付ける。
  */
-async function start_lobby(boards) {
+async function start_lobby(boards, prefix = '') {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'ytbg-lobby-test-'));
     const cfg = path.join(dir, 'ytbg.toml');
     await writeFile(cfg, boards.map(b => [
@@ -33,12 +34,14 @@ async function start_lobby(boards) {
         `port = ${b.port}`,
         'image_dir = "images1a"',
         ...(b.url ? [`url = "${b.url}"`] : []),
+        ...(b.prefix ? [`prefix = "${b.prefix}"`] : []),
         '',
     ].join('\n')).join('\n'));
 
     const port = await free_port();
     const child = spawn(
-        'uv', ['run', 'ytbg', 'lobby', '-c', cfg, '-p', String(port)],
+        'uv', ['run', 'ytbg', 'lobby', '-c', cfg, '-p', String(port),
+               ...(prefix ? ['--prefix', prefix] : [])],
         {
             cwd: REPO_ROOT,
             env: { ...process.env, YTBG_DATA_DIR: dir },
@@ -50,7 +53,7 @@ async function start_lobby(boards) {
     child.stderr.on('data', d => { log += d; });
     const exited = new Promise(resolve => child.on('exit', resolve));
 
-    const url = `http://127.0.0.1:${port}`;
+    const url = `http://127.0.0.1:${port}${prefix}`;
     const stop = async () => {
         try {
             // uv が lobby へ渡す。ボードは lobby が止める
@@ -210,5 +213,50 @@ describe('lobby の一覧ページ', () => {
                        { timeout: 15000 });
         assert.equal((await frame_of('b1')).url(),
                      `http://127.0.0.1:${ports[0]}/?sound=off`);
+    });
+});
+
+describe('URL のプレフィクス付きの lobby とボード (TODO-064)', () => {
+    let lobby = undefined;
+    let browser = undefined;
+    let page = undefined;
+    let port = undefined;
+
+    const card = id => `.board[data-server-id="${id}"]`;
+
+    before(async () => {
+        port = await free_port();
+        lobby = await start_lobby([
+            { server_id: 'p1', port, prefix: 'board1/' },
+            { server_id: 'p2', port: await free_port(), url: '/board2/' },
+        ], '/lobby');
+        browser = await launch_browser();
+        page = await browser.newPage();
+        await page.goto(`${lobby.url}/`);
+        await wait_for(() => page.textContent(`${card('p1')} .status`),
+                       s => s === '動作中', { timeout: 15000 });
+    });
+
+    after(async () => {
+        if (browser !== undefined) {
+            await browser.close();
+        }
+        if (lobby !== undefined) {
+            await lobby.stop();
+        }
+    });
+
+    it('一覧が出て、iframe の URL にボードのプレフィクスが付き、ボードが開く', async () => {
+        assert.equal(
+            await page.getAttribute(`${card('p1')} iframe`, 'src'),
+            `http://127.0.0.1:${port}/board1/?sound=off`);
+        // パスだけの url は、一覧ページと同じホストのそのパス
+        assert.equal(
+            await page.getAttribute(`${card('p2')} a`, 'href'),
+            `${new URL(lobby.url).origin}/board2/`);
+
+        const frame = await (await page.$(`${card('p1')} iframe`)).contentFrame();
+        // gameinfo が届くまで待つ (WebSocket が /board1/ws につながる)
+        await wait_board(frame);
     });
 });

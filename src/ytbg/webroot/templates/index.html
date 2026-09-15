@@ -6,14 +6,14 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=0.4, minimum-scale=0.05, maximum-scale=3">
     <title>ytBackgammon</title>
-    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="icon" type="image/png" href="{{ prefix }}/static/favicon.png">
     <link
       href="https://use.fontawesome.com/releases/v5.0.6/css/all.css"
       rel="stylesheet">
-    <link rel="stylesheet" type="text/css" href="/static/ytbg.css">
-    <script type="module" src="/static/js/main.js"></script>
+    <link rel="stylesheet" type="text/css" href="{{ prefix }}/static/ytbg.css">
+    <script type="module" src="{{ prefix }}/static/js/main.js"></script>
   </head>
-  <body style="background-image:url(/static/{{image_dir}}/bg.png);"
+  <body style="background-image:url({{ prefix }}/static/{{image_dir}}/bg.png);"
         data-image-dir="{{image_dir}}" data-server-id="{{server_id}}">
     <header>
       <div id="nav-drawer" style="display:inline-block;">

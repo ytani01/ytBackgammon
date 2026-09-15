@@ -13,6 +13,7 @@ create_app() が BackgammonServer を作り、ルートはそれを閉じ込め�
 """
 
 import json
+import re
 
 from starlette.applications import Starlette
 from starlette.routing import Mount, Route, WebSocketRoute
@@ -44,7 +45,36 @@ class NoCacheStaticFiles(StaticFiles):
         return res
 
 
-def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
+# prefix の 1 段に使える文字。HTML と JS に埋め込むので絞る
+_PREFIX_SEGMENT = re.compile(r'[A-Za-z0-9._~-]+')
+
+
+def normalize_prefix(prefix: str) -> str:
+    """
+    URL のプレフィクスを '/foo' の形に揃える。無ければ ''。
+
+    前後の '/' を取るので、'foo'・'/foo/'・'/foo' は同じ。
+    段は [A-Za-z0-9._~-] だけで、途中の空の段 ('/a//b') と '.'・'..' は
+    ValueError。CLI (__main__.py) と設定 (lobby.py) の両方から使う。
+    """
+    body = prefix.strip('/')
+    if not body:
+        return ''
+    for seg in body.split('/'):
+        if not _PREFIX_SEGMENT.fullmatch(seg) or seg in ('.', '..'):
+            raise ValueError(
+                f'invalid prefix {prefix!r}: each segment must be '
+                '[A-Za-z0-9._~-] and not empty, "." or ".."')
+    return '/' + body
+
+
+def with_prefix(routes: list, prefix: str) -> list:
+    """prefix があれば routes をその下に置く (prefix 無しの '/' では受けない)"""
+    return [Mount(prefix, routes=routes)] if prefix else routes
+
+
+def create_app(svr_name, svr_ver, svr_id, image_dir,
+               prefix: str = '') -> Starlette:
     """
     Starlette のアプリを作る。
 
@@ -55,12 +85,16 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
     svr_id: str
     image_dir: str
         static/ 以下の画像ディレクトリ
+    prefix: str
+        URL のプレフィクス。normalize_prefix() で揃えた値 ('' か '/foo')。
+        '/foo' と '/foo/' のどちらも '/foo/' に行き着く ('/foo' は
+        Starlette の Router の redirect_slashes がリダイレクトする)
 
     svr_name と image_dir は index.html の表示のためだけの値なので、
     BackgammonServer には渡さない (TODO-025)。
     """
-    _log.debug('svr_name={}, svr_ver={}, svr_id={}, image_dir={}',
-               svr_name, svr_ver, svr_id, image_dir)
+    _log.debug('svr_name={}, svr_ver={}, svr_id={}, image_dir={}, prefix={}',
+               svr_name, svr_ver, svr_id, image_dir, prefix)
 
     svr = BackgammonServer(svr_ver, svr_id)
 
@@ -74,6 +108,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
                 'version': svr_ver,
                 'server_id': svr_id,
                 'image_dir': image_dir,
+                'prefix': prefix,
             })
         response.headers['Cache-Control'] = 'no-cache'
         return response
@@ -120,7 +155,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
         finally:
             await svr.on_disconnect(websocket)
 
-    app = Starlette(routes=[
+    app = Starlette(routes=with_prefix([
         Route('/', index),
         Route('/p1', index),
         Route('/p2', index),
@@ -128,7 +163,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir) -> Starlette:
         Mount('/static',
               app=NoCacheStaticFiles(directory=str(WEBROOT / 'static')),
               name='static'),
-    ])
+    ], prefix))
 
     # テストから BackgammonServer を触れるようにしておく (TODO-025)
     app.state.svr = svr

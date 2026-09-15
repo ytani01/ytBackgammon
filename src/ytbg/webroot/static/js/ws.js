@@ -9,10 +9,13 @@ let ws_retry_sec = WS_RETRY_SEC_MIN;
 /**
  * WebSocket の URL
  *
+ * このモジュール ({prefix}/static/js/ws.js) からの相対で {prefix}/ws にする。
+ * URL のプレフィクスを別の口から受け取らずに済む
+ *
  * @return {string}
  */
 const ws_url = () => {
-    const url = new URL("/ws", location.href);
+    const url = new URL("../../ws", import.meta.url);
     url.protocol = (url.protocol === "https:") ? "wss:" : "ws:";
     return url.href;
 };

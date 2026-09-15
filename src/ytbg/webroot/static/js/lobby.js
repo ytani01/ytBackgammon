@@ -2,7 +2,7 @@
 // (c) 2026 Yoichi Tanibayashi
 //
 // 一覧ページ (TODO-063)。ボードを iframe で並べ、選んだ 1 面を大きく出す。
-// 状態は数秒おきに /api/boards から読み直す。
+// 状態は数秒おきに {prefix}/api/boards から読み直す。
 //
 // iframe は作り直さない (作り直すと読み込み直しになる)。大きく出す
 // ボードは class と CSS の order だけで入れ替える。
@@ -14,11 +14,19 @@ const MAIN_KEY = "ytbg_lobby_main";
 const cards = new Map();
 
 /**
- * ボードの URL。設定に url があればそれ、無ければ一覧ページを開いた
- * ホスト名にボードのポートを付ける
+ * lobby の API の URL。このモジュール ({prefix}/static/js/lobby.js) からの
+ * 相対で組み立てるので、lobby の URL のプレフィクスが付いても同じ
+ */
+const api_url = (path) => new URL(`../../api/${path}`, import.meta.url);
+
+/**
+ * ボードの URL。設定に url があればそれ (パスだけなら一覧ページと同じ
+ * ホスト)、無ければ一覧ページを開いたホスト名にボードのポートと
+ * ボードのプレフィクスを付ける
  */
 function board_url(b) {
-    return b.url ?? `${location.protocol}//${location.hostname}:${b.port}/`;
+    return b.url != null ? new URL(b.url, location.href).href
+        : `${location.protocol}//${location.hostname}:${b.port}${b.prefix}/`;
 }
 
 /** iframe に出す URL。全面の音が重ならないように ?sound=off を付ける */
@@ -45,7 +53,7 @@ function select_main(server_id) {
 async function post(server_id, action) {
     try {
         await fetch(
-            `/api/boards/${encodeURIComponent(server_id)}/${action}`,
+            api_url(`boards/${encodeURIComponent(server_id)}/${action}`),
             { method: "POST" });
     } catch {
         // lobby に届かない。状態は次の読み直しで出る
@@ -102,7 +110,7 @@ function update(c, b) {
 async function refresh() {
     let boards;
     try {
-        boards = await (await fetch("/api/boards")).json();
+        boards = await (await fetch(api_url("boards"))).json();
     } catch {
         return;  // lobby が止まっている。次の読み直しで戻る
     }

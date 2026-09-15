@@ -71,13 +71,17 @@ export function free_port() {
  * 保存先は YTBG_DATA_DIR で一時ディレクトリへ逃がすので、
  * 利用者の ~/ytbg-* は読み書きされない (TODO-021)。
  *
- * @param {{server_id?: string, image_dir?: string}} [opts]
+ * prefix を渡すと --prefix で起動し、返す url にもその prefix を付ける
+ * (TODO-064)。
+ *
+ * @param {{server_id?: string, image_dir?: string, prefix?: string}} [opts]
  * @return {Promise<{url: string, port: number, data_dir: string,
  *                   stop: function(): Promise<void>}>}
  */
 export async function start_server(opts = {}) {
     const server_id = opts.server_id || 'browsertest';
     const image_dir = opts.image_dir || 'images1a';
+    const prefix = opts.prefix || '';
 
     const port = await free_port();
     const data_dir = await mkdtemp(path.join(os.tmpdir(), 'ytbg-test-'));
@@ -88,7 +92,7 @@ export async function start_server(opts = {}) {
     // (パターンが自分のシェルにも当たる)
     const child = spawn(
         'uv', ['run', 'ytbg', 'board', '-p', String(port), '-i', image_dir,
-               server_id],
+               ...(prefix ? ['--prefix', prefix] : []), server_id],
         {
             cwd: REPO_ROOT,
             env: { ...process.env, YTBG_DATA_DIR: data_dir },
@@ -104,7 +108,7 @@ export async function start_server(opts = {}) {
     const exited_promise = new Promise(
         resolve => child.on('exit', () => { exited = true; resolve(); }));
 
-    const url = `http://127.0.0.1:${port}`;
+    const url = `http://127.0.0.1:${port}${prefix}`;
 
     const stop = async () => {
         if (!exited) {
