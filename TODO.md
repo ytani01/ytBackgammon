@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: なし。** これまでに 73 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-074` から。**
+**残っている項目: TODO-074、TODO-075。** これまでに 73 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-076` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -19,6 +19,93 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 **TODO-056 で決めた構成の見直し（第 4 弾）の実装（TODO-057〜060）も、
 2026-09-15 に全部終わった。** 設計は `archives/docs/design-4.md` に移した。
+
+---
+
+## TODO-074. 呼ばれていないコードと、通らない分岐を消す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | implementer + verifier + reviewer |
+
+2026-09-16 に `src/` 全体を過剰実装の観点で読み直した結果のうち、
+**消すだけで盤面の挙動が変わらないもの**。書き直しで短くするものは TODO-075。
+
+JS:
+
+- [ ] `rules/move.js` の `dst_points()` — 先頭の `dice_vals.length == 0` の
+  早期 return（下のループと `dst_p.length == 0` の判定で同じく `[]` になる）
+- [ ] `rules/judge.js` の `pip_count()` の `isNaN` と、`rules/position.js` の
+  `get_pip()` の `point === undefined`（`points_of()` は undefined を返さない）
+- [ ] `rules/judge.js` の `closeout()` のプレーヤー番号の範囲チェック
+  （呼ぶのは `render_turn()` で、turn が 0 か 1 のときだけ）。
+  `tests/js/judge.test.mjs` の範囲のテストも消す
+- [ ] `rules/position.js` の `Position.from_points()`（`new Position()` を呼ぶだけ）。
+  `tests/js/helper.mjs` は `new Position()` を呼ぶ形にする
+- [ ] `ui/base.js` の `BgText.get()` と `ui/label.js` の `PlayerScore.get()`（呼び出しが無い）
+- [ ] `ui/base.js` の `this.el` のガード（要素は必ず `build_dom()` が作って渡す）
+- [ ] `board_view.js` の投了・勝ちのバナーの `on_click`（log を出すだけ。
+  `BannerButton` は `on_click` を省略できる）
+- [ ] `ui/label.js` の `PlayerPipCount.set()` の `move()` / `rotate()`
+  （`BgText.set()` の中で、オーバーライドした同じものが呼ばれている）
+- [ ] `ui/dice.js` の `this.image_el` の代入（`BgImage` が入れている）と、
+  `get_filename()` の `val %= 10`（呼ぶ側で済んでいる）
+- [ ] `main.js` の `e.key.length === undefined` の判定と、`keyCode` のログ
+- [ ] `settings.js` の `CookieBase` の `this.cookie` と、`load()` の戻り値
+- [ ] `lobby.js` の `board_url()` で、prefix が無い分岐の `${b.prefix}`（常に空）
+
+Python:
+
+- [ ] `server.py` の `_on_roll()`（`_on_dice()` と同じ中身。登録表の `roll` に
+  `_on_dice` を渡す）
+- [ ] `server.py` の `_load_hist_ent()`（1 行で、呼ぶのも 1 か所）
+- [ ] `replay.py` の `_replay()` の `except asyncio.CancelledError: raise`
+  （書かなくても同じ動き）
+- [ ] `__main__.py` の `MY_NAME` / `VERSION`（別名を付けているだけ）
+- [ ] `__init__.py` の `__package__` が無いときの分岐（パッケージとして読まれるので通らない）
+
+確かめること:
+
+- [ ] `uv run pytest`・`ruff`・`mypy src`・`basedpyright`・`node --test tests/js/`・
+  `node --test tests/browser/` が通る
+- [ ] 文書（`CLAUDE.md`・`docs/Developer.md`）に消した名前が残っていない
+
+**対象にしないもの:** `mylog.py` の未使用の口（他でも使い回すので残す。TODO-037）、
+`winner_is()` の `by_resign`（TODO-051 で残すと決めた）、1 行だけの
+コメントアウト（TODO-037 で範囲外にした）。
+
+ガードや分岐を消すので、「本当に通らないか」を reviewer に見させる。
+
+---
+
+## TODO-075. 同じ処理を短く書き直す
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Sonnet 5 / effort medium | implementer + verifier + reviewer |
+
+TODO-074 と同じ読み直しの結果のうち、**挙動を変えずに短く書き直すもの**。
+
+- [ ] `rules/move.js` の `dst_points()` — 目を足していく 3 段の入れ子を
+  1 つのループにする
+- [ ] `rules/move.js` の `dice_for_move()` — 3 個と 4 個のゾロ目の判定を
+  1 つのループにする
+- [ ] `rules/judge.js` の `calc_gammon()` — `points` の if/else を三項演算子にする
+- [ ] `board_view.js` の `render_turn()` の `update_roll` — 直前で全部
+  `off()` にしているので、`on()` にする条件だけを残す
+- [ ] `board_view.js` のコンストラクタ — プレーヤーごとに 2 回ずつ書いている
+  スコアと ▲▼ をループにし、名前の 2 つのループを 1 つにまとめる
+- [ ] `board_view.js` の `inverse()` — `rotate(180 * player, ...)` の 1 行にする
+- [ ] `ui/cube.js` の `Cube.set()` — 2 回ある回転の if/else を分岐の前の 1 回にする
+
+確かめること:
+
+- [ ] `node --test tests/js/` と `node --test tests/browser/` が通る
+- [ ] `dst_points()` と `dice_for_move()` は、`src/` をわざと壊して
+  狙ったテストが落ちるかを見る（ループの境界を 1 つずらす、など）
+
+ルール層の条件式を書き換えるので、分岐の意味が変わっていないかを reviewer に
+見させる。
 
 ---
 
