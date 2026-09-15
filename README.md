@@ -71,7 +71,7 @@
 * OS: FreeBSD, Linux
 * Python 3.14 以上
 * [uv](https://docs.astral.sh/uv/)
-* starlette, uvicorn (``uv sync`` が入れます)
+* starlette, uvicorn (``uv tool install`` が入れます)
 
 
 ## Usage
@@ -109,21 +109,22 @@
 ```bash
 git clone https://www.github.com/ytani01/ytBackgammon.git
 cd ytBackgammon
-uv sync
+uv tool install .
 ```
 
-`uv sync` が Python 3.14 の仮想環境 (`.venv`) を作り、必要なパッケージを
-入れます。**タグごと clone してください**(バージョンを git のタグから
-取っているため)。
+`uv tool install` が Python 3.14 の環境を用意し、`ytbg` コマンドを
+`~/.local/bin` に入れます。**タグごと clone してください**(バージョンを
+git のタグから取っているため)。
+
+更新するときは、`git pull` のあとに `uv tool install --reinstall .` を
+実行します(インストールした時点のファイルがコピーされているため)。
 
 ### 2. 起動
 
-リポジトリのディレクトリの中で実行します。
-
 ```bash
-./ytbg.sh board -d -p 5001 -i images1a 1   # ボード 1 面 (ポート 5001、サーバID 1)
-./ytbg.sh lobby -c ytbg.toml               # ytbg.toml のボードをまとめて起動し、
-                                           # 一覧ページを http://<ホスト>:5000/ に出す
+ytbg board -d -p 5001 -i images1a 1   # ボード 1 面 (ポート 5001、サーバID 1)
+ytbg lobby -c ytbg.toml               # ytbg.toml のボードをまとめて起動し、
+                                      # 一覧ページを http://<ホスト>:5000/ に出す
 ```
 
 lobby は Ctrl+C で止めます (ボードも止まります)。
@@ -139,6 +140,7 @@ lobby は Ctrl+C で止めます (ボードも止まります)。
 * [デザイン テンプレート ファイル(ZIP形式)](docs/images0.zip)
 
 画像ファイルの保存先は `src/ytbg/webroot/static/` ディレクトリ直下です。
+置いたあとは `uv tool install --reinstall .` を実行してください。
 
 
 ## ライセンス

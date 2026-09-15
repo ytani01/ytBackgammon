@@ -11,15 +11,20 @@
 ```bash
 git clone https://github.com/ytani01/ytBackgammon.git
 cd ytBackgammon
-uv sync
+uv tool install .
 ```
+
+`ytbg` コマンドが `~/.local/bin` に入る（`uv tool dir --bin` で確かめられる）。
+PATH に無ければ `uv tool update-shell` で足す。
 
 **タグごと clone すること。** バージョンは git のタグから取っているので、
 `--no-tags` や `--depth 1` で clone すると、エラーにならないまま
 `0.1.devN` という誤ったバージョンになる。
 
-**リポジトリのディレクトリの中で実行する。** `~/bin` にシンボリックリンクを
-張る使い方はできない（`uv run` が `pyproject.toml` を見つけられない）。
+**インストールした時点のファイルがコピーされる。** clone したディレクトリで
+ファイルを変えても、`ytbg` には反映されない。`git pull` したとき、デザインを
+足したときは、`uv tool install --reinstall .` を実行し直す。
+アンインストールは `uv tool uninstall ytbg`。
 
 ## 起動する
 
@@ -27,10 +32,8 @@ uv sync
 立てるときは、後述の `lobby` を使う。
 
 ```bash
-./ytbg.sh board -d -p 5001 -i images1a 1
+ytbg board -d -p 5001 -i images1a 1
 ```
-
-`ytbg.sh` は `uv run ytbg` を呼ぶだけ。
 
 | 引数・オプション | 意味 |
 |------------------|------|
@@ -40,7 +43,7 @@ uv sync
 | `--prefix` | URL のプレフィクス（例 `/board1`。既定は無し）。後述 |
 | `-d`, `--debug` | ログを DEBUG まで出す |
 
-`uv run ytbg board --help` でも同じものが出る。
+`ytbg board --help` でも同じものが出る。
 
 **`-i` は毎回指定すること。** 既定値は `static/` に無いディレクトリを指しているので、
 省くと盤面の画像が出ない。
@@ -86,7 +89,8 @@ location /board1/ {
 | `images3` |
 
 ファイル名（`board-base.png`、`checker0.png`、`dice01.png`、`cube01.png` など）は
-共通なので、デザインを足すときは同じ名前を揃える。
+共通なので、デザインを足すときは同じ名前を揃える。足したあとは
+`uv tool install --reinstall .` を実行する。
 
 ## 複数のボードを立てる
 
@@ -94,8 +98,8 @@ location /board1/ {
 プロセスを別のポートで起動する。まとめて扱うには一覧サーバ（lobby）を使う。
 
 ```bash
-./ytbg.sh lobby -c ytbg.toml          # ポート 5000 で一覧ページを出す
-./ytbg.sh lobby -d -p 8000 -c ytbg.toml
+ytbg lobby -c ytbg.toml          # ポート 5000 で一覧ページを出す
+ytbg lobby -d -p 8000 -c ytbg.toml
 ```
 
 lobby は起動すると、設定ファイルにあるボードを**すべて子プロセスとして起動する。**
@@ -103,7 +107,7 @@ lobby を止める（Ctrl+C、`kill`）と、ボードも止まる。
 
 | オプション | 意味 |
 |------------|------|
-| `-c`, `--config` | 設定ファイル（既定 `ytbg.toml`） |
+| `-c`, `--config` | 設定ファイル（既定はカレントディレクトリの `ytbg.toml`） |
 | `-p`, `--port` | 一覧ページのポート番号（既定 5000） |
 | `--prefix` | 一覧ページの URL のプレフィクス（書き方はボードと同じ）。ボードには渡さない |
 | `-d`, `--debug` | ログを DEBUG まで出す。ボードにも `-d` を付ける |
@@ -153,7 +157,7 @@ url = "https://ytbg1.example.net/board1/"   # 省略可
 起動のボタンで起動する。起動できない理由（ポートが塞がっているなど）は、
 ボードのエラーがそのまま lobby の端末に出て、lobby のログに終了コードが出る。
 
-**lobby の外で動いているボードは扱わない。** `ytbg.sh board` で別に起動した
+**lobby の外で動いているボードは扱わない。** `ytbg board` で別に起動した
 ボードは一覧に出ず、同じポートを設定に書くと、そのボードは起動できずに停止中になる。
 このとき、起動に失敗して終わるまでの一瞬に状態を読むと「動作中」になり、
 iframe に外のボードが出たまま残ることがある。
@@ -171,7 +175,7 @@ iframe に外のボードが出たまま残ることがある。
 保存先は環境変数 `YTBG_DATA_DIR` で変えられる（省くとホームディレクトリ）。
 
 ```bash
-YTBG_DATA_DIR=/var/lib/ytbg ./ytbg.sh board -p 5001 -i images1a 1
+YTBG_DATA_DIR=/var/lib/ytbg ytbg board -p 5001 -i images1a 1
 ```
 
 **古い版が書いた `~/ytbg-{server_id}.json` は、もう読まない。**
@@ -211,8 +215,8 @@ kill <PID>
 
 ## バージョンを上げたとき
 
-タグを打ったあとは `uv sync` を実行する。`pyproject.toml` にタグとコミットを
-入れてあるので、それで再ビルドされる。
+タグを打ったあと、または `git pull` したあとは、`uv tool install --reinstall .` を
+実行する。`uv tool list` で入っている版を確かめられる。
 
 ## 困ったとき
 

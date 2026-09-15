@@ -19,9 +19,10 @@ Developer.md は利用者向けなので、**TODO の番号を書かない。** 
 
 ## 実行
 
-uv を使う（TODO-001 で移行した）。**リポジトリのディレクトリの中で実行する。**
-`~/bin` にシンボリックリンクを張る運用はやめた（`uv run` が
-`pyproject.toml` を見つけられないため）。
+uv を使う（TODO-001 で移行した）。**開発ではリポジトリのディレクトリの中で
+`uv run` を使う。** 利用者向けのインストールは `uv tool install .` で、`ytbg` を
+そのまま実行する（TODO-065。`ytbg.sh` は削除した）。インストールした `ytbg` は
+その時点のコピーなので、手元の変更は `uv tool install --reinstall .` まで反映されない。
 
 バージョンは `pyproject.toml` に手書きせず、git tag から hatch-vcs で取る
 （TODO-014）。タグを打ったあとは `uv sync` を実行すること。タグの無い
@@ -31,11 +32,11 @@ clone で起きることは `docs/Admin.md` にある。
 uv sync          # .venv を作って依存を入れる
 
 # サーバ起動
-./ytbg.sh board -d -p 5001 -i images1a 1   # ボード 1 面。引数は server_id、-i は static/ 以下の画像ディレクトリ
-uv run ytbg --help                         # ytbg.sh は uv run ytbg を呼ぶだけ
+uv run ytbg board -d -p 5001 -i images1a 1   # ボード 1 面。引数は server_id、-i は static/ 以下の画像ディレクトリ
+uv run ytbg --help
 
-./ytbg.sh lobby -c ytbg.toml   # 設定のボードを子プロセスで全部起動し、一覧ページを出す（TODO-063）
-                               # Ctrl+C か kill で lobby を止めると、ボードも止まる
+uv run ytbg lobby -c ytbg.toml   # 設定のボードを子プロセスで全部起動し、一覧ページを出す（TODO-063）
+                                 # Ctrl+C か kill で lobby を止めると、ボードも止まる
 
 uv run pytest              # Python のテスト
 uv run ruff check .
