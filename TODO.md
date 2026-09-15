@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: なし。** これまでに 65 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-066` から。**
+**残っている項目: TODO-066。** これまでに 65 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-067` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -19,6 +19,32 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 **TODO-056 で決めた構成の見直し（第 4 弾）の実装（TODO-057〜060）も、
 2026-09-15 に全部終わった。** 設計は `archives/docs/design-4.md` に移した。
+
+---
+
+## TODO-066. 過去に使っていた不要なファイルを削除する
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort medium | verifier |
+
+- [ ] 直下の `__pycache__/`（git の管理外。旧構成の `MyLogger` / `ytBackgammon` などの `.pyc`）
+- [ ] 直下の `bg.png`, `bg0.png`, `cloth_00043.png`, `twinkle_00028.png`
+- [ ] `docs/ytBackgammon2.png`, `docs/ytBackgammon3.png`, `docs/ytBackgammon-a.png`, `docs/ytbackgammon1-1.png`〜`1-3.png`
+- [ ] `docs/images0/`（README がリンクしているのは `docs/images0.zip` のほう）
+- [ ] `static/sounds/backgammon-src.mp3`, `computerbeep_12.mp3`, `computerbeep_43.mp3`, `computerbeep_58.mp3`
+- [ ] `static/images2/dice1a.png`
+- [ ] `_config.yml`, `docs/_config.yml`（GitHub Pages のテーマ設定。使っていない）
+- [ ] `.gitignore` から、このリポジトリで使わないテンプレートの行（Django・Flask・Scrapy など）を外す
+- [ ] 確認（verifier）: 消したファイルへの参照が `archives/` 以外に無いこと、Python・JS・ブラウザのテストが通ること、`.gitignore` を整理したあとも `git status --ignored` で `.venv` などが無視されたままであること
+
+2026-09-15 に参照を調べた（`git grep` でファイル名を探し、`archives/` を除いて
+どこからも参照が無いものを挙げた）。`*.xcf` と `images1a/ytbg.pptx` /
+`ytbg-pptx.png` はデザインの元ファイルで、`pyproject.toml` でパッケージから
+除外しているので残す。
+
+削除と `.gitignore` の整理だけで挙動は変わらないので、実装は main が行い、
+レビューの担当は入れない。
 
 ---
 
