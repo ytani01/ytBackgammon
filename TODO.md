@@ -1,7 +1,7 @@
 # TODO
 
-**残っている項目: なし。** これまでに 64 件を決着させた。
-新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-065` から。**
+**残っている項目: TODO-065。** これまでに 64 件を決着させた。
+新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-066` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
 手元の 4 つのボードは 2026-09-12 に `.jsonl` へ移行済み
@@ -19,6 +19,40 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 **TODO-056 で決めた構成の見直し（第 4 弾）の実装（TODO-057〜060）も、
 2026-09-15 に全部終わった。** 設計は `archives/docs/design-4.md` に移した。
+
+---
+
+## TODO-065. インストールを `uv tool install .` に変え、`ytbg.sh` を削除する
+
+|      | main | 担当 |
+|------|------|------|
+| 見込み | Opus 5 / effort medium | verifier |
+
+- [ ] `ytbg.sh` を `git rm` する
+- [ ] `README.md`・`docs/Admin.md`: インストールを `uv tool install .` に、
+      起動の例を `ytbg board ...` / `ytbg lobby ...` に変える。更新するときは
+      `uv tool install --reinstall .` と書く。「リポジトリのディレクトリの中で
+      実行する」「`~/bin` にリンクを張れない」の記述は利用者向けの手順から外す
+- [ ] `CLAUDE.md`: `ytbg.sh` を使った例を `uv run ytbg ...` に直す
+- [ ] README の手順を、別の担当が書いたとおりに再現する
+
+`uv tool install .` でインストールすれば、`uv run ytbg` ではなく `ytbg` で
+起動できる。コードの変更は要らない（2026-09-15 に確認）。
+
+- wheel に `webroot/`（画像・JS・テンプレート）が入っている（`uv build` で確認）
+- lobby はボードを `sys.executable -m ytbg` で起動するので、`uv run` に依存しない
+- `tests/` と `docs/Developer.md` は `ytbg.sh` を使っていない
+
+決めたこと:
+
+- `ytbg.sh` は削除する（インストール後は `ytbg` が PATH にあるため）
+- 開発者向けの手順（テスト・lint・手元での起動）は `uv sync` と `uv run` の
+  まま残す。変更がすぐ反映されるため
+
+分担: 文書の変更と削除は main が行う。README の手順は書いたとおりに試せるので、
+verifier に scratchpad へ clone させ、`uv tool install` → `ytbg board --help`・
+起動 → アンインストールまでを再現させる。コードの分岐は変わらないので
+reviewer は入れない。
 
 ---
 
