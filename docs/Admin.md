@@ -165,6 +165,105 @@ url = "https://ytbg1.example.net/board1/"   # 省略可
 このとき、起動に失敗して終わるまでの一瞬に状態を読むと「動作中」になり、
 iframe に外のボードが出たまま残ることがある。
 
+## 設定例
+
+lobby とボード 2 面を、1 つのホストのパスで分けて HTTPS で出す例。
+ytbg はホスト `board-host` で動かし、nginx はそれとは別のホストで HTTPS を受ける。
+
+| URL | 中身 | board-host のポート |
+|-----|------|---------------------|
+| `https://www.example.net/ytbg/` | 一覧ページ（lobby） | 5000 |
+| `https://www.example.net/ytbg1/` | ボード 1 | 5001 |
+| `https://www.example.net/ytbg2/` | ボード 2 | 5002 |
+
+### board-host の設定ファイル
+
+`~/ytbg/ytbg.toml`
+
+```toml
+[[board]]
+server_id = 1
+port = 5001
+image_dir = "images2"
+prefix = "/ytbg1"
+url = "/ytbg1/"
+
+[[board]]
+server_id = 2
+port = 5002
+image_dir = "images0a"
+prefix = "/ytbg2"
+url = "/ytbg2/"
+```
+
+**`url` は省かないこと。** 省くと iframe の URL が
+`https://www.example.net:5001/ytbg1/` になり、一覧ページにボードが出ない。
+
+### board-host で起動する
+
+lobby がボードを起動するので、起動するのは lobby だけ。systemd のユーザーサービスにする。
+
+`~/.config/systemd/user/ytbg.service`
+
+```ini
+[Unit]
+Description=ytBackgammon lobby
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/ytbg lobby -c %h/ytbg/ytbg.toml -p 5000 --prefix /ytbg
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now ytbg
+sudo loginctl enable-linger $USER   # ログインしていなくても動かし続ける
+```
+
+止めるときは `systemctl --user stop ytbg`。ボードも止まる。
+ログは `journalctl --user -u ytbg` で見る。
+
+### nginx
+
+`server_name www.example.net;` の `server`（HTTPS を受けるもの）の中に足す。
+
+```nginx
+location /ytbg/ {
+    proxy_pass http://board-host:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+location /ytbg1/ {
+    proxy_pass http://board-host:5001;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+location /ytbg2/ {
+    proxy_pass http://board-host:5002;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+```
+
+- `location` の末尾の `/` は省かないこと。`location /ytbg` と書くと `/ytbg1` にも当たる。
+  `/` があれば、末尾に `/` の無い `/ytbg1` は nginx が `/ytbg1/` へリダイレクトする
+- `proxy_pass` にはパスを付けない（付けるなら `location` と同じパスにする）。
+  プレフィクスが外れると、ボードが開かない
+- 別のホスト名から一覧ページへ飛ばすなら、そのホストの `server` に
+  `rewrite ^(.*)$ https://www.example.net/ytbg$1 permanent;` を書く
+
+**一覧ページには認証が無い。** 開ける人は誰でもボードを起動・停止できる。
+
 ## 状態の保存
 
 盤面と履歴は **`~/ytbg-{server_id}.jsonl`** に保存される（JSON Lines）。
