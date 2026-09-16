@@ -27,14 +27,11 @@ def client(tmp_path, monkeypatch):
     """
     create_app() で作ったアプリの TestClient。
 
-    YTBG_DATA_DIR を tmp_path へ逃がすのは他のテストと同じ。
-    BackgammonServer は create_app() の中で作られるので、差し替えは
-    その前に済ませる。
+    保存先を tmp_path へ逃がすのは他のテストと同じ。
     """
-    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
     monkeypatch.setenv('HOME', str(tmp_path))
 
-    app = create_app('test', 'test', 'test', 'images1a')
+    app = create_app('test', 'test', 'test', 'images1a', tmp_path)
     return TestClient(app)
 
 
@@ -234,10 +231,9 @@ def test_unknown_type_keeps_connection(client):
 @pytest.fixture
 def prefix_client(tmp_path, monkeypatch):
     """prefix '/foo' で作ったアプリの TestClient"""
-    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
     monkeypatch.setenv('HOME', str(tmp_path))
 
-    app = create_app('test', 'test', 'test', 'images1a', '/foo')
+    app = create_app('test', 'test', 'test', 'images1a', tmp_path, '/foo')
     return TestClient(app)
 
 

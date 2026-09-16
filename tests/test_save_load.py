@@ -6,7 +6,7 @@ test_save_load.py
 
 保存・読み込み (TODO-024) のテスト。
 
-保存の形は JSON Lines (~/ytbg-{server_id}.jsonl)。1 行目がメタ
+保存の形は JSON Lines (<data>/ytbg-{server_id}.jsonl)。1 行目がメタ
 (形式のバージョンとクロック)、以降が履歴 (h) と進む側の履歴 (f) で、
 書かれた順がスタックの順。
 
@@ -303,7 +303,7 @@ def test_jsonl_misspelled_key_is_broken_file(tmp_path):
     ],
 )
 async def test_jsonl_not_dict_is_broken_file(
-        make_bg_server, tmp_path, name, where, value):
+        make_bg_server, data_dir, name, where, value):
     """
     dict であるべき所が dict でない履歴も「壊れたファイル」で、
     サーバは初期配置から起動する (TODO-051)。
@@ -319,7 +319,7 @@ async def test_jsonl_not_dict_is_broken_file(
         target[where[-1]] = value
     else:
         ent = value
-    path = tmp_path / f'ytbg-{name}.jsonl'
+    path = data_dir / f'ytbg-{name}.jsonl'
     path.write_text(
         json.dumps({'v': 2, 'clock': {}}) + '\n'
         + json.dumps({'h': ent}) + '\n')
@@ -332,14 +332,14 @@ async def test_jsonl_not_dict_is_broken_file(
     assert svr._gameinfo.score == [0, 0]
 
 
-def test_header_only_file_starts_with_one_entry(make_bg_server, tmp_path):
+def test_header_only_file_starts_with_one_entry(make_bg_server, data_dir):
     """
     ヘッダだけで履歴が 0 件のファイルでも、今の盤面を 1 件目として積む。
 
     load_data() は「読めて、履歴が 1 件以上あったか」を返す (TODO-055)。
     読めただけで True を返すと、履歴が空のまま起動してしまう。
     """
-    path = tmp_path / 'ytbg-header.jsonl'
+    path = data_dir / 'ytbg-header.jsonl'
     path.write_text(json.dumps({'v': 2, 'clock': {}}) + '\n')
 
     svr = make_bg_server('header')
@@ -384,9 +384,9 @@ def test_old_format_is_not_read_and_kept(tmp_path):
     assert old_path.read_text() == before
 
 
-async def test_server_starts_with_only_old_format(make_bg_server, tmp_path):
+async def test_server_starts_with_only_old_format(make_bg_server, data_dir):
     """旧形式しか無いときは、初期配置から始まる (TODO-031)"""
-    old_file(tmp_path / 'ytbg-old.json')
+    old_file(data_dir / 'ytbg-old.json')
 
     svr = make_bg_server('old')
 

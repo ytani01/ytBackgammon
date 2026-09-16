@@ -14,9 +14,9 @@ HTTP の応答 (index.html) はここには無い。app.py の担当。
 """
 
 import asyncio
-import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, fields, is_dataclass
+from pathlib import Path
 from typing import Any, get_args, get_origin, get_type_hints
 
 from .clock import Clock
@@ -50,20 +50,20 @@ class BackgammonServer:
 
     __log = getLogger(__qualname__)
 
-    def __init__(self, svr_ver, svr_id):
-        self.__log.debug('svr_ver={}, svr_id={}', svr_ver, svr_id)
+    def __init__(self, svr_ver, svr_id, data_dir: str | Path):
+        self.__log.debug('svr_ver={}, svr_id={}, data_dir={}',
+                         svr_ver, svr_id, data_dir)
 
         self._svr_ver = svr_ver
         self._svr_id = svr_id
 
         # 保存は JSON Lines (TODO-024)。旧形式 (.json) は
         # もう読まない (TODO-031)
-        # 保存先。ブラウザでの動作確認は実プロセスを起動するので、
-        # 環境変数で一時ディレクトリへ逃がせるようにしてある (TODO-021)。
-        # import のときではなく作るときに読む (TODO-055)
-        datafile_dir = os.getenv('YTBG_DATA_DIR') or os.getenv('HOME')
+        # 保存先は渡してもらう (TODO-076)。置き場所を決めるのは
+        # __main__.py の paths.resolve() だけで、ここは決まった場所に
+        # ファイル名を付けるだけ。ディレクトリは書くときに作る
         self._datafile_path = (
-            f'{datafile_dir}/{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
+            Path(data_dir) / f'{self.DATAFILE_NAME}-{self._svr_id}.jsonl')
         self.__log.debug('_datafile_path={}', self._datafile_path)
         self._storage = Storage(self._datafile_path)
 

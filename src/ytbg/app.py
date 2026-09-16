@@ -73,7 +73,7 @@ def with_prefix(routes: list, prefix: str) -> list:
     return [Mount(prefix, routes=routes)] if prefix else routes
 
 
-def create_app(svr_name, svr_ver, svr_id, image_dir,
+def create_app(svr_name, svr_ver, svr_id, image_dir, data_dir,
                prefix: str = '') -> Starlette:
     """
     Starlette のアプリを作る。
@@ -85,6 +85,9 @@ def create_app(svr_name, svr_ver, svr_id, image_dir,
     svr_id: str
     image_dir: str
         static/ 以下の画像ディレクトリ
+    data_dir: str | Path
+        盤面と履歴の保存先。置き場所を決めるのは __main__.py だけで、
+        ここは受け取るだけ (TODO-076)
     prefix: str
         URL のプレフィクス。normalize_prefix() で揃えた値 ('' か '/foo')。
         '/foo' と '/foo/' のどちらも '/foo/' に行き着く ('/foo' は
@@ -93,10 +96,11 @@ def create_app(svr_name, svr_ver, svr_id, image_dir,
     svr_name と image_dir は index.html の表示のためだけの値なので、
     BackgammonServer には渡さない (TODO-025)。
     """
-    _log.debug('svr_name={}, svr_ver={}, svr_id={}, image_dir={}, prefix={}',
-               svr_name, svr_ver, svr_id, image_dir, prefix)
+    _log.debug('svr_name={}, svr_ver={}, svr_id={}, image_dir={}, '
+               'data_dir={}, prefix={}',
+               svr_name, svr_ver, svr_id, image_dir, data_dir, prefix)
 
-    svr = BackgammonServer(svr_ver, svr_id)
+    svr = BackgammonServer(svr_ver, svr_id, data_dir)
 
     async def index(request):
         """'/', '/p1', '/p2' はいずれも同じ index.html を返す"""

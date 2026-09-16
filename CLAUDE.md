@@ -162,9 +162,10 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `goto` などで、`page.evaluate()` には入らない。マウスを離したあとの待ちの間に
   サーバの返事が届くので、先行実行の表示を読むテストが返事の表示を読むことになる。
   **待ちを入れた実行は、通るかどうかの確認には使わない**
-- 保存先は `YTBG_DATA_DIR` で一時ディレクトリへ逃がす。この環境変数は
-  `BackgammonServer` を作るときに読み（TODO-055）、無ければ `$HOME`。
-  利用者の `~/ytbg-*` は読み書きされない
+- 保存先は `YTBG_DIR` で一時ディレクトリへ逃がす。この環境変数は
+  `BackgammonServer` を作るときに読み（TODO-055、TODO-076）、無ければ
+  `~/.ytbg`。データはその下の `data/` に置く。利用者の `~/.ytbg/` は
+  読み書きされない
 - ポートは固定せず、空いているものを OS に選ばせる。サーバは
   `detached` で起動してプロセスグループごと kill する（`uv run` の下に
   python がぶら下がるため）。`pkill` は使わない
@@ -194,10 +195,11 @@ Node の標準機能なので、**npm パッケージは要らない**（playwri
   `on_json()` は待たずに返る。**完了を待つテストは
   `await bg_server._replayer._task`**（TODO-009、TODO-025）
 - `BackgammonServer` はコンストラクタの中で `load_data()` を呼び、
-  保存先を環境変数 `YTBG_DATA_DIR`（無ければ `$HOME`）から組み立てる。
-  `conftest.py` の `bg_server` フィクスチャが `YTBG_DATA_DIR` を `tmp_path` に
+  保存先を `paths.resolve()` で組み立てる（環境変数 `YTBG_DIR`、無ければ
+  `~/.ytbg`。その下の `data/`。TODO-076）。
+  `conftest.py` の `bg_server` フィクスチャが `YTBG_DIR` を `tmp_path` に
   差し替えている
-  ので、利用者の `~/ytbg-*` は読み書きされない。**このとき履歴が
+  ので、利用者の `~/.ytbg/` は読み書きされない。**このとき履歴が
   1 件積まれる**ので、件数を数えるテストはそれを前提に書く
 - 同じフィクスチャが `ClientHub.broadcast()` を丸ごと差し替え、送られた
   メッセージを `emitted`（`EmittedMessages`）へ積む。テストは**送られた

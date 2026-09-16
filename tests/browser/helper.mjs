@@ -68,8 +68,8 @@ export function free_port() {
 /**
  * ytbg サーバを実プロセスとして起動する。
  *
- * 保存先は YTBG_DATA_DIR で一時ディレクトリへ逃がすので、
- * 利用者の ~/ytbg-* は読み書きされない (TODO-021)。
+ * 置き場所は YTBG_DIR で一時ディレクトリへ逃がすので、
+ * 利用者の ~/.ytbg/ は読み書きされない (TODO-021、TODO-076)。
  *
  * prefix を渡すと --prefix で起動し、返す url にもその prefix を付ける
  * (TODO-064)。
@@ -95,7 +95,7 @@ export async function start_server(opts = {}) {
                ...(prefix ? ['--prefix', prefix] : []), server_id],
         {
             cwd: REPO_ROOT,
-            env: { ...process.env, YTBG_DATA_DIR: data_dir },
+            env: { ...process.env, YTBG_DIR: data_dir },
             stdio: ['ignore', 'pipe', 'pipe'],
             detached: true,
         });

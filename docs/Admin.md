@@ -38,15 +38,20 @@ ytbg board -d -p 5001 -i images1a 1
 | 引数・オプション | 意味 |
 |------------------|------|
 | `SERVER_ID`(引数) | ボードの識別子。**状態ファイルとクッキーの名前がこれで分かれる** |
-| `-p`, `--port` | ポート番号(既定 5001) |
-| `-i`, `--image_dir` | 盤面のデザイン。`static/` の下のディレクトリ名 |
+| `-p`, `--port` | ポート番号(省くと設定ファイルの値、それも無ければ 5001) |
+| `-i`, `--image_dir` | 盤面のデザイン。`static/` の下のディレクトリ名(省くと設定ファイルの値、それも無ければ `images1a`) |
+| `--dir` | 置き場所の基準ディレクトリ(既定は `~/.ytbg`)。後述 |
+| `-c`, `--config` | 設定ファイル(既定は `<基準>/ytbg.toml`) |
 | `--prefix` | URL のプレフィクス(例 `/board1`。既定は無し)。後述 |
 | `-d`, `--debug` | ログを DEBUG まで出す |
 
+`ytbg board 1` のように `-p` と `-i` を省くと、設定ファイル(`~/.ytbg/ytbg.toml`)の
+`server_id` が合う `[[board]]` から `port` と `image_dir` を取る。
+
 `ytbg board --help` でも同じものが出る。
 
-**`-i` は毎回指定すること。** 既定値は `static/` に無いディレクトリを指しているので、
-省くと盤面の画像が出ない。
+`-i` を省いたときは、設定ファイルの `image_dir`、それも無ければ `images1a` で
+起動する。**好みのデザインがあるなら、`-i` で指定するか設定ファイルに書くこと。**
 
 ブラウザで `http://<ホスト>:<ポート>/` を開く。`/p1` と `/p2` も同じページ。
 **盤面の向きは URL では決まらない。** 「ボード回転」で変えた向きは
@@ -101,7 +106,7 @@ location /board1/ {
 プロセスを別のポートで起動する。まとめて扱うには一覧サーバ(lobby)を使う。
 
 ```bash
-ytbg lobby -c ytbg.toml          # ポート 5000 で一覧ページを出す
+ytbg lobby                       # ~/.ytbg/ytbg.toml のボードを起動する
 ytbg lobby -d -p 8000 -c ytbg.toml
 ```
 
@@ -110,7 +115,8 @@ lobby を止める(Ctrl+C、`kill`)と、ボードも止まる。
 
 | オプション | 意味 |
 |------------|------|
-| `-c`, `--config` | 設定ファイル(既定はカレントディレクトリの `ytbg.toml`) |
+| `-c`, `--config` | 設定ファイル(既定は `<基準>/ytbg.toml`)。**子のボードにも `-c` で渡す** |
+| `--dir` | 置き場所の基準ディレクトリ(既定は `~/.ytbg`)。後述 |
 | `-p`, `--port` | 一覧ページのポート番号(既定 5000) |
 | `--prefix` | 一覧ページの URL のプレフィクス(書き方はボードと同じ)。ボードには渡さない |
 | `-d`, `--debug` | ログを DEBUG まで出す。ボードにも `-d` を付ける |
@@ -137,6 +143,14 @@ prefix = "/board1"       # 省略可。ボードを --prefix で起動する
 nginx などのリバースプロキシの裏に置いても動く(リダイレクトの仕組みは
 下の「一覧ページ」を参照)。
 **ボードの数は設定ファイルで決まる。** 一覧ページから足したり消したりはできない。
+
+同じファイルに `[path]` も書ける(「置き場所」を参照)。`[[board]]` を
+1 つも書かず、`[path]` だけのファイルにしてもよい(その設定で `ytbg lobby` を
+起動するとエラーになる)。`ytbg board` は、`server_id` が合う `[[board]]` から
+`port` と `image_dir` を取る。**`ytbg board` が見るのは自分の項目だけ**なので、
+他のボードの項目が間違っていても起動する(自分の項目が間違っていれば止まる)。
+`ytbg board` にも `-c` があり、lobby が子のボードを起動するときは、lobby が
+読んだ設定ファイルと基準を、そのまま `-c` と `--dir` で渡す。
 
 ### === 一覧ページ
 
@@ -177,7 +191,7 @@ ytbg はホスト `board-host` で動かし、nginx はそれとは別のホス�
 
 ### === board-host の設定ファイル
 
-`~/ytbg/ytbg.toml`
+`~/.ytbg/ytbg.toml`
 
 ```toml
 [[board]]
@@ -205,7 +219,7 @@ Description=ytBackgammon lobby
 After=network-online.target
 
 [Service]
-ExecStart=%h/.local/bin/ytbg lobby -c %h/ytbg/ytbg.toml -p 5000 --prefix /ytbg
+ExecStart=%h/.local/bin/ytbg lobby -p 5000 --prefix /ytbg
 Restart=on-failure
 
 [Install]
@@ -262,9 +276,47 @@ location /ytbg2/ {
 
 **一覧ページには認証が無い。** 開ける人は誰でもボードを起動・停止できる。
 
+## == 置き場所
+
+データ・ログ・画像・設定ファイルは、**基準のディレクトリ `~/.ytbg/` の下**に
+まとめる。
+
+| もの | 既定の場所 |
+|------|------------|
+| 設定ファイル | `~/.ytbg/ytbg.toml` |
+| 盤面と履歴 | `~/.ytbg/data/` |
+| ログ | `~/.ytbg/log/` |
+| 画像 | `~/.ytbg/images/` |
+
+基準は、次の順で決まる(上が強い)。
+
+1. `--dir` (board・lobby の両方にある)
+2. 環境変数 `YTBG_DIR`
+3. `~/.ytbg`
+
+```bash
+YTBG_DIR=/var/lib/ytbg ytbg board 1
+ytbg board --dir /var/lib/ytbg 1
+```
+
+項目ごとの場所は、設定ファイルの `[path]` で変えられる。相対パスは
+基準からの相対。**基準そのものは設定ファイルでは変えられない**
+(設定ファイル自身が基準の下にあるため)。
+
+```toml
+[path]
+data = "/var/lib/ytbg/data"   # 絶対パス
+log = "log"                   # <基準>/log と同じ
+```
+
+保存先のディレクトリは、書き込むときに無ければ作る。
+
+**ログのファイル出力と、パッケージの外の画像ディレクトリは、まだ無い。**
+いまは `log` と `images` を書いても使われない。
+
 ## == 状態の保存
 
-盤面と履歴は **`~/ytbg-{server_id}.jsonl`** に保存される(JSON Lines)。
+盤面と履歴は **`~/.ytbg/data/ytbg-{server_id}.jsonl`** に保存される(JSON Lines)。
 
 - 1 行目がメタ情報(形式の版とクロック)
 - 2 行目以降が履歴。1 行 1 手
@@ -272,11 +324,21 @@ location /ytbg2/ {
 プロセスを落としても、次に同じ `server_id` で起動すれば続きから始まる。
 **バックアップも引っ越しも、このファイルをコピーするだけ。**
 
-保存先は環境変数 `YTBG_DATA_DIR` で変えられる(省くとホームディレクトリ)。
+保存先は前節の置き場所で変えられる(`--dir`、`YTBG_DIR`、`[path]` の `data`)。
+
+### === 古い版からの移行
+
+**版 1.2.7 までは `~/ytbg-{server_id}.jsonl` に保存していた。**
+自動では移さないので、**サーバを止めてから手で移す。**
 
 ```bash
-YTBG_DATA_DIR=/var/lib/ytbg ytbg board -p 5001 -i images1a 1
+mkdir -p ~/.ytbg/data
+mv ~/ytbg-*.jsonl ~/.ytbg/data/
 ```
+
+移さずに起動すると、初期配置から始まる(古いファイルは消えないので、
+止めてから移して起動し直せば戻る)。設定ファイルも
+`~/.ytbg/ytbg.toml` へ移すと、`-c` を省ける。
 
 **古い版が書いた `~/ytbg-{server_id}.json` は、もう読まない。**
 消しもしないが、**中身は使われない。** `.json` しか無いボードを起動すると
@@ -343,5 +405,5 @@ pgrep -af 'ytbg (board|lobby)'   # 前のプロセスが残っていないか
 **盤面がおかしくなった**
 
 「履歴を削除」で履歴だけを消せる(盤面は変わらない)。それでも直らないときは、
-サーバを止めて `~/ytbg-{server_id}.jsonl` を退避してから起動し直す。
+サーバを止めて `~/.ytbg/data/ytbg-{server_id}.jsonl` を退避してから起動し直す。
 新しいファイルが作られ、初期配置から始まる。

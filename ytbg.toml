@@ -1,8 +1,17 @@
-# ytbg lobby の設定 (ytbg lobby -c ytbg.toml)
+# ytbg の設定 (既定の置き場所は ~/.ytbg/ytbg.toml)
 #
 # ボードごとに [[board]] を書く。server_id は整数でも文字列でもよい。
 # prefix は省略可で、URL のプレフィクス ("/board1" など)。ボードを
-# --prefix で起動する。
+# --prefix で起動する。ytbg board は、同じ server_id の [[board]] から
+# port と image_dir を取る (CLI で指定すれば CLI が勝つ)。
+#
+# 置き場所は [path] で変えられる (相対パスは基準からの相対)。
+# 基準そのものは --dir か環境変数 YTBG_DIR で変える。
+#
+#   [path]
+#   data = "data"
+#   log = "log"
+#   images = "images"
 
 [[board]]
 server_id = 1

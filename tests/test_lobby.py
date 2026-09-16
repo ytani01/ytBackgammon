@@ -7,7 +7,7 @@ test_lobby.py
 lobby (TODO-063) の設定の読み込みと、子プロセスの起動・停止。
 
 子プロセスのテストは lobby を実プロセスで起動し、HTTP の API で操作する。
-保存先は YTBG_DATA_DIR で tmp_path へ逃がし、ポートは OS に選ばせる。
+保存先は YTBG_DIR で tmp_path へ逃がし、ポートは OS に選ばせる。
 """
 import asyncio
 import contextlib
@@ -32,9 +32,11 @@ from ytbg.lobby import (
     BoardConfig,
     BoardProcess,
     ConfigError,
+    board_config,
     create_lobby_app,
     load_config,
 )
+from ytbg.paths import resolve
 
 VALID = '''
 [[board]]
@@ -82,7 +84,6 @@ BOARD = '[[board]]\nserver_id = "1"\nport = 5001\nimage_dir = "images2"\n'
 
 
 @pytest.mark.parametrize(('text', 'msg'), [
-    ('', 'no [[board]]'),
     ('board = 1', 'no [[board]]'),
     ('[[board]]\nport = 5001\nimage_dir = "x"', '"server_id" is required'),
     ('[[board]]\nserver_id = "1"\nimage_dir = "x"', '"port" is required'),
@@ -179,6 +180,39 @@ async def test_start_passes_prefix(monkeypatch, prefix, expected):
     assert args == ['-p', '5001', '-i', 'images2', *expected, '--', '1']
 
 
+async def test_start_passes_paths(monkeypatch, tmp_path):
+    """
+    置き場所を渡されたら、子プロセスへ --dir と -c で渡す (TODO-076)。
+
+    基準の外のファイルを lobby の -c で指したときも、その [path] が
+    ボードに効くようにするため。**環境変数ではなく引数で渡す。**
+    """
+    cmds = []
+
+    async def fake_exec(*cmd):
+        cmds.append(list(cmd))
+        return FakeProc()
+
+    class FakeProc:
+        pid = 1
+        returncode = None
+
+        async def wait(self):
+            await asyncio.Event().wait()
+
+    monkeypatch.setattr(asyncio, 'create_subprocess_exec', fake_exec)
+    paths = resolve(str(tmp_path), str(tmp_path / 'my.toml'))
+    p = BoardProcess(BoardConfig('1', 5001, 'images2'), paths=paths)
+    await p.start()
+    assert p._watch is not None
+    p._watch.cancel()
+
+    args = cmds[0][cmds[0].index('board') + 1:]
+    assert args == ['-p', '5001', '-i', 'images2',
+                    '--dir', str(tmp_path), '-c', str(tmp_path / 'my.toml'),
+                    '--', '1']
+
+
 def test_lobby_prefix_routes():
     """lobby 自身の prefix の下に一覧ページ・API・static を置く"""
     # with を使わないので lifespan は走らず、子プロセスは起動しない
@@ -210,6 +244,65 @@ def test_board_redirect():
     res = client.get('/board1/')
     assert res.status_code == 302
     assert res.headers['location'] == 'http://testserver:5001/board1/'
+
+
+@pytest.mark.parametrize('text', ['[path]\ndata = "d"\n', 'board = []\n'])
+def test_load_config_no_board_table(tmp_path, text):
+    """
+    [[board]] が 1 つも無い設定ファイルは空のリスト (TODO-076)。
+
+    [path] だけを書いた設定ファイルを board が読むため。**書かなくても
+    空のリストを書いても同じ**で、ボードが要るかどうかは呼ぶ側
+    (lobby のコマンド) が決める。
+    """
+    assert load_config(write(tmp_path, text)) == []
+
+
+# --- board_config(): 自分の項目だけを見る (TODO-076) ---------------------
+
+BROKEN = BOARD.replace('"1"', '"2"').replace('port = 5001\n', '')
+
+
+def test_board_config(tmp_path):
+    """server_id が合う [[board]] を返す"""
+    assert board_config(write(tmp_path, BOARD), '1') \
+        == BoardConfig('1', 5001, 'images2')
+
+
+def test_board_config_not_found(tmp_path):
+    """合うものが無ければ None"""
+    assert board_config(write(tmp_path, BOARD), '9') is None
+
+
+def test_board_config_no_file(tmp_path):
+    """設定ファイルが無ければ None"""
+    assert board_config(tmp_path / 'none.toml', '1') is None
+
+
+@pytest.mark.parametrize('text', [BOARD + BROKEN, BROKEN + BOARD])
+def test_board_config_ignores_other_entries(tmp_path, text):
+    """
+    他の項目が壊れていても、自分の項目が読めれば止まらない。
+
+    ytbg.toml は lobby のためにボードが並ぶファイルなので、他のボードの
+    誤りで起動できなくなるのを避ける。壊れた項目が自分より前にあっても同じ。
+    """
+    assert board_config(write(tmp_path, text), '1') \
+        == BoardConfig('1', 5001, 'images2')
+
+
+def test_board_config_own_entry_error(tmp_path):
+    """自分の項目が壊れていれば、これまでどおりエラー"""
+    with pytest.raises(ConfigError) as e:
+        board_config(write(tmp_path, BOARD + BROKEN), '2')
+
+    assert '"port" is required' in str(e.value)
+
+
+def test_load_config_sees_every_entry(tmp_path):
+    """lobby (load_config) は全部の項目を見る"""
+    with pytest.raises(ConfigError):
+        load_config(write(tmp_path, BOARD + BROKEN))
 
 
 def test_load_config_no_file(tmp_path):
@@ -258,7 +351,7 @@ class Lobby:
             self.proc = subprocess.Popen(
                 [sys.executable, '-m', 'ytbg', 'lobby',
                  '-c', str(cfg), '-p', str(self.port)],
-                env=os.environ | {'YTBG_DATA_DIR': str(tmp_path)},
+                env=os.environ | {'YTBG_DIR': str(tmp_path)},
                 stdout=err, stderr=err, start_new_session=True)
 
     def request(self, path, method='GET'):

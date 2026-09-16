@@ -123,8 +123,9 @@ git のタグから取っているため)。
 
 ```bash
 ytbg board -d -p 5001 -i images1a 1   # ボード 1 面 (ポート 5001、サーバID 1)
-ytbg lobby -c ytbg.toml               # ytbg.toml のボードをまとめて起動し、
-                                      # 一覧ページを http://<ホスト>:5000/ に出す
+ytbg lobby                            # ~/.ytbg/ytbg.toml のボードをまとめて
+                                      # 起動し、一覧ページを
+                                      # http://<ホスト>:5000/ に出す
 ```
 
 lobby は Ctrl+C で止めます (ボードも止まります)。

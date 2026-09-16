@@ -6,7 +6,7 @@ storage.py
 
 履歴とクロックの保存・読み込み (TODO-024)。
 
-保存の形は JSON Lines (~/ytbg-{server_id}.jsonl)。1 行目がメタで、
+保存の形は JSON Lines (~/.ytbg/data/ytbg-{server_id}.jsonl)。1 行目がメタで、
 以降が履歴。
 
     {"v": 2, "clock": {"limit": [120, 12], "sw": true, "clock": [...]}}
@@ -17,7 +17,7 @@ h が _history、f が _fwd_hist で、**書かれた順がスタックの順**�
 1 行につき json.dumps() を 1 回呼ぶだけなので、gameinfo にキーを
 足したときに保存側を直し忘れて落ちることが無くなる。
 
-旧形式 (~/ytbg-{server_id}.json) の読み込みは TODO-031 で消した。
+旧形式 (.json) の読み込みは TODO-031 で消した。
 **残っている .json は読まないし、消しもしない。**
 """
 
@@ -84,6 +84,8 @@ class Storage:
             json.dumps(line, ensure_ascii=False) + '\n' for line in lines)
 
         try:
+            # 保存先のディレクトリは、書くときに無ければ作る (TODO-076)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
             # ensure_ascii=False で日本語をそのまま書くので、
             # encoding を指定しないとロケール依存になる (TODO-024)
             with self.path.open('w', encoding='utf-8') as f:

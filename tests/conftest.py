@@ -161,8 +161,9 @@ def make_bg_server(tmp_path, monkeypatch, emitted):
     """
     BackgammonServer を、呼んだときに作るフィクスチャ。
 
-    - 環境変数 YTBG_DATA_DIR を tmp_path に差し替え、利用者の
-      ~/ytbg-* を読み書きしないようにする
+    - 保存先に tmp_path/data/ を渡し、利用者の ~/.ytbg/ を
+      読み書きしないようにする (置き場所を決めるのは __main__.py だけで、
+      BackgammonServer は渡された保存先を使う。TODO-076)
     - ClientHub.broadcast() を差し替え、全員へ送られた msg を
       emitted へ積む。**クラスごと差し替える**ので、同じテストで
       create_app() を使うと、TestClient 側の送信まで止まる
@@ -171,9 +172,8 @@ def make_bg_server(tmp_path, monkeypatch, emitted):
     作る時点を自分で決める必要があるので、bg_server ではなく
     こちらを使う。
     """
-    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
-    # 保存先を import のときに読む形へ戻っても、利用者の $HOME に書かない
-    # ように HOME も逃がす (TODO-055 のレビュー)
+    # 保存先を引数以外から決める形へ戻っても、利用者の $HOME に
+    # 書かないように HOME も逃がす (TODO-055 のレビュー)
     monkeypatch.setenv('HOME', str(tmp_path))
 
     async def fake_broadcast(_self, msg):
@@ -182,7 +182,8 @@ def make_bg_server(tmp_path, monkeypatch, emitted):
     monkeypatch.setattr(ClientHub, 'broadcast', fake_broadcast)
 
     def make(svr_id='test'):
-        return BackgammonServer(svr_ver='test', svr_id=svr_id)
+        return BackgammonServer(svr_ver='test', svr_id=svr_id,
+                                data_dir=tmp_path / 'data')
 
     return make
 
@@ -217,10 +218,22 @@ def bg_server_raw(tmp_path, monkeypatch):
 
     broadcast() の中身と、接続の出入り (on_connect / on_disconnect) を
     確かめるテスト用 (TODO-009)。送信先は FakeClient を _hub._clients
-    へ直接入れて用意する。YTBG_DATA_DIR を tmp_path に差し替えるのは
+    へ直接入れて用意する。保存先を tmp_path/data/ にするのは
     bg_server と同じ。
     """
-    monkeypatch.setenv('YTBG_DATA_DIR', str(tmp_path))
     monkeypatch.setenv('HOME', str(tmp_path))
 
-    return BackgammonServer(svr_ver='test', svr_id='test')
+    return BackgammonServer(svr_ver='test', svr_id='test',
+                            data_dir=tmp_path / 'data')
+
+
+@pytest.fixture
+def data_dir(tmp_path):
+    """
+    bg_server / make_bg_server に渡している保存先 (TODO-076)。
+
+    保存したファイルを先に置いてから起動するテストは、ここへ置く。
+    """
+    path = tmp_path / 'data'
+    path.mkdir(exist_ok=True)
+    return path

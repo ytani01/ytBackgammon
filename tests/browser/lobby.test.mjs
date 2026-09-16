@@ -43,7 +43,7 @@ async function start_lobby(boards, prefix = '') {
                ...(prefix ? ['--prefix', prefix] : [])],
         {
             cwd: REPO_ROOT,
-            env: { ...process.env, YTBG_DATA_DIR: dir },
+            env: { ...process.env, YTBG_DIR: dir },
             stdio: ['ignore', 'pipe', 'pipe'],
             detached: true,
         });

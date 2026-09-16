@@ -32,8 +32,8 @@ graph LR
     B1["ブラウザ"] <-->|"WebSocket /ws"| S1["ytbg (server_id=1)<br/>:5001"]
     B2["ブラウザ"] <-->|"WebSocket /ws"| S1
     B3["ブラウザ"] <-->|"WebSocket /ws"| S2["ytbg (server_id=2)<br/>:5002"]
-    S1 --- F1["~/ytbg-1.jsonl"]
-    S2 --- F2["~/ytbg-2.jsonl"]
+    S1 --- F1["~/.ytbg/data/ytbg-1.jsonl"]
+    S2 --- F2["~/.ytbg/data/ytbg-2.jsonl"]
 ```
 
 `ytbg lobby` は、設定ファイル(`ytbg.toml`)のボードを子プロセスとして起動し、
@@ -66,8 +66,9 @@ graph LR
 | `hub.py` | `ClientHub`。つないでいる WebSocket と、全員への送信 |
 | `replay.py` | `Replayer`。連続再生の Task を 1 本だけ持つ |
 | `storage.py` | `Storage`。JSON Lines での保存・読み込み |
+| `paths.py` | 置き場所の解決。`resolve()` が基準・設定ファイル・data・log・images を返す |
 | `mylog.py` | ログ(loguru) |
-| `lobby.py` | 一覧サーバ。設定の読み込み `load_config()`、子プロセス 1 つぶんの `BoardProcess`、`create_lobby_app()` |
+| `lobby.py` | 一覧サーバ。設定の読み込み `load_config()` / `board_config()`、子プロセス 1 つぶんの `BoardProcess`、`create_lobby_app()` |
 
 ```mermaid
 graph TD
@@ -80,6 +81,8 @@ graph TD
     server --> hub["hub.py<br/>ClientHub"]
     server --> replay["replay.py<br/>Replayer"]
     server --> storage["storage.py<br/>Storage"]
+    server --> paths["paths.py<br/>resolve()"]
+    main --> paths
     gameinfo --> message
     history --> gameinfo
     storage --> gameinfo
@@ -111,6 +114,25 @@ graph TD
   読まれてしまう。dict でないもの(`"board": null` など)も入口で `KeyError` に
   する。読み込みで拾う例外(`storage.py` の `LOAD_ERRORS`)に `TypeError` は
   入っていないので、`TypeError` のまま出るとサーバが起動しない
+- **置き場所を決めるのは `__main__.py` だけ。** `paths.resolve()` を呼ぶのは
+  `board` と `lobby` のコマンドで、基準は `--dir` > 環境変数 `YTBG_DIR` >
+  `~/.ytbg`、data / log / images は設定ファイルの `[path]` > 基準の下の
+  同じ名前。決まった保存先は `create_app()` を通して `BackgammonServer` へ
+  **引数で**渡す。`BackgammonServer` は環境変数も設定ファイルも読まない
+- **置き場所は、子のボードへも `--dir` と `-c` で渡す。** lobby は
+  `BoardProcess` から両方を付けて子を起動する。基準の外の設定ファイルを
+  `-c` で指したときに、その `[path]` がボードにも効くようにするため。
+  **環境変数で暗黙に渡さない**(経路が 2 本になり、どちらが効いているのか
+  読めなくなる)
+- **設定ファイルには `[[board]]` が 1 つも無くてよい。** `[path]` だけを
+  書いたファイルを `board` も読むので、`board` が無いときも `board = []` の
+  ときも空のリストを返す。**ボードが 1 面も無いのを誤りとするかは
+  呼ぶ側の判断**で、`lobby` のコマンドがそこでエラーにしている
+- **`board` は、自分の `server_id` の `[[board]]` だけを見る**
+  (`lobby.py` の `board_config()`)。`ytbg.toml` は lobby のためにボードが
+  並ぶファイルなので、他のボードの誤りで起動できなくなるのを避ける。
+  自分の項目が壊れていればエラーで止まる。`lobby` の `load_config()` は
+  全部の項目を見る
 
 ### === URL のプレフィクス
 
@@ -364,7 +386,8 @@ n 手ぶんの「戻す・進める」は Task にせず、その場で走り切
   止めずに消すと、再生の Task が差し替えたあとの履歴を pop し続ける。
   連続再生の途中で押すと、止まった時点の盤面が残る
 
-保存は `~/ytbg-{server_id}.jsonl`(JSON Lines)。1 行目がメタ(形式のバージョンとクロック)、
+保存は `<data>/ytbg-{server_id}.jsonl`(JSON Lines。`<data>` は既定で
+`~/.ytbg/data`)。1 行目がメタ(形式のバージョンとクロック)、
 以降が履歴。1 行 1 手なので読みやすい。各行は `json.dumps()` で書くだけなので、
 `GameInfo` にフィールドを足しても保存側を直す必要が無い。
 日本語のプレーヤー名をそのまま書く(`ensure_ascii=False`)ので、

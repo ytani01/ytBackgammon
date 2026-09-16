@@ -34,15 +34,12 @@ from starlette.routing import Mount, Route
 from . import WEBROOT
 from .app import NoCacheStaticFiles, normalize_prefix, templates, with_prefix
 from .mylog import getLogger
+from .paths import ConfigError, Paths
 
 # SIGTERM を送ってから SIGKILL にするまでの秒数
 STOP_TIMEOUT_SEC = 5.0
 # listen しているかを確かめる接続の待ち時間
 CONNECT_TIMEOUT_SEC = 0.5
-
-
-class ConfigError(Exception):
-    """設定ファイルの誤り。メッセージはそのまま利用者に見せる"""
 
 
 @dataclass(frozen=True)
@@ -62,17 +59,12 @@ _REQUIRED: dict[str, type | tuple[type, ...]] = {
 _OPTIONAL: dict[str, type | tuple[type, ...]] = {'prefix': str}
 
 
-def load_config(path: str | Path) -> list[BoardConfig]:
+def _entries(path: str | Path) -> list:
     """
-    設定ファイルを読む。誤りがあれば ConfigError。
+    設定ファイルを読み、[[board]] のリストを返す。誤りがあれば ConfigError。
 
-    形式::
-
-        [[board]]
-        server_id = 1        # 整数でも文字列でもよい。文字列に直す
-        port = 5001
-        image_dir = "images2"
-        prefix = "/board1"   # 省略可。子プロセスへ --prefix で渡す
+    [[board]] が 1 つも無いファイル ([path] だけを書いたものなど) は
+    空のリスト。**ボードが 0 件でよいかは、呼ぶ側が決める** (TODO-076)。
     """
     try:
         with Path(path).open('rb') as f:
@@ -82,49 +74,66 @@ def load_config(path: str | Path) -> list[BoardConfig]:
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f'{path}: {e}') from e
 
-    entries = data.get('board')
-    if not isinstance(entries, list) or not entries:
+    entries = data.get('board', [])
+    if not isinstance(entries, list):
         raise ConfigError(f'{path}: no [[board]]')
 
-    boards: list[BoardConfig] = []
-    for i, ent in enumerate(entries, 1):
-        where = f'{path}: [[board]] #{i}'
-        if not isinstance(ent, dict):
-            raise ConfigError(f'{where}: not a table')
+    return entries
 
-        unknown = set(ent) - set(_REQUIRED) - set(_OPTIONAL)
-        if unknown:
-            raise ConfigError(f'{where}: unknown key {sorted(unknown)}')
 
-        for key, typ in (_REQUIRED | _OPTIONAL).items():
-            if key not in ent:
-                if key in _REQUIRED:
-                    raise ConfigError(f'{where}: "{key}" is required')
-                continue
-            val = ent[key]
-            # bool は int のサブクラスなので、port = true を弾く
-            if not isinstance(val, typ) or isinstance(val, bool):
-                names = ' or '.join(
-                    t.__name__ for t in
-                    (typ if isinstance(typ, tuple) else (typ,)))
-                raise ConfigError(f'{where}: "{key}" must be {names}')
+def _parse_board(ent, where: str) -> BoardConfig:
+    """[[board]] 1 つぶんを読む。誤りがあれば ConfigError"""
+    if not isinstance(ent, dict):
+        raise ConfigError(f'{where}: not a table')
 
-        if not 0 < ent['port'] < 65536:
-            raise ConfigError(f'{where}: "port" is out of range')
+    unknown = set(ent) - set(_REQUIRED) - set(_OPTIONAL)
+    if unknown:
+        raise ConfigError(f'{where}: unknown key {sorted(unknown)}')
 
-        # API のパス /api/boards/{server_id}/... に当たる値に限る
-        server_id = str(ent['server_id'])
-        if not server_id or '/' in server_id:
-            raise ConfigError(
-                f'{where}: "server_id" must not be empty or contain "/"')
+    for key, typ in (_REQUIRED | _OPTIONAL).items():
+        if key not in ent:
+            if key in _REQUIRED:
+                raise ConfigError(f'{where}: "{key}" is required')
+            continue
+        val = ent[key]
+        # bool は int のサブクラスなので、port = true を弾く
+        if not isinstance(val, typ) or isinstance(val, bool):
+            names = ' or '.join(
+                t.__name__ for t in
+                (typ if isinstance(typ, tuple) else (typ,)))
+            raise ConfigError(f'{where}: "{key}" must be {names}')
 
-        try:
-            prefix = normalize_prefix(ent.get('prefix', ''))
-        except ValueError as e:
-            raise ConfigError(f'{where}: "prefix": {e}') from e
+    if not 0 < ent['port'] < 65536:
+        raise ConfigError(f'{where}: "port" is out of range')
 
-        boards.append(
-            BoardConfig(server_id, ent['port'], ent['image_dir'], prefix))
+    # API のパス /api/boards/{server_id}/... に当たる値に限る
+    server_id = str(ent['server_id'])
+    if not server_id or '/' in server_id:
+        raise ConfigError(
+            f'{where}: "server_id" must not be empty or contain "/"')
+
+    try:
+        prefix = normalize_prefix(ent.get('prefix', ''))
+    except ValueError as e:
+        raise ConfigError(f'{where}: "prefix": {e}') from e
+
+    return BoardConfig(server_id, ent['port'], ent['image_dir'], prefix)
+
+
+def load_config(path: str | Path) -> list[BoardConfig]:
+    """
+    設定ファイルの [[board]] を全部読む (lobby 用)。誤りがあれば ConfigError。
+
+    形式::
+
+        [[board]]
+        server_id = 1        # 整数でも文字列でもよい。文字列に直す
+        port = 5001
+        image_dir = "images2"
+        prefix = "/board1"   # 省略可。子プロセスへ --prefix で渡す
+    """
+    boards = [_parse_board(ent, f'{path}: [[board]] #{i}')
+              for i, ent in enumerate(_entries(path), 1)]
 
     for key in ('server_id', 'port'):
         seen = set()
@@ -137,19 +146,44 @@ def load_config(path: str | Path) -> list[BoardConfig]:
     return boards
 
 
+def board_config(path: str | Path, server_id: str) -> BoardConfig | None:
+    """
+    設定ファイルから server_id が合う [[board]] だけを読む (board 用)。
+
+    **見るのは自分の項目だけ**なので、他の項目が壊れていても止まらない
+    (ytbg.toml は lobby のためにボードが並ぶファイルで、その 1 件の誤りで
+    全部のボードが起動しなくなるのを避ける。TODO-076)。自分の項目が
+    壊れていれば ConfigError。設定ファイルが無ければ None。
+    """
+    if not Path(path).exists():
+        return None
+
+    for i, ent in enumerate(_entries(path), 1):
+        if isinstance(ent, dict) and str(ent.get('server_id')) == server_id:
+            return _parse_board(ent, f'{path}: [[board]] #{i}')
+
+    return None
+
+
 class BoardProcess:
     """
     ボード 1 面ぶんの子プロセス。
 
     子は ``python -m ytbg board`` で、stdout と stderr は lobby のものを
     そのまま使う (起動できない理由はそこに出る)。
+
+    paths は lobby が解決した置き場所。子へ ``--dir`` と ``-c`` で渡すので、
+    基準の外の設定ファイルを ``-c`` で指したときも、その ``[path]`` が
+    ボードに効く (TODO-076)。
     """
 
     __log = getLogger(__qualname__)
 
-    def __init__(self, conf: BoardConfig, debug: bool = False):
+    def __init__(self, conf: BoardConfig, debug: bool = False,
+                 paths: Paths | None = None):
         self.conf = conf
         self.debug = debug
+        self.paths = paths
         self._proc: asyncio.subprocess.Process | None = None
         self._watch: asyncio.Task | None = None
         # 起動と停止が同時に押されたときに、順に処理する
@@ -194,6 +228,9 @@ class BoardProcess:
 
             cmd = [sys.executable, '-m', 'ytbg', 'board',
                    '-p', str(self.conf.port), '-i', self.conf.image_dir]
+            if self.paths:
+                cmd += ['--dir', str(self.paths.base),
+                        '-c', str(self.paths.config)]
             if self.conf.prefix:
                 cmd += ['--prefix', self.conf.prefix]
             if self.debug:
@@ -254,12 +291,14 @@ def _board_redirect(conf: BoardConfig):
 
 
 def create_lobby_app(boards: list[BoardConfig], debug: bool = False,
-                     prefix: str = '') -> Starlette:
+                     prefix: str = '',
+                     paths: Paths | None = None) -> Starlette:
     """
     一覧サーバの Starlette のアプリを作る。prefix は lobby 自身の
-    URL のプレフィクス (normalize_prefix() で揃えた値)
+    URL のプレフィクス (normalize_prefix() で揃えた値)。
+    paths は子のボードへ --dir と -c で渡す置き場所 (TODO-076)
     """
-    procs = {b.server_id: BoardProcess(b, debug) for b in boards}
+    procs = {b.server_id: BoardProcess(b, debug, paths) for b in boards}
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
