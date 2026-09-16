@@ -103,7 +103,7 @@ def test_board_config_only(tmp_path):
     """[[board]] しか無い設定ファイルでも、既定で動く"""
     write_config(tmp_path / 'ytbg.toml',
                  '[[board]]\nserver_id = "1"\nport = 5001\n'
-                 'image_dir = "images1a"\n')
+                 'image_dir = "images1"\n')
 
     assert resolve(str(tmp_path)).data == tmp_path / 'data'
 

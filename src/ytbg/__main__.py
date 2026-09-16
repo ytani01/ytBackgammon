@@ -70,7 +70,7 @@ CONFIG_OPTION = click.option(
 
 # 設定にも CLI にも無いときの最後の既定
 DEFAULT_PORT = 5001
-DEFAULT_IMAGE_DIR = 'images1a'
+DEFAULT_IMAGE_DIR = 'images1'
 
 
 def resolve_image_dir(image_dir: str, images_base: Path) -> str | Path:

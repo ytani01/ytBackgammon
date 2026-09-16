@@ -32,7 +32,7 @@ async function start_lobby(boards, prefix = '') {
         '[[board]]',
         `server_id = "${b.server_id}"`,
         `port = ${b.port}`,
-        'image_dir = "images1a"',
+        'image_dir = "images1"',
         ...(b.prefix ? [`prefix = "${b.prefix}"`] : []),
         '',
     ].join('\n')).join('\n'));

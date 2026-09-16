@@ -69,7 +69,7 @@ export class CookieBase {
  * ここが唯一の読み口で、<img> の src から逆算しない。
  * static/ の場所は、このモジュールからの相対で決める (URL のプレフィクス)。
  *
- * @return {string} - 例: "/static/images1a/" (プレフィクスが /foo なら "/foo/static/images1a/")
+ * @return {string} - 例: "/static/images1/" (プレフィクスが /foo なら "/foo/static/images1/")
  */
 export function get_image_dir() {
     return new URL(`../${document.body.dataset.imageDir}/`, import.meta.url).pathname;

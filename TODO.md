@@ -1,6 +1,6 @@
 # TODO
 
-**残っている項目: TODO-079。** これまでに 78 件を決着させた。
+**残っている項目は無い。** これまでに 79 件を決着させた。
 新しく足すときは「完了済み」の上に節を作る。**番号は `TODO-080` から。**
 
 **TODO-020 で決めた設計の実装（TODO-023〜030）は、全部終わった。**
@@ -22,47 +22,12 @@ TODO-037（削除）・038（集約）・039（標準機能への置き換え）
 
 ---
 
-## TODO-079. 画像ディレクトリの名前から `a` を外す
-
-|      | main | 担当 |
-|------|------|------|
-| 見込み | Opus 5 / effort high | verifier（実装は main） |
-
-- [ ] `git mv` で `images0a/` → `images0/`、`images1a/` → `images1/`
-- [ ] 参照している 15 ファイルを直す
-- [ ] `uv run pytest`、`node --test tests/js/`、`node --test tests/browser/`、
-      `uv run ruff check .`、`uv run mypy src`、`uv run basedpyright`
-- [ ] 実際に `uv run ytbg board` と `uv run ytbg lobby` を起動して画像が出るか
-
-`src/ytbg/webroot/static/` にあるデザインは `images0a` / `images1a` /
-`images2` / `images3` の 4 つで、`a` が付いているのは最初の 2 つだけ。
-名前の付け方を揃える。
-
-`images2` / `images3` は変えない。旧名からのシンボリックリンクも残さない
-（`~/.ytbg/` がまだ無く、古い設定ファイルが存在しないため）。
-
-直す先:
-
-| ファイル | 中身 |
-|---|---|
-| `src/ytbg/__main__.py` | `DEFAULT_IMAGE_DIR` |
-| `src/ytbg/webroot/templates/lobby.html` | 背景画像の URL |
-| `src/ytbg/webroot/static/js/settings.js`、`js/dom.js` | JSDoc の例 |
-| `ytbg.toml` | `image_dir` 2 箇所 |
-| `tests/test_ws.py`、`test_lobby.py`、`test_cli.py`、`test_paths.py` | 17 箇所 |
-| `tests/browser/helper.mjs`、`board.test.mjs`、`lobby.test.mjs` | 4 箇所 |
-| `README.md`、`docs/Admin.md`、`CLAUDE.md` | 起動例、デザインの一覧、元ファイルの例 |
-
-挙動は変わらないのでレビューの担当は置かないが、画像が実際に出るかは
-テストだけでは分からないので、確認は verifier に分ける。
-
----
-
 ## 完了済み
 
 1 項目 1 ファイル。`archives/todo/` にある（新しい順）。
 **やらないと決めたものの理由もそこにある。** 蒸し返す前に読むこと。
 
+- [**TODO-079.** 画像ディレクトリの名前から `a` を外す](archives/todo/TODO-079.%20画像ディレクトリの名前から%20%60a%60%20を外す.md)
 - [**TODO-078.** lobby が起動するボードのログをファイルに残す](archives/todo/TODO-078.%20lobby%20が起動するボードのログをファイルに残す.md)
 - [**TODO-077.** 画像ディレクトリをパッケージの外にも置けるようにする](archives/todo/TODO-077.%20画像ディレクトリをパッケージの外にも置けるようにする.md)
 - [**TODO-076.** 置き場所を `~/.ytbg/` に統一し、CLI・環境変数・設定ファイルで変えられるようにする](archives/todo/TODO-076.%20置き場所を%20`~/.ytbg/`%20に統一し、CLI・環境変数・設定ファイルで変えられるようにする.md)

@@ -81,9 +81,9 @@ def test_cli_beats_config(run, tmp_path):
     """CLI で指定されていれば CLI が勝つ"""
     write_config(tmp_path, BOARD)
 
-    called = run('1', '-p', '5099', '-i', 'images0a')
+    called = run('1', '-p', '5099', '-i', 'images0')
 
-    assert (called['port'], called['image_dir']) == (5099, 'images0a')
+    assert (called['port'], called['image_dir']) == (5099, 'images0')
 
 
 def test_other_server_id(run, tmp_path):
@@ -131,7 +131,7 @@ def test_other_entry_error(run, tmp_path):
     write_config(tmp_path, BOARD + '''
 [[board]]
 server_id = "2"
-image_dir = "images0a"
+image_dir = "images0"
 ''')
 
     assert run('1')['port'] == 5011

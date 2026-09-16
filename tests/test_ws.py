@@ -31,7 +31,7 @@ def client(tmp_path, monkeypatch):
     """
     monkeypatch.setenv('HOME', str(tmp_path))
 
-    app = create_app('test', 'test', 'test', 'images1a', tmp_path)
+    app = create_app('test', 'test', 'test', 'images1', tmp_path)
     return TestClient(app)
 
 
@@ -95,8 +95,8 @@ def test_index_has_image_dir(client):
     res = client.get('/')
 
     assert res.status_code == 200
-    assert 'data-image-dir="images1a"' in res.text
-    assert '/static/images1a/bg.png' in res.text
+    assert 'data-image-dir="images1"' in res.text
+    assert '/static/images1/bg.png' in res.text
 
 
 def test_index_no_cache(client):
@@ -113,7 +113,7 @@ def test_index_no_cache(client):
 
 def test_static_files(client):
     """/static/ の下のファイルが返る"""
-    res = client.get('/static/images1a/board-base.png')
+    res = client.get('/static/images1/board-base.png')
 
     assert res.status_code == 200
     assert len(res.content) > 0
@@ -233,14 +233,14 @@ def prefix_client(tmp_path, monkeypatch):
     """prefix '/foo' で作ったアプリの TestClient"""
     monkeypatch.setenv('HOME', str(tmp_path))
 
-    app = create_app('test', 'test', 'test', 'images1a', tmp_path, '/foo')
+    app = create_app('test', 'test', 'test', 'images1', tmp_path, '/foo')
     return TestClient(app)
 
 
 def test_prefix_routes(prefix_client):
     """prefix の下でページ・static・WebSocket が応え、prefix 無しでは 404"""
     for path in ('/foo/', '/foo/p1', '/foo/p2',
-                 '/foo/static/images1a/board-base.png',
+                 '/foo/static/images1/board-base.png',
                  '/foo/static/js/main.js'):
         res = prefix_client.get(path)
         assert res.status_code == 200, path
@@ -265,7 +265,7 @@ def test_prefix_in_index(prefix_client):
     text = prefix_client.get('/foo/').text
     assert 'src="/foo/static/js/main.js"' in text
     assert 'href="/foo/static/ytbg.css"' in text
-    assert 'url(/foo/static/images1a/bg.png)' in text
+    assert 'url(/foo/static/images1/bg.png)' in text
     assert '"/static/' not in text
 
 ##

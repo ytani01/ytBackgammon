@@ -122,7 +122,7 @@ git のタグから取っているため)。
 ### === 2. 起動
 
 ```bash
-ytbg board -d -p 5001 -i images1a 1   # ボード 1 面 (ポート 5001、サーバID 1)
+ytbg board -d -p 5001 -i images1 1   # ボード 1 面 (ポート 5001、サーバID 1)
 ytbg lobby                            # ~/.ytbg/ytbg.toml のボードをまとめて
                                       # 起動し、一覧ページを
                                       # http://<ホスト>:5000/ に出す

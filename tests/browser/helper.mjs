@@ -80,7 +80,7 @@ export function free_port() {
  */
 export async function start_server(opts = {}) {
     const server_id = opts.server_id || 'browsertest';
-    const image_dir = opts.image_dir || 'images1a';
+    const image_dir = opts.image_dir || 'images1';
     const prefix = opts.prefix || '';
 
     const port = await free_port();

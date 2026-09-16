@@ -32,14 +32,14 @@ PATH に無ければ `uv tool update-shell` で足す。
 立てるときは、後述の `lobby` を使う。
 
 ```bash
-ytbg board -d -p 5001 -i images1a 1
+ytbg board -d -p 5001 -i images1 1
 ```
 
 | 引数・オプション | 意味 |
 |------------------|------|
 | `SERVER_ID`(引数) | ボードの識別子。**状態ファイルとクッキーの名前がこれで分かれる** |
 | `-p`, `--port` | ポート番号(省くと設定ファイルの値、それも無ければ 5001) |
-| `-i`, `--image_dir` | 盤面のデザイン。名前かパス(省くと設定ファイルの値、それも無ければ `images1a`)。後述 |
+| `-i`, `--image_dir` | 盤面のデザイン。名前かパス(省くと設定ファイルの値、それも無ければ `images1`)。後述 |
 | `--dir` | 置き場所の基準ディレクトリ(既定は `~/.ytbg`)。後述 |
 | `-c`, `--config` | 設定ファイル(既定は `<基準>/ytbg.toml`) |
 | `--prefix` | URL のプレフィクス(例 `/board1`。既定は無し)。後述 |
@@ -50,7 +50,7 @@ ytbg board -d -p 5001 -i images1a 1
 
 `ytbg board --help` でも同じものが出る。
 
-`-i` を省いたときは、設定ファイルの `image_dir`、それも無ければ `images1a` で
+`-i` を省いたときは、設定ファイルの `image_dir`、それも無ければ `images1` で
 起動する。**好みのデザインがあるなら、`-i` で指定するか設定ファイルに書くこと。**
 自分で用意した画像も使える(後述の「盤面のデザイン」)。
 
@@ -89,8 +89,8 @@ location /board1/ {
 
 | ディレクトリ |
 |--------------|
-| `images0a` |
-| `images1a` |
+| `images0` |
+| `images1` |
 | `images2` |
 | `images3` |
 
@@ -141,8 +141,8 @@ lobby を止める(Ctrl+C、`kill`)と、ボードも止まる。
 ### === 設定ファイル
 
 TOML で、ボードごとに `[[board]]` を書く。リポジトリのトップの `ytbg.toml` は、
-`server_id` 1〜4 をポート 5001〜5004 に、デザインを `images2` / `images0a` /
-`images1a` / `images3` の順で割り当てている。
+`server_id` 1〜4 をポート 5001〜5004 に、デザインを `images2` / `images0` /
+`images1` / `images3` の順で割り当てている。
 
 ```toml
 [[board]]
@@ -220,7 +220,7 @@ prefix = "/ytbg1"
 [[board]]
 server_id = 2
 port = 5002
-image_dir = "images0a"
+image_dir = "images0"
 prefix = "/ytbg2"
 ```
 

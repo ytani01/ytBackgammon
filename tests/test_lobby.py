@@ -47,7 +47,7 @@ image_dir = "images2"
 [[board]]
 server_id = "2"
 port = 5002
-image_dir = "images0a"
+image_dir = "images0"
 prefix = "/board2"
 '''
 
@@ -61,7 +61,7 @@ def write(tmp_path, text):
 def test_load_config(tmp_path):
     assert load_config(write(tmp_path, VALID)) == [
         BoardConfig('1', 5001, 'images2'),
-        BoardConfig('2', 5002, 'images0a', '/board2'),
+        BoardConfig('2', 5002, 'images0', '/board2'),
     ]
 
 
@@ -75,8 +75,8 @@ def test_repo_config():
     """リポジトリのトップの ytbg.toml も読める"""
     boards = load_config('ytbg.toml')
     assert [(b.server_id, b.port, b.image_dir) for b in boards] == [
-        ('1', 5001, 'images2'), ('2', 5002, 'images0a'),
-        ('3', 5003, 'images1a'), ('4', 5004, 'images3'),
+        ('1', 5001, 'images2'), ('2', 5002, 'images0'),
+        ('3', 5003, 'images1'), ('4', 5004, 'images3'),
     ]
 
 
@@ -234,7 +234,7 @@ def test_lobby_prefix_routes():
     page = client.get('/lb/')
     assert page.status_code == 200
     assert 'src="/lb/static/js/lobby.js"' in page.text
-    assert 'url(/lb/static/images1a/bg.png)' in page.text
+    assert 'url(/lb/static/images1/bg.png)' in page.text
     assert '"/static/' not in page.text
     assert client.get('/lb/static/js/lobby.js').status_code == 200
     boards = client.get('/lb/api/boards').json()
@@ -355,7 +355,7 @@ class Lobby:
     def __init__(self, tmp_path, ports):
         conf = ''.join(
             f'[[board]]\nserver_id = "b{i}"\nport = {p}\n'
-            f'image_dir = "images1a"\n'
+            f'image_dir = "images1"\n'
             for i, p in enumerate(ports))
         cfg = write(tmp_path, conf)
         self.port = free_port()

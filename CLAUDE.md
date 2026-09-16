@@ -32,7 +32,7 @@ clone で起きることは `docs/Admin.md` にある。
 uv sync          # .venv を作って依存を入れる
 
 # サーバ起動
-uv run ytbg board -d -p 5001 -i images1a 1   # ボード 1 面。引数は server_id、-i は画像ディレクトリ（名前かパス）
+uv run ytbg board -d -p 5001 -i images1 1   # ボード 1 面。引数は server_id、-i は画像ディレクトリ（名前かパス）
 uv run ytbg --help
 
 uv run ytbg lobby -c ytbg.toml   # 設定のボードを子プロセスで全部起動し、一覧ページを出す（TODO-063）
@@ -269,6 +269,6 @@ TODO-057〜060 で実装した（TODO-060 で移した）。
 - クライアント側の座標は `layout.js` の `BX` / `BY` の配列を基準に
   組み立てられている（`BoardView` が複製して `this.bx` / `this.by` として持つ）。
   位置を直すときはこの配列を見る
-- **デザインの元ファイル（`static/images*/` の `*.xcf`、`images1a/ytbg.pptx` など）は
+- **デザインの元ファイル（`static/images*/` の `*.xcf`、`images1/ytbg.pptx` など）は
   ソースの一部としてコミットする。** 画面から参照されていなくても、不要なファイルとして
   消さない。配布物からは `pyproject.toml` の `exclude` で外している

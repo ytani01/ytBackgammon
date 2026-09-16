@@ -283,7 +283,7 @@ describe('URL のプレフィクス付きで起動したボード (TODO-064)', (
         const ours = urls.filter(u => u.startsWith(origin));
         const msg = ours.join('\n');
         assert.ok(ours.some(u => u.includes('/pre/fix/static/js/main.js')), msg);
-        assert.ok(ours.some(u => u.includes('/pre/fix/static/images1a/')), msg);
+        assert.ok(ours.some(u => u.includes('/pre/fix/static/images1/')), msg);
         assert.deepEqual(
             ours.filter(u => !new URL(u).pathname.startsWith('/pre/fix/')), []);
 
@@ -311,7 +311,7 @@ describe('パッケージの外の画像ディレクトリ (TODO-077)', () => {
     before(async () => {
         // 同梱のデザインを一時ディレクトリへ写して、外の絵として使う
         image_dir = await mkdtemp(path.join(os.tmpdir(), 'ytbg-images-'));
-        await cp(path.join(REPO_ROOT, 'src/ytbg/webroot/static/images1a'),
+        await cp(path.join(REPO_ROOT, 'src/ytbg/webroot/static/images1'),
                  image_dir, { recursive: true });
 
         server = await start_server({ image_dir });
