@@ -26,6 +26,7 @@ import sys
 import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import IO
 
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, RedirectResponse
@@ -169,7 +170,9 @@ class BoardProcess:
     """
     ボード 1 面ぶんの子プロセス。
 
-    子は ``python -m ytbg board`` で、stdout と stderr は lobby のものを
+    子は ``python -m ytbg board``。stdout と stderr は
+    ``<log>/board-<server_id>.log`` にまとめて追記する (TODO-078)。
+    ローテーションはしない。paths が無ければ lobby の stdout と stderr を
     そのまま使う (起動できない理由はそこに出る)。
 
     paths は lobby が解決した置き場所。子へ ``--dir`` と ``-c`` で渡すので、
@@ -239,13 +242,40 @@ class BoardProcess:
             cmd += ['--', self.conf.server_id]
 
             self.__log.info('start: {}', cmd)
-            proc = await asyncio.create_subprocess_exec(*cmd)
+            out = self._open_log()
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd, stdout=out,
+                    stderr=asyncio.subprocess.STDOUT if out else None)
+            except BaseException:
+                # 起動できなければ _wait() が走らないので、ここで閉じる
+                if out:
+                    out.close()
+                raise
             self._proc = proc
-            self._watch = asyncio.create_task(self._wait(proc))
+            self._watch = asyncio.create_task(self._wait(proc, out))
 
-    async def _wait(self, proc: asyncio.subprocess.Process) -> None:
+    def _open_log(self) -> IO[bytes] | None:
+        """
+        子の stdout と stderr を書くファイルを開く (TODO-078)。
+
+        paths が無ければ None で、lobby のものをそのまま使う。
+        """
+        if self.paths is None:
+            return None
+
+        path = self.paths.log / f'board-{self.conf.server_id}.log'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path.open('ab')
+
+    async def _wait(self, proc: asyncio.subprocess.Process,
+                    out: IO[bytes] | None) -> None:
         """子の終了を待ち、終了コードをログに出す"""
-        code = await proc.wait()
+        try:
+            code = await proc.wait()
+        finally:
+            if out:
+                out.close()
         log = self.__log.info if code in (0, -signal.SIGTERM) else \
             self.__log.warning
         log('server_id={}: exited (pid={}, returncode={})',

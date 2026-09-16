@@ -158,9 +158,11 @@ def test_cli_bad_prefix(cmd):
 async def test_start_passes_prefix(monkeypatch, prefix, expected):
     """lobby は子プロセスへ --prefix を渡す (prefix が無ければ渡さない)"""
     cmds = []
+    kws = []
 
-    async def fake_exec(*cmd):
+    async def fake_exec(*cmd, **kw):
         cmds.append(list(cmd))
+        kws.append(kw)
         return FakeProc()
 
     class FakeProc:
@@ -178,6 +180,8 @@ async def test_start_passes_prefix(monkeypatch, prefix, expected):
 
     args = cmds[0][cmds[0].index('board') + 1:]
     assert args == ['-p', '5001', '-i', 'images2', *expected, '--', '1']
+    # paths が無ければ lobby の stdout と stderr をそのまま使う (TODO-078)
+    assert kws[0] == {'stdout': None, 'stderr': None}
 
 
 async def test_start_passes_paths(monkeypatch, tmp_path):
@@ -188,9 +192,11 @@ async def test_start_passes_paths(monkeypatch, tmp_path):
     ボードに効くようにするため。**環境変数ではなく引数で渡す。**
     """
     cmds = []
+    kws = []
 
-    async def fake_exec(*cmd):
+    async def fake_exec(*cmd, **kw):
         cmds.append(list(cmd))
+        kws.append(kw)
         return FakeProc()
 
     class FakeProc:
@@ -211,6 +217,13 @@ async def test_start_passes_paths(monkeypatch, tmp_path):
     assert args == ['-p', '5001', '-i', 'images2',
                     '--dir', str(tmp_path), '-c', str(tmp_path / 'my.toml'),
                     '--', '1']
+
+    # stdout と stderr は log/board-<server_id>.log へ (TODO-078)
+    out = kws[0]['stdout']
+    assert out.name == str(tmp_path / 'log' / 'board-1.log')
+    assert kws[0]['stderr'] == asyncio.subprocess.STDOUT
+    # _wait() を cancel したので、閉じるのはテスト側 (二重に閉じても無害)
+    out.close()
 
 
 def test_lobby_prefix_routes():
@@ -452,3 +465,43 @@ def test_board_cannot_start(lobby_factory):
 
     wait_for(lambda: lb.stderr.read_text(encoding='utf-8'),
              lambda s: re.search(r'server_id=b0: exited .*returncode=[1-9]', s))
+
+
+def test_board_log_file(lobby_factory, tmp_path):
+    """
+    lobby が起動したボードの出力は log/board-<server_id>.log に残る
+    (TODO-078)。起動し直しても消さずに追記する
+    """
+    lb = lobby_factory([free_port()])
+    wait_for(lb.boards, all_listening)
+
+    log = tmp_path / 'log' / 'board-b0.log'
+    first = wait_for(lambda: log.read_text(encoding='utf-8'), bool)
+
+    lb.request('/api/boards/b0/stop', 'POST')
+    lb.request('/api/boards/b0/start', 'POST')
+    wait_for(lb.boards, all_listening)
+    wait_for(lambda: log.read_text(encoding='utf-8'),
+             lambda s: s.startswith(first) and len(s) > len(first))
+
+
+
+async def test_start_closes_log_on_error(monkeypatch, tmp_path):
+    """
+    起動そのものが失敗したら、開いたログファイルを閉じる (TODO-078)。
+
+    この経路は _wait() が走らないので、閉じるのは start() の側。
+    """
+    opened = []
+
+    async def fake_exec(*_cmd, stdout=None, **_kw):
+        opened.append(stdout)
+        raise OSError('boom')
+
+    monkeypatch.setattr(asyncio, 'create_subprocess_exec', fake_exec)
+    p = BoardProcess(BoardConfig('1', 5001, 'images2'),
+                     paths=resolve(str(tmp_path)))
+    with pytest.raises(OSError):
+        await p.start()
+
+    assert opened[0].closed

@@ -163,8 +163,10 @@ graph TD
   (Starlette の lifespan の終わり)に全部止める。落ちたボードは起動し直さず、
   lobby の外で動いているボードも探さない。lobby を SIGKILL で殺すと子が残る
 - 停止は SIGTERM を送り、5 秒で終わらなければ SIGKILL
-- 子の stdout と stderr は lobby のものをそのまま使う。起動できない理由はそこに出て、
-  lobby は終了コードだけをログに出す
+- 子の stdout と stderr は、置き場所の `log` の下の `board-{server_id}.log` へ
+  まとめて追記する(`BoardProcess._open_log()`)。ローテーションはしない。
+  起動できない理由もそこに出て、lobby は終了コードだけを自分のログに出す。
+  置き場所を渡さずに `BoardProcess` を作ったときだけ、lobby のものをそのまま使う
 - API の状態は `running`(プロセスがある)と `listening`(lobby がボードのポートへ
   `127.0.0.1` で接続できた)の 2 つ。一覧ページは両方偽を「停止中」、`running` だけを
   「起動中」、両方真を「動作中」と出す。**接続できるかしか見ない**ので、lobby の外の
