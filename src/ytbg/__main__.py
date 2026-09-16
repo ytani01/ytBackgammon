@@ -13,10 +13,12 @@ __main__.py
   一覧ページを出すサーバ。中身は lobby.py
 """
 
+from pathlib import Path
+
 import click
 import uvicorn
 
-from . import __prog_name__, __version__
+from . import WEBROOT, __prog_name__, __version__
 from .app import create_app, normalize_prefix
 from .lobby import board_config, create_lobby_app, load_config
 from .mylog import getLogger, loggerInit
@@ -71,6 +73,34 @@ DEFAULT_PORT = 5001
 DEFAULT_IMAGE_DIR = 'images1a'
 
 
+def resolve_image_dir(image_dir: str, images_base: Path) -> str | Path:
+    """
+    -i の値から画像ディレクトリを決める (TODO-077)。
+
+    '/' を含む値と '~' で始まる値はパスとして、そのディレクトリを使う。
+    相対パスは、プロセスの作業ディレクトリからの相対。
+    名前だけのときは、パッケージの static/<名前> を見て、無ければ
+    <基準>/images/<名前> を見る。
+
+    返すのは、パッケージの中なら名前 (str)、外ならパス (Path)。
+    どちらも無ければ ClickException。
+    """
+    if '/' in image_dir or image_dir.startswith('~'):
+        path = Path(image_dir).expanduser()
+    elif image_dir in ('', '.', '..'):
+        # Path('.../static') / '..' は webroot 自身になり、is_dir() が
+        # 真になってしまう。名前として受ける前に弾く
+        raise click.ClickException(f'{image_dir!r}: invalid image directory')
+    elif (WEBROOT / 'static' / image_dir).is_dir():
+        return image_dir
+    else:
+        path = images_base / image_dir
+
+    if not path.is_dir():
+        raise click.ClickException(f'{image_dir}: no such image directory')
+    return path
+
+
 @click.group(context_settings=CONTEXT_SETTINGS)
 def main():
     """ytBackgammon: network shared backgammon board"""
@@ -81,7 +111,8 @@ def main():
 @click.option('--port', '-p', 'port', type=int, default=None,
               help=f'port number. Default: config or {DEFAULT_PORT}')
 @click.option('--image_dir', '-i', 'image_dir', type=str, default=None,
-              help="Images directory under '/static/'. "
+              help='Images directory: a name (bundled or under '
+                   '<dir>/images/) or a path. '
                    f'Default: config or {DEFAULT_IMAGE_DIR}')
 @PREFIX_OPTION
 @DIR_OPTION
@@ -104,6 +135,7 @@ def board(server_id, port, image_dir, prefix, base_dir, config, debug):
         port = conf.port if conf else DEFAULT_PORT
     if image_dir is None:
         image_dir = conf.image_dir if conf else DEFAULT_IMAGE_DIR
+    image_dir = resolve_image_dir(image_dir, paths.images)
 
     _log.info('server_id={}, port={}, image_dir={}, prefix={}, base={}',
               server_id, port, image_dir, prefix, paths.base)

@@ -5,11 +5,13 @@
 test_cli.py
 
 CLI の置き場所と、board が設定ファイルから取る値 (TODO-076)。
+画像ディレクトリの探し方 (TODO-077) もここで見る。
 
 サーバは起動しないので、_run() を差し替えて渡された引数を見る。
 """
 import pytest
 from click.testing import CliRunner
+from starlette.testclient import TestClient
 
 import ytbg.__main__ as cli
 from ytbg.__main__ import main
@@ -203,3 +205,71 @@ def test_lobby_passes_config_to_boards(monkeypatch, tmp_path):
 
     assert res.exit_code == 0, res.output
     assert boards['paths'].config == cfg
+
+
+# --- 画像ディレクトリの探し方 (TODO-077) ---
+
+def make_images(path):
+    """画像ディレクトリの代わり。中身は 1 枚あればよい"""
+    path.mkdir(parents=True)
+    (path / 'board-base.png').write_bytes(b'png')
+    return path
+
+
+def test_image_dir_path(run, tmp_path):
+    """'/' を含む値はパスとして、そのディレクトリを使う"""
+    outside = make_images(tmp_path / 'outside' / 'mydeck')
+
+    called = run('1', '-i', str(outside))
+
+    assert called['image_dir'] == outside
+
+
+def test_image_dir_served_as_static_images(run, tmp_path):
+    """パスで渡したディレクトリは /static/images として返る"""
+    outside = make_images(tmp_path / 'outside' / 'mydeck')
+
+    called = run('1', '-i', str(outside))
+
+    with TestClient(called['app']) as client:
+        res = client.get('/static/images/board-base.png')
+        # 同梱の static/ も、これまで通り返る
+        assert client.get('/static/js/main.js').status_code == 200
+        # ページも images を見る
+        page = client.get('/').text
+
+    assert (res.status_code, res.content) == (200, b'png')
+    assert 'data-image-dir="images"' in page
+
+
+def test_image_dir_name_under_base(run, tmp_path):
+    """名前だけで同梱に無ければ、<基準>/images/<名前> を使う"""
+    outside = make_images(tmp_path / 'images' / 'mydeck')
+
+    called = run('1', '-i', 'mydeck')
+
+    assert called['image_dir'] == outside
+
+
+def test_image_dir_bundled_wins(run, tmp_path):
+    """同梱に同じ名前があれば、そちらを使う (名前のまま渡す)"""
+    make_images(tmp_path / 'images' / 'images2')
+
+    called = run('1', '-i', 'images2')
+
+    assert called['image_dir'] == 'images2'
+
+
+@pytest.mark.parametrize('arg', ['mydeck', '/nonexistent/mydeck', '', '.',
+                                 '..'])
+def test_image_dir_not_found(monkeypatch, tmp_path, arg):
+    """どこにも無ければ、起動せずにエラー"""
+    monkeypatch.setenv('YTBG_DIR', str(tmp_path))
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setattr(cli, '_run', lambda app, port, debug: None)
+
+    res = CliRunner().invoke(main, ['board', '-i', arg, '1'])
+
+    # '' ・'.' ・'..' は、パッケージの static/ 自身や webroot を指して
+    # しまうので、名前として受ける前に弾く
+    assert res.exit_code != 0, res.output

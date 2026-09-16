@@ -10,11 +10,14 @@
 // テストは書いた順に走るので、drag のあとに sync が来ることに依存している。
 //
 import assert from 'node:assert/strict';
+import { cp, mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import {
-    apply_gameinfo, checkers, console_errors, center_of, dragging, gameinfo,
-    launch_browser, open_board, part_el_ids, settings, shown_dice,
+    REPO_ROOT, apply_gameinfo, checkers, console_errors, center_of, dragging,
+    gameinfo, launch_browser, open_board, part_el_ids, settings, shown_dice,
     shown_parts, stack, start_server, wait_for,
 } from './helper.mjs';
 
@@ -291,6 +294,53 @@ describe('URL のプレフィクス付きで起動したボード (TODO-064)', (
             `${server.url}/static/js/sound.js`);
         assert.equal(sound, '/pre/fix/static/sounds/roll1.mp3');
         assert.equal((await fetch(`${origin}${sound}`)).status, 200);
+    });
+
+    it('コンソールエラーが出ていない', async () => {
+        const errors = console_errors(page, server.url);
+        assert.deepEqual(errors, [], JSON.stringify(errors, null, 2));
+    });
+});
+
+describe('パッケージの外の画像ディレクトリ (TODO-077)', () => {
+    let server = undefined;
+    let browser = undefined;
+    let page = undefined;
+    let image_dir = undefined;
+
+    before(async () => {
+        // 同梱のデザインを一時ディレクトリへ写して、外の絵として使う
+        image_dir = await mkdtemp(path.join(os.tmpdir(), 'ytbg-images-'));
+        await cp(path.join(REPO_ROOT, 'src/ytbg/webroot/static/images1a'),
+                 image_dir, { recursive: true });
+
+        server = await start_server({ image_dir });
+        browser = await launch_browser();
+        page = await open_board(browser, server.url);
+    });
+
+    after(async () => {
+        if (browser !== undefined) {
+            await browser.close();
+        }
+        if (server !== undefined) {
+            await server.stop();
+        }
+        if (image_dir !== undefined) {
+            await rm(image_dir, { recursive: true, force: true });
+        }
+    });
+
+    it('外のディレクトリの画像が /static/images/ から出る', async () => {
+        const srcs = await page.evaluate(
+            () => [...document.querySelectorAll('img')].map(
+                img => ({ src: img.getAttribute('src'),
+                          w: img.naturalWidth })));
+        assert.ok(srcs.length > 0);
+
+        const bad = srcs.filter(
+            s => !s.src.startsWith('/static/images/') || s.w === 0);
+        assert.deepEqual(bad, [], JSON.stringify(srcs, null, 2));
     });
 
     it('コンソールエラーが出ていない', async () => {

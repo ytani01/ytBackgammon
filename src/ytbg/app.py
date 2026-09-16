@@ -14,6 +14,7 @@ create_app() が BackgammonServer を作り、ルートはそれを閉じ込め�
 
 import json
 import re
+from pathlib import Path
 
 from starlette.applications import Starlette
 from starlette.routing import Mount, Route, WebSocketRoute
@@ -83,8 +84,10 @@ def create_app(svr_name, svr_ver, svr_id, image_dir, data_dir,
     svr_name: str
     svr_ver: str
     svr_id: str
-    image_dir: str
-        static/ 以下の画像ディレクトリ
+    image_dir: str | Path
+        画像ディレクトリ。str ならパッケージの static/ 以下の名前、
+        Path ならそのディレクトリを /static/images としてマウントする
+        (TODO-077)。どちらを渡すかを決めるのは __main__.py だけ
     data_dir: str | Path
         盤面と履歴の保存先。置き場所を決めるのは __main__.py だけで、
         ここは受け取るだけ (TODO-076)
@@ -101,6 +104,19 @@ def create_app(svr_name, svr_ver, svr_id, image_dir, data_dir,
                svr_name, svr_ver, svr_id, image_dir, data_dir, prefix)
 
     svr = BackgammonServer(svr_ver, svr_id, data_dir)
+
+    # パッケージの外のディレクトリは /static/images として足す。
+    # /static より前に置かないと、こちらが使われない (TODO-077)。
+    # 同梱のデザインに static/images を足すと、パスで指定したときに
+    # このマウントが先に当たって隠れる
+    image_routes = []
+    if isinstance(image_dir, Path):
+        image_routes = [
+            Mount('/static/images',
+                  app=NoCacheStaticFiles(directory=str(image_dir)),
+                  name='images'),
+        ]
+        image_dir = 'images'
 
     async def index(request):
         """'/', '/p1', '/p2' はいずれも同じ index.html を返す"""
@@ -164,6 +180,7 @@ def create_app(svr_name, svr_ver, svr_id, image_dir, data_dir,
         Route('/p1', index),
         Route('/p2', index),
         WebSocketRoute('/ws', websocket_endpoint),
+        *image_routes,
         Mount('/static',
               app=NoCacheStaticFiles(directory=str(WEBROOT / 'static')),
               name='static'),

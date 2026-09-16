@@ -32,7 +32,7 @@ clone で起きることは `docs/Admin.md` にある。
 uv sync          # .venv を作って依存を入れる
 
 # サーバ起動
-uv run ytbg board -d -p 5001 -i images1a 1   # ボード 1 面。引数は server_id、-i は static/ 以下の画像ディレクトリ
+uv run ytbg board -d -p 5001 -i images1a 1   # ボード 1 面。引数は server_id、-i は画像ディレクトリ（名前かパス）
 uv run ytbg --help
 
 uv run ytbg lobby -c ytbg.toml   # 設定のボードを子プロセスで全部起動し、一覧ページを出す（TODO-063）
